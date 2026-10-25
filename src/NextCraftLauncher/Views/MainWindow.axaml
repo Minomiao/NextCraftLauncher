@@ -1,0 +1,159 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NextCraftLauncher.ViewModels"
+        xmlns:views="using:NextCraftLauncher.Views"
+        xmlns:media="using:Avalonia.Media"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="820"
+        x:Class="NextCraftLauncher.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Next Craft Launcher"
+        Width="900" Height="620"
+        MinWidth="820" MinHeight="540"
+        WindowStartupLocation="CenterScreen"
+        WindowDecorations="BorderOnly"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="-1">
+
+    <Window.Styles>
+        <Style Selector="Button.nav">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="18,0" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.nav.selected">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.caption">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.caption:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="14" />
+        </Style>
+        <Style Selector="Button.caption:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="14" />
+        </Style>
+
+        <!-- 弹窗打开时模糊背景 -->
+        <Style Selector="Grid.blurred">
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <media:BlurEffect Radius="10" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Styles>
+
+    <Panel>
+        <Grid RowDefinitions="Auto,*" Classes.blurred="{Binding IsVersionDeleteDialogOpen}">
+
+        <!-- 沉浸式标题栏：左侧品牌、居中导航，可拖动 -->
+        <Grid Grid.Row="0"
+              Height="52"
+              Background="Transparent"
+              PointerPressed="OnTitleBarPointerPressed">
+            <Grid ColumnDefinitions="*,Auto,*" Margin="16,0,0,0">
+                <TextBlock Text="NEXT"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           LetterSpacing="2"
+                           VerticalAlignment="Center" />
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="4"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <Button Classes="nav"
+                            Classes.selected="{Binding IsLaunchPageSelected}"
+                            Content="启动"
+                            Command="{Binding ShowLaunchPageCommand}" />
+                    <Button Classes="nav"
+                            Classes.selected="{Binding IsDownloadPageSelected}"
+                            Content="下载"
+                            Command="{Binding ShowDownloadPageCommand}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            Spacing="2"
+                            Margin="0,0,8,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <Button Classes="caption"
+                            Content="—"
+                            ToolTip.Tip="最小化"
+                            Click="OnMinimizeClick" />
+                    <Button Classes="caption"
+                            Content="✕"
+                            ToolTip.Tip="关闭"
+                            Click="OnCloseClick" />
+                </StackPanel>
+            </Grid>
+
+            <Border Height="1"
+                    VerticalAlignment="Bottom"
+                    Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        </Grid>
+
+        <!-- 主体 -->
+        <Grid Grid.Row="1" Margin="16,10,16,16">
+            <views:LaunchView IsVisible="{Binding IsLaunchPageSelected}" />
+            <views:DownloadView IsVisible="{Binding IsDownloadPageSelected}" />
+        </Grid>
+        </Grid>
+
+        <!-- 删除版本确认弹窗 -->
+        <Border IsVisible="{Binding IsVersionDeleteDialogOpen}"
+                Background="#33000000">
+            <Border Width="420"
+                    Padding="24"
+                    CornerRadius="12"
+                    Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="删除版本" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding VersionDeleteDialogMessage}"
+                               FontSize="13"
+                               Opacity="0.75"
+                               TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                HorizontalAlignment="Right">
+                        <Button Content="取消"
+                                Height="32"
+                                Padding="14,0"
+                                Command="{Binding CancelVersionDeleteCommand}" />
+                        <Button Content="不显示"
+                                Height="32"
+                                Padding="14,0"
+                                Command="{Binding HideSelectedVersionCommand}" />
+                        <Button Classes="danger"
+                                Content="完全删除"
+                                Height="32"
+                                Padding="14,0"
+                                Command="{Binding DeleteSelectedVersionCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Panel>
+
+</Window>

@@ -1,0 +1,18 @@
+# 构建输出
+bin/
+obj/
+artifacts/
+publish/
+
+# 运行数据与日志
+NCL/
+*.log
+
+# IDE
+.vs/
+.idea/
+*.user
+*.suo
+
+# 测试
+TestResults/

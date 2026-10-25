@@ -1,0 +1,246 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NextCraftLauncher.ViewModels"
+             xmlns:java="using:NextCraftLauncher.Core.Java"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="620"
+             x:Class="NextCraftLauncher.Views.LaunchView"
+             x:DataType="vm:MainViewModel">
+
+    <Grid ColumnDefinitions="176,1,*" ColumnSpacing="16">
+
+        <!-- 左侧边栏 -->
+        <StackPanel Spacing="2" VerticalAlignment="Top" Margin="0,2,0,0">
+            <Button Classes="side"
+                    Classes.selected="{Binding IsStartSectionSelected}"
+                    Content="启动"
+                    Command="{Binding ShowStartSectionCommand}" />
+            <Button Classes="side"
+                    Classes.selected="{Binding IsVersionsSectionSelected}"
+                    Content="版本"
+                    Command="{Binding ShowVersionsSectionCommand}" />
+            <Button Classes="side"
+                    Classes.selected="{Binding IsSettingsSectionSelected}"
+                    Content="启动设置"
+                    Command="{Binding ShowSettingsSectionCommand}" />
+        </StackPanel>
+
+        <Border Grid.Column="1" Classes="vline" />
+
+        <Grid Grid.Column="2">
+
+            <!-- 启动 -->
+            <Grid IsVisible="{Binding IsStartSectionSelected}">
+                <StackPanel Spacing="12"
+                            MaxWidth="520"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="当前版本"
+                                   FontSize="12"
+                                   Opacity="0.55"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding CurrentVersionName}"
+                                   FontSize="32"
+                                   FontWeight="Bold"
+                                   HorizontalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding CurrentVersionSubtitle}"
+                                   FontSize="13"
+                                   Opacity="0.6"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding CurrentJavaName}"
+                                   FontSize="12"
+                                   Opacity="0.5"
+                                   HorizontalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+
+                        <TextBox Classes="toolbar"
+                                 Width="220"
+                                 HorizontalAlignment="Center"
+                                 Text="{Binding PlayerName}"
+                                 Margin="0,4,0,6" />
+
+                        <Button Content="启动"
+                                Command="{Binding LaunchCommand}"
+                                IsEnabled="{Binding CanLaunch}"
+                                Classes="primary"
+                                Width="240"
+                                Height="48"
+                                HorizontalAlignment="Center" />
+
+                        <TextBlock Text="{Binding LaunchWarning}"
+                                   Foreground="#D13438"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   IsVisible="{Binding HasLaunchWarning}" />
+                    </StackPanel>
+            </Grid>
+
+            <!-- 版本 -->
+            <Grid RowDefinitions="Auto,*" RowSpacing="12" IsVisible="{Binding IsVersionsSectionSelected}">
+
+                <!-- 文件夹下拉 + 重新扫描 + 导入 -->
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <ComboBox ItemsSource="{Binding GameFolders}"
+                              SelectedItem="{Binding SelectedGameFolder}"
+                              HorizontalAlignment="Stretch"
+                              MinHeight="34"
+                              Padding="8,1"
+                              ToolTip.Tip="{Binding SelectedGameFolder.Path}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:GameFolderItemViewModel">
+                                <StackPanel Spacing="0">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Path}"
+                                               FontSize="10"
+                                               Opacity="0.55"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <Button Grid.Column="1"
+                            Classes="soft"
+                            Content="重新扫描"
+                            Height="34"
+                            Padding="12,0"
+                            Command="{Binding RefreshCommand}"
+                            IsEnabled="{Binding !IsBusy}" />
+
+                    <DropDownButton Grid.Column="2"
+                                    Classes="soft"
+                                    Content="导入"
+                                    Height="34"
+                                    Padding="14,0"
+                                    IsEnabled="{Binding !IsBusy}">
+                        <DropDownButton.Flyout>
+                            <MenuFlyout>
+                                <MenuItem Header="添加已有文件夹…" Click="OnAddGameFolderClick" />
+                                <MenuItem Header="导入 PCL 启动器 (.exe)…" Click="OnChoosePclExecutableClick" />
+                                <MenuItem Header="导入 PCL 文件夹 / 游戏目录…" Click="OnChoosePclFolderClick" />
+                            </MenuFlyout>
+                        </DropDownButton.Flyout>
+                    </DropDownButton>
+                </Grid>
+
+                <!-- 版本列表 + 信息 -->
+                <Grid Grid.Row="1" ColumnDefinitions="260,1,*" ColumnSpacing="16">
+                    <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="本地版本" Classes="section" FontSize="13" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding VersionsCountText}"
+                                       FontSize="11"
+                                       Opacity="0.6"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <ListBox Grid.Row="1"
+                                 ItemsSource="{Binding Versions}"
+                                 SelectedItem="{Binding SelectedVersion}"
+                                 Background="Transparent"
+                                 Padding="0,0,14,0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:VersionItemViewModel">
+                                    <StackPanel Spacing="1" Margin="2,4">
+                                        <TextBlock Text="{Binding Id}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Subtitle}" FontSize="11" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+
+                    <Border Grid.Column="1" Classes="vline" />
+
+                    <Grid Grid.Column="2" RowDefinitions="Auto,*,Auto" RowSpacing="8">
+                        <TextBlock Text="版本信息" Classes="section" />
+                        <ScrollViewer Grid.Row="1"
+                                      VerticalScrollBarVisibility="Auto"
+                                      Padding="0,0,12,0">
+                            <TextBlock Text="{Binding VersionDetails}"
+                                       FontFamily="Consolas"
+                                       FontSize="12"
+                                       LineHeight="18"
+                                       TextWrapping="Wrap" />
+                        </ScrollViewer>
+                        <Grid Grid.Row="2" RowDefinitions="1,Auto" RowSpacing="10" Margin="0,2,0,0">
+                            <Border Classes="hline" />
+                            <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <!-- 版本设置界面暂未实现，先保留空按钮 -->
+                                <Button Classes="soft"
+                                        Content="设置"
+                                        Height="34"
+                                        HorizontalAlignment="Stretch"
+                                        FontSize="13" />
+                                <Button Grid.Column="1"
+                                        Classes="danger"
+                                        Content="删除"
+                                        Height="34"
+                                        HorizontalAlignment="Stretch"
+                                        FontSize="13"
+                                        Command="{Binding RequestVersionDeleteCommand}"
+                                        IsEnabled="{Binding CanManageSelectedVersion}" />
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <!-- 启动设置 -->
+            <ScrollViewer IsVisible="{Binding IsSettingsSectionSelected}"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="20" MaxWidth="620" HorizontalAlignment="Left">
+                    <TextBlock Text="启动设置" Classes="section" />
+
+                    <Grid ColumnDefinitions="90,*"
+                          RowDefinitions="Auto,Auto,Auto,Auto"
+                          ColumnSpacing="12"
+                          RowSpacing="10">
+                        <TextBlock Text="内存 (MB)" Classes="fieldLabel" />
+                        <ComboBox Grid.Column="1"
+                                  Classes="toolbar"
+                                  ItemsSource="{Binding MemoryOptions}"
+                                  SelectedItem="{Binding MemoryMb}"
+                                  HorizontalAlignment="Stretch" />
+
+                        <TextBlock Grid.Row="1" Text="Java" Classes="fieldLabel" />
+                        <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <ComboBox Classes="toolbar"
+                                      ItemsSource="{Binding JavaRuntimes}"
+                                      SelectedItem="{Binding SelectedJava}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="java:JavaRuntime">
+                                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <Button Grid.Column="1" Classes="toolbar soft" Content="浏览" Click="OnBrowseJavaClick" />
+                        </Grid>
+
+                        <TextBlock Grid.Row="2" Text="版本隔离" Classes="fieldLabel" />
+                        <CheckBox Grid.Row="2" Grid.Column="1"
+                                  Content="启用"
+                                  IsChecked="{Binding IsVersionIsolated}" />
+
+                        <TextBlock Grid.Row="3" Text="运行目录" Classes="fieldLabel" />
+                        <TextBlock Grid.Row="3" Grid.Column="1"
+                                   Text="{Binding EffectiveGameDirectory}"
+                                   FontSize="11"
+                                   Opacity="0.6"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"
+                                   ToolTip.Tip="{Binding EffectiveGameDirectory}" />
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+
+</UserControl>

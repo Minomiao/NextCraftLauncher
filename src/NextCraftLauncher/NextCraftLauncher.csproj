@@ -1,0 +1,80 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RootNamespace>NextCraftLauncher</RootNamespace>
+    <AssemblyName>NextCraftLauncher</AssemblyName>
+    <ApplicationTitle>Next Craft Launcher</ApplicationTitle>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <!--
+      不指定 RID 时，dotnet build 会把所有平台/架构的 runtimes 全部拷进输出（约 550 MB）。
+      这里只为当前开发机复制原生资产；SelfContained=false 保持依赖已安装的 .NET 运行时，
+      AppendRuntimeIdentifierToOutputPath=false 则保持 bin/Debug/net10.0 不变，
+      避免 exe 同级的 NCL 配置目录跟着 RID 一起搬家。
+    -->
+    <RuntimeIdentifier Condition="'$(NETCoreSdkRuntimeIdentifier)' != ''">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Models\" />
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NextCraftLauncher.Core\NextCraftLauncher.Core.csproj" />
+    <ProjectReference Include="..\NextCraftLauncher.Download\NextCraftLauncher.Download.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      应用自身使用 System.Text.Json 的反射序列化，且 ViewLocator 通过反射创建视图。
+      发布时开启 PublishTrimmed 后，这三个程序集必须整体保留，否则配置读写与视图创建会失效。
+    -->
+    <TrimmerRootAssembly Include="NextCraftLauncher" />
+    <TrimmerRootAssembly Include="NextCraftLauncher.Core" />
+    <TrimmerRootAssembly Include="NextCraftLauncher.Download" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <Target Name="CleanPublishSymbols" AfterTargets="Publish" Condition="'$(PublishSingleFile)' == 'true'">
+    <ItemGroup>
+      <PublishPdbFiles Include="$(PublishDir)**\*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(PublishPdbFiles)" />
+  </Target>
+
+  <!--
+    原生库自带的 .pdb 体积很大（win-x64 下 libSkiaSharp.pdb 单个约 84 MB，
+    libHarfBuzzSharp.pdb 约 21 MB），Debug 调试只用到托管程序的 PDB，
+    因此在复制到输出目录之前就把它们从列表里移除。
+  -->
+  <Target Name="TrimNativeDebugSymbols"
+          AfterTargets="ResolvePackageAssets"
+          BeforeTargets="ResolveLockFileCopyLocalFiles"
+          Condition="'$(Configuration)' == 'Debug'">
+    <ItemGroup>
+      <_NativePdb Include="@(NativeCopyLocalItems);@(RuntimeCopyLocalItems)"
+                  Condition="'%(Extension)' == '.pdb'" />
+      <NativeCopyLocalItems Remove="@(_NativePdb)" />
+      <RuntimeCopyLocalItems Remove="@(_NativePdb)" />
+    </ItemGroup>
+  </Target>
+</Project>

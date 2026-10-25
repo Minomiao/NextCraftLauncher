@@ -1,0 +1,631 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NextCraftLauncher.ViewModels"
+             xmlns:java="using:NextCraftLauncher.Core.Java"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="1080" d:DesignHeight="620"
+             x:Class="NextCraftLauncher.Views.DownloadView"
+             x:DataType="vm:MainViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.versionRow">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.versionRow.selected">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+        </Style>
+
+        <!-- 列表只负责虚拟化滚动，选中高亮由行内按钮控制 -->
+        <Style Selector="ListBox.versionList ListBoxItem:pointerover /template/ Border#PART_Root">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.versionList ListBoxItem:selected /template/ Border#PART_Root">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid>
+
+        <!-- ================= 侧边栏视图 ================= -->
+        <Grid ColumnDefinitions="176,1,*" ColumnSpacing="16"
+              IsVisible="{Binding !IsDownloadRunningSelected}">
+
+            <!-- 左侧边栏 -->
+            <Grid RowDefinitions="*,Auto">
+                <StackPanel Spacing="2" VerticalAlignment="Top" Margin="0,2,0,0">
+                    <Button Classes="side"
+                            Classes.selected="{Binding IsDownloadVersionsSelected}"
+                            Content="游戏版本"
+                            Command="{Binding ShowDownloadVersionsCommand}" />
+                    <Button Classes="side"
+                            Classes.selected="{Binding IsDownloadJavaSelected}"
+                            Content="Java 运行时"
+                            Command="{Binding ShowDownloadJavaCommand}" />
+                    <Button Classes="side"
+                            Classes.selected="{Binding IsDownloadSettingsSelected}"
+                            Content="下载设置"
+                            Command="{Binding ShowDownloadSettingsCommand}" />
+                </StackPanel>
+
+                <Button Grid.Row="1"
+                        Classes="side"
+                        Content="任务"
+                        Command="{Binding ShowDownloadRunningCommand}" />
+            </Grid>
+
+            <Border Grid.Column="1" Classes="vline" />
+
+            <Grid Grid.Column="2" RowDefinitions="Auto,*" RowSpacing="14">
+
+                <!-- 游戏目录 -->
+                <TextBlock Text="{Binding MinecraftDirectory}"
+                           FontSize="11"
+                           Opacity="0.5"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding MinecraftDirectory}" />
+
+                <Grid Grid.Row="1">
+
+                    <!-- 游戏版本：列表 → 版本详情 -->
+                    <Grid IsVisible="{Binding IsDownloadVersionsSelected}">
+
+                        <!-- 版本列表 -->
+                        <Grid RowDefinitions="Auto,*" RowSpacing="10"
+                              IsVisible="{Binding !IsRemoteVersionDetailOpen}">
+
+                            <Grid ColumnDefinitions="*,120,Auto" ColumnSpacing="8">
+                                <TextBox Classes="toolbar"
+                                         Text="{Binding RemoteVersionSearch}"
+                                         PlaceholderText="搜索版本号…" />
+                                <ComboBox Grid.Column="1"
+                                          Classes="toolbar"
+                                          ItemsSource="{Binding RemoteVersionTypes}"
+                                          SelectedItem="{Binding RemoteVersionType}"
+                                          HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="2"
+                                        Classes="toolbar soft"
+                                        Content="刷新列表"
+                                        Command="{Binding LoadRemoteVersionsCommand}"
+                                        IsEnabled="{Binding !IsRemoteVersionsLoading}" />
+                            </Grid>
+
+                            <Grid Grid.Row="1">
+                                <ListBox Classes="versionList"
+                                         ItemsSource="{Binding RemoteVersionRows}"
+                                         Background="Transparent"
+                                         Padding="0,0,14,0">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RemoteVersionListRowViewModel">
+                                            <Grid>
+                                                <Grid IsVisible="{Binding IsHeader}"
+                                                      ColumnDefinitions="*,Auto"
+                                                      Margin="0,10,0,4">
+                                                    <TextBlock Text="{Binding GroupTitle}"
+                                                               Classes="section"
+                                                               FontSize="13" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding GroupCountText}"
+                                                               FontSize="11"
+                                                               Opacity="0.5"
+                                                               VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Button IsVisible="{Binding IsVersion}"
+                                                        Classes="versionRow"
+                                                        Classes.selected="{Binding Version.IsSelected}"
+                                                        Command="{Binding Version.SelectCommand}">
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                        <StackPanel Spacing="1">
+                                                            <TextBlock Text="{Binding Version.Id}"
+                                                                       FontWeight="SemiBold"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Version.Subtitle}"
+                                                                       FontSize="11"
+                                                                       Opacity="0.6" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="已安装"
+                                                                   FontSize="11"
+                                                                   Opacity="0.5"
+                                                                   VerticalAlignment="Center"
+                                                                   IsVisible="{Binding Version.IsInstalled}" />
+                                                    </Grid>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock Text="正在获取版本清单..."
+                                           IsVisible="{Binding ShowRemoteVersionsLoading}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Opacity="0.6" />
+                            </Grid>
+                        </Grid>
+
+                        <!-- 版本详情：加载器版本 + 原版下载 -->
+                        <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10"
+                              IsVisible="{Binding IsRemoteVersionDetailOpen}">
+
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                <Button Classes="soft"
+                                        Content="← 返回"
+                                        Command="{Binding CloseRemoteVersionDetailCommand}"
+                                        Height="30"
+                                        Padding="12,0"
+                                        VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding SelectedRemoteVersion.Id}"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding SelectedRemoteVersion.Subtitle}"
+                                               FontSize="11"
+                                               Opacity="0.6"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="2"
+                                           Text="已安装"
+                                           FontSize="11"
+                                           Opacity="0.55"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding SelectedRemoteVersion.IsInstalled}" />
+                            </Grid>
+
+                            <Grid Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="6">
+                                <TextBlock Text="模组加载器版本（单选，可与原版一起下载）"
+                                           Classes="fieldLabel"
+                                           FontSize="11"
+                                           Opacity="0.55"
+                                           Margin="8,0,0,0" />
+
+                                <!-- 与游戏版本列表同构：分组标题行 + 版本行，共用 versionRow 样式 -->
+                                <ListBox Grid.Row="1"
+                                         Classes="versionList"
+                                         ItemsSource="{Binding LoaderVersionRows}"
+                                         Background="Transparent"
+                                         Padding="0,0,14,0">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:LoaderVersionListRowViewModel">
+                                            <Grid>
+                                                <Button IsVisible="{Binding IsHeader}"
+                                                        Classes="versionRow"
+                                                        Command="{Binding ToggleCommand}"
+                                                        ToolTip.Tip="{Binding Error}">
+                                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                                                        <TextBlock Text="{Binding Chevron}"
+                                                                   FontSize="10"
+                                                                   Width="10"
+                                                                   Opacity="0.5"
+                                                                   VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Title}"
+                                                                   Classes="section"
+                                                                   FontSize="13"
+                                                                   VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2"
+                                                                   Text="{Binding Status}"
+                                                                   FontSize="11"
+                                                                   Opacity="0.5"
+                                                                   VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Button>
+
+                                                <Button IsVisible="{Binding IsVersion}"
+                                                        Classes="versionRow"
+                                                        Classes.selected="{Binding Item.IsSelected}"
+                                                        Command="{Binding Item.SelectCommand}">
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                        <TextBlock Text="{Binding Version}"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Tag}"
+                                                                   IsVisible="{Binding HasTag}"
+                                                                   FontSize="11"
+                                                                   Opacity="0.5"
+                                                                   VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Button>
+
+                                                <TextBlock IsVisible="{Binding IsEmpty}"
+                                                           Text="{Binding Text}"
+                                                           FontSize="12"
+                                                           Opacity="0.55"
+                                                           Margin="8,5"
+                                                           TextWrapping="Wrap"
+                                                           ToolTip.Tip="{Binding Error}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+
+                            <Grid Grid.Row="2" RowDefinitions="Auto,Auto" RowSpacing="8">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                    <TextBlock Text="版本名" Classes="fieldLabel" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1"
+                                             Classes="toolbar"
+                                             Text="{Binding VersionName}"
+                                             PlaceholderText="新版本的名称" />
+                                    <Button Grid.Column="2"
+                                            Classes="soft"
+                                            Content="默认"
+                                            Command="{Binding ResetVersionNameCommand}"
+                                            Height="32"
+                                            Padding="12,0"
+                                            ToolTip.Tip="恢复为「版本-加载器 版本」" />
+                                </Grid>
+
+                                <Button Grid.Row="1"
+                                        Classes="primary"
+                                        Content="{Binding PrimaryDownloadText}"
+                                        Command="{Binding DownloadSelectedCommand}"
+                                        IsEnabled="{Binding CanDownloadSelected}"
+                                        HorizontalAlignment="Right"
+                                        Height="32"
+                                        Padding="18,0"
+                                        ToolTip.Tip="选中加载器时会与原版一起下载；同一版本只能选择一种加载器" />
+                            </Grid>
+
+                            <Grid Grid.Row="3" RowDefinitions="Auto,Auto" RowSpacing="4"
+                                  IsVisible="{Binding HasVersionDownloadProgress}">
+                                <ProgressBar Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding VersionDownloadPercent}"
+                                             IsIndeterminate="{Binding IsVersionInstallIndeterminate}"
+                                             IsVisible="{Binding IsDownloadingVersion}"
+                                             Height="6" />
+                                <TextBlock Grid.Row="1"
+                                           Text="{Binding VersionDownloadText}"
+                                           FontSize="12"
+                                           Opacity="0.7"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+                        </Grid>
+                    </Grid>
+
+                    <!-- Java 运行时 -->
+                    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12"
+                          IsVisible="{Binding IsDownloadJavaSelected}">
+
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="下载所需 Java" Classes="section" />
+
+                            <Grid ColumnDefinitions="76,*"
+                                  RowDefinitions="Auto,Auto,Auto"
+                                  ColumnSpacing="10"
+                                  RowSpacing="8">
+                                <TextBlock Text="目标版本" Classes="fieldLabel" />
+                                <ComboBox Grid.Column="1"
+                                          Classes="toolbar"
+                                          ItemsSource="{Binding Versions}"
+                                          SelectedItem="{Binding SelectedVersion}"
+                                          HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:VersionItemViewModel">
+                                            <StackPanel Spacing="1">
+                                                <TextBlock Text="{Binding Id}" />
+                                                <TextBlock Text="{Binding Subtitle}" FontSize="11" Opacity="0.6" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="1" Text="所需 Java" Classes="fieldLabel" />
+                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                           Text="{Binding RequiredJavaDescription}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center" />
+
+                                <TextBlock Grid.Row="2" Text="当前 Java" Classes="fieldLabel" />
+                                <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <ComboBox Classes="toolbar"
+                                              ItemsSource="{Binding JavaRuntimes}"
+                                              SelectedItem="{Binding SelectedJava}"
+                                              HorizontalAlignment="Stretch">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="java:JavaRuntime">
+                                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Grid.Column="1" Classes="toolbar soft" Content="浏览" Click="OnBrowseJavaClick" />
+                                </Grid>
+                            </Grid>
+
+                            <Button Content="下载 Java"
+                                    Command="{Binding DownloadJavaCommand}"
+                                    IsEnabled="{Binding CanDownloadJava}"
+                                    Classes="primary"
+                                    Height="34"
+                                    Padding="18,0"
+                                    HorizontalAlignment="Left" />
+
+                            <Grid RowDefinitions="Auto,Auto" RowSpacing="4"
+                                  IsVisible="{Binding HasJavaDownloadProgress}">
+                                <ProgressBar Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding JavaDownloadPercent}"
+                                             IsVisible="{Binding IsDownloadingJava}"
+                                             Height="6" />
+                                <TextBlock Grid.Row="1"
+                                           Text="{Binding JavaDownloadText}"
+                                           FontSize="12"
+                                           Opacity="0.7"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+                        </StackPanel>
+
+                        <Border Grid.Row="1" Classes="hline" />
+
+                        <Grid Grid.Row="2" RowDefinitions="Auto,Auto,*" RowSpacing="8">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBlock Text="全部 Java 运行时" Classes="section" />
+                                <Button Grid.Column="1"
+                                        Classes="toolbar soft"
+                                        Content="刷新列表"
+                                        Command="{Binding LoadJavaRuntimesCommand}"
+                                        IsEnabled="{Binding !IsJavaRuntimeCatalogLoading}"
+                                        VerticalAlignment="Center" />
+                            </Grid>
+
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding JavaRuntimeCatalogStatus}"
+                                       Classes="meta" />
+
+                            <Grid Grid.Row="2">
+                                <ListBox ItemsSource="{Binding AvailableJavaRuntimes}"
+                                         Background="Transparent">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RemoteJavaRuntimeItemViewModel">
+                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Margin="2,5">
+                                                <StackPanel Spacing="1">
+                                                    <TextBlock Text="{Binding ComponentName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Subtitle}" FontSize="11" Opacity="0.6" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="已安装"
+                                                           FontSize="11"
+                                                           Opacity="0.5"
+                                                           VerticalAlignment="Center"
+                                                           IsVisible="{Binding IsInstalled}" />
+                                                <Button Grid.Column="2"
+                                                        Classes="soft"
+                                                        Content="下载"
+                                                        Command="{Binding DownloadCommand}"
+                                                        IsEnabled="{Binding !IsInstalled}"
+                                                        Height="26"
+                                                        Padding="12,0" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock Text="正在获取 Java 运行时列表..."
+                                           IsVisible="{Binding IsJavaRuntimeCatalogLoading}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Opacity="0.6" />
+                            </Grid>
+                        </Grid>
+                    </Grid>
+
+                    <!-- 下载设置：各类列表的获取源（当前只影响显示） -->
+                    <ScrollViewer IsVisible="{Binding IsDownloadSettingsSelected}"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="18" MaxWidth="620" HorizontalAlignment="Left">
+                            <TextBlock Text="下载设置" Classes="section" />
+                            <TextBlock Classes="meta"
+                                       Text="游戏版本源同时用于版本清单、游戏文件与 Java 的下载；Forge / Fabric / NeoForge 源仅用于各自版本列表的获取。" />
+
+                            <Grid ColumnDefinitions="110,*"
+                                  RowDefinitions="Auto,Auto,Auto,Auto"
+                                  ColumnSpacing="12"
+                                  RowSpacing="12">
+                                <TextBlock Text="游戏版本" Classes="fieldLabel" />
+                                <ComboBox Grid.Column="1"
+                                          Classes="toolbar"
+                                          HorizontalAlignment="Stretch"
+                                          ItemsSource="{Binding DownloadMirrors}"
+                                          SelectedIndex="{Binding SelectedGameMirrorIndex}" />
+
+                                <TextBlock Grid.Row="1" Text="Forge" Classes="fieldLabel" />
+                                <ComboBox Grid.Row="1" Grid.Column="1"
+                                          Classes="toolbar"
+                                          HorizontalAlignment="Stretch"
+                                          ItemsSource="{Binding LoaderMirrorOptions}"
+                                          SelectedIndex="{Binding SelectedForgeMirrorIndex}" />
+
+                                <TextBlock Grid.Row="2" Text="Fabric" Classes="fieldLabel" />
+                                <ComboBox Grid.Row="2" Grid.Column="1"
+                                          Classes="toolbar"
+                                          HorizontalAlignment="Stretch"
+                                          ItemsSource="{Binding LoaderMirrorOptions}"
+                                          SelectedIndex="{Binding SelectedFabricMirrorIndex}" />
+
+                                <TextBlock Grid.Row="3" Text="NeoForge" Classes="fieldLabel" />
+                                <ComboBox Grid.Row="3" Grid.Column="1"
+                                          Classes="toolbar"
+                                          HorizontalAlignment="Stretch"
+                                          ItemsSource="{Binding LoaderMirrorOptions}"
+                                          SelectedIndex="{Binding SelectedNeoForgeMirrorIndex}" />
+                            </Grid>
+
+                            <TextBlock Classes="meta"
+                                       Text="游戏版本：自动 / Mojang 官方 / Mojang CDN / BMCLAPI。加载器：自动（官网立即请求、BMCLAPI 延迟对冲） / 官方（仅加载器官网） / BMCLAPI（优先镜像）。" />
+
+                            <Border Classes="hline" />
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="版本隔离" Classes="fieldLabel" />
+                                <CheckBox Content="下载后开启版本隔离（使用版本目录作为游戏目录）"
+                                          IsChecked="{Binding DownloadVersionIsolated}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- ================= 任务独立视图 ================= -->
+        <Grid ColumnDefinitions="180,1,*" ColumnSpacing="20"
+              IsVisible="{Binding IsDownloadRunningSelected}">
+
+            <!-- 左列：返回 + 统计，分割线不再被按钮行截断 -->
+            <Grid RowDefinitions="Auto,*" RowSpacing="16">
+                <Button Classes="soft"
+                        Content="← 返回"
+                        Height="32"
+                        Padding="12,0"
+                        HorizontalAlignment="Left"
+                        Command="{Binding ReturnFromDownloadTasksCommand}" />
+
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="32">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="总进度"
+                                   Foreground="{DynamicResource SystemAccentColor}"
+                                   FontSize="12"
+                                   HorizontalAlignment="Center" />
+                        <Border Height="2"
+                                Margin="6,0"
+                                Background="{DynamicResource SystemAccentColor}" />
+                        <TextBlock Text="{Binding OverallDownloadPercentText}"
+                                   FontSize="22"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="下载速度"
+                                   Foreground="{DynamicResource SystemAccentColor}"
+                                   FontSize="12"
+                                   HorizontalAlignment="Center" />
+                        <Border Height="2"
+                                Margin="6,0"
+                                Background="{DynamicResource SystemAccentColor}" />
+                        <TextBlock Text="{Binding CurrentDownloadSpeedText}"
+                                   FontSize="22"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="剩余文件"
+                                   Foreground="{DynamicResource SystemAccentColor}"
+                                   FontSize="12"
+                                   HorizontalAlignment="Center" />
+                        <Border Height="2"
+                                Margin="6,0"
+                                Background="{DynamicResource SystemAccentColor}" />
+                        <TextBlock Text="{Binding RemainingFilesCount}"
+                                   FontSize="22"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <Border Grid.Column="1" Classes="vline" />
+
+                <!-- 任务列表 -->
+                <Grid Grid.Column="2">
+                    <TextBlock Text="没有正在进行的下载"
+                               IsVisible="{Binding !HasActiveDownloads}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Opacity="0.45" />
+
+                    <ScrollViewer IsVisible="{Binding HasActiveDownloads}"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="24">
+
+                            <!-- 版本安装 -->
+                            <StackPanel Spacing="10" IsVisible="{Binding IsDownloadingVersion}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding VersionTaskTitle}"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <Button Grid.Column="1"
+                                            Classes="caption"
+                                            Content="✕"
+                                            ToolTip.Tip="取消"
+                                            Command="{Binding CancelVersionDownloadCommand}" />
+                                </Grid>
+
+                                <StackPanel Spacing="4">
+                                    <Grid ColumnDefinitions="44,*">
+                                        <TextBlock Text="✓"
+                                                   Foreground="{DynamicResource SystemAccentColor}"
+                                                   IsVisible="{Binding IsVersionStepInfoDone}" />
+                                        <TextBlock Text="…"
+                                                   Foreground="{DynamicResource SystemAccentColor}"
+                                                   IsVisible="{Binding IsVersionStagePreparing}" />
+                                        <TextBlock Grid.Column="1" Text="版本信息" />
+                                    </Grid>
+
+                                    <Grid ColumnDefinitions="44,*">
+                                        <TextBlock Text="✓"
+                                                   Foreground="{DynamicResource SystemAccentColor}"
+                                                   IsVisible="{Binding IsVersionStepFilesDone}" />
+                                        <TextBlock Text="{Binding VersionDownloadPercentText}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource SystemAccentColor}"
+                                                   IsVisible="{Binding IsVersionStageFiles}" />
+                                        <TextBlock Text="·"
+                                                   Opacity="0.35"
+                                                   IsVisible="{Binding IsVersionStagePreparing}" />
+                                        <TextBlock Grid.Column="1" Text="游戏文件" />
+                                    </Grid>
+
+                                    <Grid ColumnDefinitions="44,*">
+                                        <TextBlock Text="…"
+                                                   Foreground="{DynamicResource SystemAccentColor}"
+                                                   IsVisible="{Binding IsVersionStageFinalizing}" />
+                                        <TextBlock Text="·"
+                                                   Opacity="0.35"
+                                                   IsVisible="{Binding !IsVersionStageFinalizing}" />
+                                        <TextBlock Grid.Column="1" Text="写入配置" />
+                                    </Grid>
+                                </StackPanel>
+
+                                <ProgressBar Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding VersionDownloadPercent}"
+                                             IsIndeterminate="{Binding IsVersionInstallIndeterminate}"
+                                             Height="6" />
+                                <TextBlock Text="{Binding VersionDownloadText}" Classes="meta" />
+                            </StackPanel>
+
+                            <!-- Java 运行时 -->
+                            <StackPanel Spacing="10" IsVisible="{Binding IsDownloadingJava}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Java 运行时"
+                                               FontSize="16"
+                                               FontWeight="SemiBold" />
+                                    <Button Grid.Column="1"
+                                            Classes="caption"
+                                            Content="✕"
+                                            ToolTip.Tip="取消"
+                                            Command="{Binding CancelJavaDownloadCommand}" />
+                                </Grid>
+
+                                <ProgressBar Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding JavaDownloadPercent}"
+                                             Height="6" />
+                                <TextBlock Text="{Binding JavaDownloadText}" Classes="meta" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+        </Grid>
+    </Grid>
+
+</UserControl>

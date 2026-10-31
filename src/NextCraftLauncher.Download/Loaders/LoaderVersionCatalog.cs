@@ -41,12 +41,17 @@ public static class LoaderVersionCatalog
         DownloadMirror mirror,
         CancellationToken cancellationToken = default)
     {
-        LoaderVersionResult? stored = null;
-        if (LoaderVersionStore.TryLoad(loader, minecraftVersion, out var storedResult, out var updatedAt) &&
-            LoaderVersionStore.IsFresh(updatedAt))
+        // 缓存读取与写入都在线程池完成，避免阻塞调用方（UI 线程）。
+        var stored = await Task.Run(() =>
         {
-            stored = storedResult;
-        }
+            if (LoaderVersionStore.TryLoad(loader, minecraftVersion, out var storedResult, out var updatedAt) &&
+                LoaderVersionStore.IsFresh(updatedAt))
+            {
+                return storedResult;
+            }
+
+            return null;
+        }, cancellationToken);
 
         LoaderVersionResult result;
 
@@ -71,7 +76,7 @@ public static class LoaderVersionCatalog
 
         if (result.Error is null)
         {
-            LoaderVersionStore.Save(loader, minecraftVersion, result);
+            await Task.Run(() => LoaderVersionStore.Save(loader, minecraftVersion, result));
             return result;
         }
 

@@ -80,8 +80,12 @@ public static class MinecraftVersionCatalog
         // 多个候选源并行竞速（显式选择 BMCLAPI 时按优先级顺序回退）。
         var bytes = await downloader.DownloadBytesAutoAsync(urls, mirror, cancellationToken: cancellationToken);
 
-        var result = Parse(bytes);
-        TrySaveCache(bytes);
-        return result;
+        // 解析与缓存写入都是 CPU/磁盘操作，放到线程池，避免阻塞调用方（UI 线程）。
+        return await Task.Run(() =>
+        {
+            var result = Parse(bytes);
+            TrySaveCache(bytes);
+            return result;
+        }, cancellationToken);
     }
 }

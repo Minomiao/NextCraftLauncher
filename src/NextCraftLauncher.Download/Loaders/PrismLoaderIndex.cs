@@ -123,7 +123,9 @@ public static class PrismLoaderIndex
             if (bytes is null)
                 throw new IOException($"无法获取 {component.Uid} 版本索引。");
 
-            Parse(state, bytes);
+            // 索引可能上万条，解析放到线程池，避免在 UI 线程上做大块 JSON 处理。
+            var parsed = await Task.Run(() => Parse(bytes), cancellationToken);
+            state.ByMinecraft = parsed;
             state.LoadedAt = DateTimeOffset.UtcNow;
         }
         finally
@@ -132,7 +134,7 @@ public static class PrismLoaderIndex
         }
     }
 
-    private static void Parse(ComponentState state, byte[] bytes)
+    private static Dictionary<string, IReadOnlyList<PrismLoaderVersion>> Parse(byte[] bytes)
     {
         var data = JsonSerializer.Deserialize<PrismIndex>(bytes, JsonOptions);
         if (data?.Versions is null)
@@ -161,7 +163,7 @@ public static class PrismLoaderIndex
         foreach (var (minecraft, versions) in grouped)
             result[minecraft] = versions;
 
-        state.ByMinecraft = result;
+        return result;
     }
 
     private static byte[]? TryReadDiskCache(PrismLoaderComponent component, bool freshOnly)

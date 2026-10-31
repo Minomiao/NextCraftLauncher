@@ -2,7 +2,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:NextCraftLauncher.ViewModels"
         xmlns:views="using:NextCraftLauncher.Views"
-        xmlns:media="using:Avalonia.Media"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="820"
@@ -49,19 +48,10 @@
             <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
             <Setter Property="CornerRadius" Value="14" />
         </Style>
-
-        <!-- 弹窗打开时模糊背景 -->
-        <Style Selector="Grid.blurred">
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <media:BlurEffect Radius="10" />
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Styles>
 
     <Panel>
-        <Grid RowDefinitions="Auto,*" Classes.blurred="{Binding IsVersionDeleteDialogOpen}">
+        <Grid RowDefinitions="Auto,*">
 
         <!-- 沉浸式标题栏：左侧品牌、居中导航，可拖动 -->
         <Grid Grid.Row="0"

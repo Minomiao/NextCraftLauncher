@@ -40,6 +40,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private string? _selectedLoaderVersion;
     private bool _versionNameEdited;
     private bool _updatingVersionName;
+    private bool _initialized;
     private readonly LoaderVersionPrefetcher _loaderPrefetcher;
     private MinecraftDownloadStage _versionStage = MinecraftDownloadStage.Preparing;
     private int _versionCompletedFiles;
@@ -70,15 +71,56 @@ public partial class MainViewModel : ObservableObject, IDisposable
         LoaderGroups.Add(new LoaderVersionGroupViewModel("fabric", "Fabric"));
         LoaderGroups.Add(new LoaderVersionGroupViewModel("neoforge", "NeoForge"));
 
-        _ = RefreshAsync();
-        _ = PrefetchRemoteVersionsAsync();
-
         // 后台慢慢补全各游戏版本的加载器列表，结果写入 NCL/cache/loaders。
         _loaderPrefetcher = new LoaderVersionPrefetcher(
             ResolvePrefetchMirror,
             isBusy: () => IsDownloadingVersion || IsDownloadingJava || IsRemoteVersionsLoading);
         _loaderPrefetcher.LoaderVersionsCached += OnLoaderVersionsCached;
-        _ = RunLoaderPrefetcherAsync();
+
+        // 搜索框延迟筛选，避免每敲一个字符都重建整张列表。
+        _remoteSearchTimer.Tick += (_, _) =>
+        {
+            _remoteSearchTimer.Stop();
+            ApplyRemoteVersionFilter();
+        };
+    }
+
+    /// <summary>
+    /// 启动界面期间完成本地初始化：扫描版本、发现 Java，然后让远程清单与后台预取自行运行。
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        if (_initialized) return;
+        _initialized = true;
+
+        // 主界面只等待本地版本扫描；Java 发现可能很慢，放到后台完成后再刷新界面。
+        await RefreshCoreAsync(refreshJava: false);
+        _ = RefreshJavaSafeAsync();
+
+        // 先把上次缓存的远程清单填上，主界面打开时下载页已有内容；网络刷新在后台继续。
+        var cached = await Task.Run(MinecraftVersionCatalog.TryLoadCached, _lifetime.Token);
+        if (cached is not null && !_remoteManifestLoaded)
+            ApplyRemoteManifest(cached, markLoaded: false);
+
+        LauncherLog.Info("本地初始化完成");
+
+        _ = PrefetchRemoteVersionsAsync();
+        _ = Task.Run(RunLoaderPrefetcherAsync);
+    }
+
+    private async Task RefreshJavaSafeAsync()
+    {
+        try
+        {
+            await RefreshJavaAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            LauncherLog.Warn($"Java 发现失败：{exception.Message}");
+        }
     }
 
     private async Task RunLoaderPrefetcherAsync()
@@ -98,6 +140,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnLoaderVersionsCached(string loader, string minecraftVersion, LoaderVersionResult result)
     {
+        // 后台预取会处理成百上千个版本，详情页没打开时不必往 UI 线程排队。
+        if (!string.Equals(_activeLoaderVersionId, minecraftVersion, StringComparison.OrdinalIgnoreCase))
+            return;
+
         Dispatcher.UIThread.Post(() => ApplyCachedLoaderGroup(loader, minecraftVersion, result));
     }
 
@@ -197,8 +243,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<GameFolderItemViewModel> GameFolders { get; } = new();
 
-    public ObservableCollection<RemoteVersionItemViewModel> RemoteVersions { get; } = new();
-
     public RangeObservableCollection<RemoteVersionListRowViewModel> RemoteVersionRows { get; } = new();
 
     /// <summary>版本详情页里的加载器分组（Forge / Fabric / NeoForge）。</summary>
@@ -216,6 +260,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool _remoteManifestLoaded;
     private int _gameMirrorGeneration;
     private bool _javaRuntimeCatalogLoaded;
+    private int _filteredRemoteVersionCount;
+    // 重复筛选（如搜索框打字）时复用行包装对象，避免每次重建上千个实例。
+    private readonly Dictionary<RemoteVersionItemViewModel, RemoteVersionListRowViewModel> _remoteVersionRows = new();
+    private volatile string? _activeLoaderVersionId;
+    private readonly DispatcherTimer _remoteSearchTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(120),
+    };
 
     public ObservableCollection<JavaRuntime> JavaRuntimes { get; } = new();
 
@@ -527,12 +579,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _ = EnsureJavaRuntimesLoadedAsync();
 
             // 预取在启动时完成；若此处仍未完成，界面会显示“正在获取版本清单”。
-            if (_remoteManifestLoaded && RemoteVersions.Count == 0 && _allRemoteVersions.Count > 0)
+            if (_remoteManifestLoaded && _filteredRemoteVersionCount == 0 && _allRemoteVersions.Count > 0)
                 ApplyRemoteVersionFilter();
         }
     }
 
-    partial void OnRemoteVersionSearchChanged(string value) => ApplyRemoteVersionFilter();
+    partial void OnRemoteVersionSearchChanged(string value)
+    {
+        _remoteSearchTimer.Stop();
+        _remoteSearchTimer.Start();
+    }
 
     partial void OnRemoteVersionTypeChanged(string value) => ApplyRemoteVersionFilter();
 
@@ -864,7 +920,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     };
 
     [RelayCommand]
-    private async Task RefreshAsync()
+    private Task RefreshAsync() => RefreshCoreAsync(refreshJava: true);
+
+    private async Task RefreshCoreAsync(bool refreshJava)
     {
         if (IsBusy) return;
 
@@ -896,7 +954,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var previousId = SelectedVersion?.Id;
             SelectedVersion = Versions.FirstOrDefault(version => version.Id == previousId) ?? Versions.FirstOrDefault();
 
-            await RefreshJavaAsync();
+            if (refreshJava)
+                await RefreshJavaAsync();
 
             Status = Versions.Count == 0
                 ? "未找到版本，请确认路径指向 .minecraft 目录"
@@ -1082,6 +1141,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var selectedId = SelectedRemoteVersion?.Id;
 
         _allRemoteVersions.Clear();
+        _remoteVersionRows.Clear();
         foreach (var entry in result.Versions)
             _allRemoteVersions.Add(new RemoteVersionItemViewModel(entry, SelectRemoteVersion));
 
@@ -1096,7 +1156,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
             if (selected is not null)
                 SelectedRemoteVersion = selected;
             else if (IsRemoteVersionDetailOpen)
+            {
+                _activeLoaderVersionId = null;
                 IsRemoteVersionDetailOpen = false;
+            }
         }
 
         UpdateRemoteInstalledStatus();
@@ -1111,7 +1174,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void ApplyRemoteVersionFilter()
     {
-        RemoteVersions.Clear();
         var rows = new List<RemoteVersionListRowViewModel>();
 
         var search = RemoteVersionSearch.Trim();
@@ -1124,6 +1186,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             filtered.Add(item);
         }
 
+        _filteredRemoteVersionCount = filtered.Count;
+
         foreach (var group in filtered
                      .GroupBy(item => item.Type)
                      .OrderBy(group => VersionTypeOrder(group.Key)))
@@ -1135,8 +1199,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             rows.Add(RemoteVersionListRowViewModel.CreateHeader(VersionTypeTitle(group.Key), items.Count));
             foreach (var item in items)
             {
-                RemoteVersions.Add(item);
-                rows.Add(RemoteVersionListRowViewModel.CreateVersion(item));
+                rows.Add(GetRemoteVersionRow(item));
             }
         }
 
@@ -1145,10 +1208,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
         UpdateRemoteVersionsStatus();
     }
 
+    private RemoteVersionListRowViewModel GetRemoteVersionRow(RemoteVersionItemViewModel item)
+    {
+        if (_remoteVersionRows.TryGetValue(item, out var row)) return row;
+
+        row = RemoteVersionListRowViewModel.CreateVersion(item);
+        _remoteVersionRows[item] = row;
+        return row;
+    }
+
     private void SelectRemoteVersion(RemoteVersionItemViewModel item)
     {
         SelectedRemoteVersion = item;
         IsRemoteVersionDetailOpen = true;
+        _activeLoaderVersionId = item.Id;
 
         _selectedLoaderKey = null;
         _selectedLoaderVersion = null;
@@ -1162,6 +1235,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void CloseRemoteVersionDetail()
     {
         _loaderVersionsCts?.Cancel();
+        _activeLoaderVersionId = null;
         IsRemoteVersionDetailOpen = false;
     }
 
@@ -1375,6 +1449,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>读取加载器版本缓存；文件读取与反序列化都在线程池完成。</summary>
+    private static Task<(LoaderVersionResult Result, DateTimeOffset UpdatedAt)?> LoadCachedLoaderVersionsAsync(
+        string loader,
+        string minecraftVersion,
+        CancellationToken cancellationToken)
+        => Task.Run<(LoaderVersionResult, DateTimeOffset)?>(() =>
+        {
+            if (!LoaderVersionStore.TryLoad(loader, minecraftVersion, out var result, out var updatedAt))
+                return null;
+
+            return (result, updatedAt);
+        }, cancellationToken);
+
     private async Task LoadLoaderGroupAsync(
         LoaderVersionGroupViewModel group,
         string minecraftVersion,
@@ -1384,10 +1471,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         try
         {
             // 1) 先用本地缓存（72 小时内）秒开，不等网络。
-            if (LoaderVersionStore.TryLoad(group.Key, minecraftVersion, out var cached, out var cachedAt) &&
-                LoaderVersionStore.IsFresh(cachedAt))
+            //    文件读取与 JSON 解析放线程池，避免点开详情页时卡住界面。
+            var cached = await LoadCachedLoaderVersionsAsync(group.Key, minecraftVersion, cancellationToken);
+            if (cached is { } cache && LoaderVersionStore.IsFresh(cache.UpdatedAt))
             {
-                ApplyLoaderGroupResult(group, cached);
+                ApplyLoaderGroupResult(group, cache.Result);
             }
 
             // 2) 无论是否有缓存，都继续访问网络获取最新数据（按分组各自的源）。
@@ -1474,9 +1562,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         var installedCount = _allRemoteVersions.Count(item => item.IsInstalled);
-        RemoteVersionsStatus = RemoteVersions.Count == _allRemoteVersions.Count
+        RemoteVersionsStatus = _filteredRemoteVersionCount == _allRemoteVersions.Count
             ? $"共 {_allRemoteVersions.Count} 个版本 · 已安装 {installedCount} 个"
-            : $"显示 {RemoteVersions.Count} / {_allRemoteVersions.Count} 个版本 · 已安装 {installedCount} 个";
+            : $"显示 {_filteredRemoteVersionCount} / {_allRemoteVersions.Count} 个版本 · 已安装 {installedCount} 个";
     }
 
     [RelayCommand]
@@ -1551,9 +1639,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
             // 版本列表与文件下载共用「游戏版本」源。
             var mirror = ResolveGameMirror();
 
+            var lastUiTicks = 0L;
             var progress = new Progress<MinecraftVersionDownloadProgress>(report =>
             {
-                if (_versionStage != report.Stage)
+                var stageChanged = _versionStage != report.Stage;
+                var now = Environment.TickCount64;
+                var isFinal = report.Percent is >= 100 ||
+                              (report.TotalFiles > 0 && report.CompletedFiles >= report.TotalFiles);
+
+                // 高并发下载会每文件上报一次，限制 UI 刷新频率，但最终状态一定更新。
+                if (!stageChanged && !isFinal && now - lastUiTicks < 100)
+                    return;
+
+                lastUiTicks = now;
+
+                if (stageChanged)
                 {
                     _versionStage = report.Stage;
                     NotifyVersionStage();
@@ -1683,9 +1783,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             if (needsVanilla)
             {
+                var lastVanillaTicks = 0L;
                 var vanillaProgress = new Progress<MinecraftVersionDownloadProgress>(report =>
                 {
-                    if (_versionStage != report.Stage)
+                    var stageChanged = _versionStage != report.Stage;
+                    var now = Environment.TickCount64;
+                    var isFinal = report.Percent is >= 100 ||
+                                  (report.TotalFiles > 0 && report.CompletedFiles >= report.TotalFiles);
+
+                    if (!stageChanged && !isFinal && now - lastVanillaTicks < 100)
+                        return;
+
+                    lastVanillaTicks = now;
+
+                    if (stageChanged)
                     {
                         _versionStage = report.Stage;
                         NotifyVersionStage();
@@ -1980,8 +2091,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             var mirror = ResolveGameMirror();
 
+            var lastUiTicks = 0L;
             var progress = new Progress<JavaRuntimeDownloadProgress>(report =>
             {
+                var now = Environment.TickCount64;
+                var isFinal = report.Percent is >= 100 ||
+                              (report.TotalFiles > 0 && report.CompletedFiles >= report.TotalFiles);
+
+                if (!isFinal && now - lastUiTicks < 100)
+                    return;
+
+                lastUiTicks = now;
+
                 _javaCompletedFiles = report.CompletedFiles;
                 _javaTotalFiles = report.TotalFiles;
 
@@ -2074,8 +2195,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             LauncherLog.Info($"启动游戏：{_resolved.Id}（Java {SelectedJava.MajorVersion}）");
 
-            // 游戏输出同时写入 NCL/log。
-            var gameLog = new Progress<string>(line => LauncherLog.Game(line));
+            // 游戏输出直接在当前线程写入日志，不占用 UI 线程。
+            var gameLog = new InlineProgress<string>(LauncherLog.Game);
 
             var exitCode = await GameLauncher.RunAsync(
                 plan,
@@ -2121,6 +2242,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         JavaRuntimes.Clear();
         foreach (var runtime in runtimes)
             JavaRuntimes.Add(runtime);
+
+        LauncherLog.Info($"Java 发现完成：{JavaRuntimes.Count} 个运行时");
 
         SelectedJava = JavaLocator.SelectBest(JavaRuntimes, _resolved?.RequiredJavaMajor ?? 8);
         UpdateLaunchWarning();
@@ -2230,6 +2353,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         try
         {
+            _remoteSearchTimer.Stop();
             _loaderPrefetcher.LoaderVersionsCached -= OnLoaderVersionsCached;
             _loaderVersionsCts?.Cancel();
             _loaderVersionsCts?.Dispose();

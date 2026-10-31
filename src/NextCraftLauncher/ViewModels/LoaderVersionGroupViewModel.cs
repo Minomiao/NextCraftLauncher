@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace NextCraftLauncher.ViewModels;
@@ -19,7 +19,7 @@ public partial class LoaderVersionGroupViewModel : ObservableObject
 
     public string DisplayName { get; }
 
-    public ObservableCollection<LoaderVersionItemViewModel> Versions { get; } = new();
+    public List<LoaderVersionItemViewModel> Versions { get; } = new();
 
     [ObservableProperty] private bool _isAvailable;
     [ObservableProperty] private bool _isExpanded;

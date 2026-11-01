@@ -19,6 +19,12 @@ public sealed class LoaderInstallOptions
     /// <summary>安装后的版本目录名称；为空时沿用安装器 / profile 的默认 id。</summary>
     public string? VersionName { get; init; }
 
+    /// <summary>可选的 Fabric API 版本；安装完成后会下载到 mods 目录。</summary>
+    public string? FabricApiVersion { get; init; }
+
+    /// <summary>版本隔离：为 true 时 mods 放在版本目录下，否则放在游戏根目录。</summary>
+    public bool IsolateVersion { get; init; }
+
     public IProgress<LoaderInstallProgress>? Progress { get; init; }
 
     /// <summary>安装器实时输出的日志行（仅 Forge / NeoForge）。</summary>
@@ -149,10 +155,43 @@ public static class LoaderInstaller
             minecraftDirectory, versionId, options.VersionName);
         var finalDirectory = Path.Combine(minecraftDirectory, "versions", finalId);
 
+        if (!string.IsNullOrWhiteSpace(options.FabricApiVersion))
+            await InstallFabricApiAsync(client, minecraftDirectory, finalDirectory, options, cancellationToken);
+
         options.Progress?.Report(new LoaderInstallProgress(
             "Fabric 安装完成", 100, MinecraftDownloadStage.Finalizing));
 
         return new LoaderInstallResult(finalId, finalDirectory);
+    }
+
+    /// <summary>把选中的 Fabric API 下载到该版本对应的 mods 目录。</summary>
+    private static async Task InstallFabricApiAsync(
+        DownloadClient client,
+        string minecraftDirectory,
+        string versionDirectory,
+        LoaderInstallOptions options,
+        CancellationToken cancellationToken)
+    {
+        var apiVersion = options.FabricApiVersion!;
+        var encoded = Uri.EscapeDataString(apiVersion);
+        var url = "https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/" +
+                  $"{encoded}/fabric-api-{encoded}.jar";
+
+        var modsDirectory = Path.Combine(
+            options.IsolateVersion ? versionDirectory : minecraftDirectory, "mods");
+        Directory.CreateDirectory(modsDirectory);
+
+        var destination = Path.Combine(modsDirectory, $"fabric-api-{apiVersion}.jar");
+
+        options.Progress?.Report(new LoaderInstallProgress(
+            $"正在下载 Fabric API {apiVersion}…", 99, MinecraftDownloadStage.Finalizing));
+
+        await client.DownloadFileAsync(
+            DownloadUrlResolver.Build(url, options.Mirror),
+            destination,
+            cancellationToken: cancellationToken);
+
+        LauncherLog.Info($"Fabric API {apiVersion} → {destination}");
     }
 
     private static async Task DownloadLibraryAsync(

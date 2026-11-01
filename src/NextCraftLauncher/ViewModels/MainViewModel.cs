@@ -39,6 +39,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool _loaderMirrorDirty;
     private string? _selectedLoaderKey;
     private string? _selectedLoaderVersion;
+    private string? _selectedFabricApiVersion;
+    private string? _fabricApiLoadedVersion;
+    private CancellationTokenSource? _fabricApiCts;
     private bool _versionNameEdited;
     private bool _updatingVersionName;
     private bool _initialized;
@@ -107,6 +110,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         _ = PrefetchRemoteVersionsAsync();
         _ = Task.Run(RunLoaderPrefetcherAsync);
+
+        // Fabric API 的版本表很小（约 48 KB），启动时后台拉一次；之后各游戏版本的列表都在本地过滤。
+        var fabricMirror = ResolveLoaderMirror("fabric");
+        _ = Task.Run(() => LoaderVersionCatalog.PrimeFabricApiAsync(fabricMirror, _lifetime.Token));
     }
 
     private async Task RefreshJavaSafeAsync()
@@ -186,11 +193,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
 
             // 之前选中的版本已从列表里消失时清除选择。
-            if (IsLoaderSelected(group.Key, _selectedLoaderVersion) &&
+            var selectedVersion = string.Equals(group.Key, FabricApiGroup.Key, StringComparison.OrdinalIgnoreCase)
+                ? _selectedFabricApiVersion
+                : _selectedLoaderVersion;
+
+            if (IsLoaderSelected(group.Key, selectedVersion) &&
                 !group.Versions.Any(item =>
-                    string.Equals(item.Version, _selectedLoaderVersion, StringComparison.Ordinal)))
+                    string.Equals(item.Version, selectedVersion, StringComparison.Ordinal)))
             {
-                ClearLoaderSelection();
+                if (string.Equals(group.Key, FabricApiGroup.Key, StringComparison.OrdinalIgnoreCase))
+                    ClearFabricApiSelection();
+                else
+                    ClearLoaderSelection();
             }
         }
 
@@ -248,6 +262,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>版本详情页里的加载器分组（Forge / Fabric / NeoForge）。</summary>
     public ObservableCollection<LoaderVersionGroupViewModel> LoaderGroups { get; } = new();
+
+    /// <summary>选中 Fabric 后出现的可选分组：Fabric API，与加载器分组同级展示。</summary>
+    public LoaderVersionGroupViewModel FabricApiGroup { get; } = new("fabric-api", "Fabric API");
+
+    /// <summary>只有在选中了某个 Fabric 加载器版本后才显示 Fabric API 分组。</summary>
+    public bool IsFabricApiGroupVisible =>
+        string.Equals(_selectedLoaderKey, "fabric", StringComparison.OrdinalIgnoreCase) &&
+        _selectedLoaderVersion is not null;
 
     /// <summary>版本详情页的扁平行列表，和游戏版本列表共用同一套行样式。</summary>
     public RangeObservableCollection<LoaderVersionListRowViewModel> LoaderVersionRows { get; } = new();
@@ -519,10 +541,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
         SelectedRemoteVersion is not null &&
         VersionNaming.Normalize(VersionName).Length > 0;
 
-    public string PrimaryDownloadText =>
-        _selectedLoaderKey is null || _selectedLoaderVersion is null
-            ? "下载选中版本"
-            : $"下载并安装 {GetLoaderDisplayName(_selectedLoaderKey)} {_selectedLoaderVersion}";
+    public string PrimaryDownloadText
+    {
+        get
+        {
+            if (_selectedLoaderKey is null || _selectedLoaderVersion is null)
+                return "下载选中版本";
+
+            var text = $"下载并安装 {GetLoaderDisplayName(_selectedLoaderKey)} {_selectedLoaderVersion}";
+            return string.IsNullOrEmpty(_selectedFabricApiVersion)
+                ? text
+                : text + " + Fabric API";
+        }
+    }
 
     public bool CanManageSelectedVersion =>
         !IsBusy &&
@@ -1010,7 +1041,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private DownloadMirror ResolveLoaderMirror(string loader) => loader.ToLowerInvariant() switch
     {
         "forge" => LoaderMirrorFromIndex(SelectedForgeMirrorIndex),
-        "fabric" => LoaderMirrorFromIndex(SelectedFabricMirrorIndex),
+        "fabric" or "fabric-api" => LoaderMirrorFromIndex(SelectedFabricMirrorIndex),
         "neoforge" => LoaderMirrorFromIndex(SelectedNeoForgeMirrorIndex),
         _ => DownloadMirror.Automatic,
     };
@@ -1384,6 +1415,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void CloseRemoteVersionDetail()
     {
         _loaderVersionsCts?.Cancel();
+        _fabricApiCts?.Cancel();
         _activeLoaderVersionId = null;
         IsRemoteVersionDetailOpen = false;
     }
@@ -1391,6 +1423,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ResetLoaderGroups()
     {
         ClearLoaderSelection();
+
+        _fabricApiCts?.Cancel();
+        _fabricApiLoadedVersion = null;
+        _selectedFabricApiVersion = null;
+        FabricApiGroup.Versions.Clear();
+        FabricApiGroup.IsAvailable = false;
+        FabricApiGroup.IsExpanded = false;
+        FabricApiGroup.IsLoading = false;
+        FabricApiGroup.ErrorText = null;
+        FabricApiGroup.StatusText = "加载中…";
 
         foreach (var group in LoaderGroups)
         {
@@ -1414,21 +1456,30 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         foreach (var group in LoaderGroups)
         {
-            rows.Add(CreateLoaderHeaderRow(group));
+            AppendGroupRows(rows, group);
 
-            if (!group.IsExpanded) continue;
-
-            if (group.Versions.Count == 0)
-            {
-                rows.Add(LoaderVersionListRowViewModel.CreateEmpty(group, DescribeLoaderEmpty(group)));
-                continue;
-            }
-
-            foreach (var version in group.Versions)
-                rows.Add(LoaderVersionListRowViewModel.CreateVersion(version));
+            // Fabric API 与加载器分组同级，紧跟在 Fabric 分组后面。
+            if (group.Key == "fabric" && IsFabricApiGroupVisible)
+                AppendGroupRows(rows, FabricApiGroup);
         }
 
         LoaderVersionRows.ReplaceAll(rows);
+    }
+
+    private void AppendGroupRows(List<LoaderVersionListRowViewModel> rows, LoaderVersionGroupViewModel group)
+    {
+        rows.Add(CreateLoaderHeaderRow(group));
+
+        if (!group.IsExpanded) return;
+
+        if (group.Versions.Count == 0)
+        {
+            rows.Add(LoaderVersionListRowViewModel.CreateEmpty(group, DescribeLoaderEmpty(group)));
+            return;
+        }
+
+        foreach (var version in group.Versions)
+            rows.Add(LoaderVersionListRowViewModel.CreateVersion(version));
     }
 
     private LoaderVersionListRowViewModel CreateLoaderHeaderRow(LoaderVersionGroupViewModel group)
@@ -1495,13 +1546,26 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     private bool IsLoaderSelected(string? loaderKey, string? version)
-        => loaderKey is not null &&
-           version is not null &&
-           string.Equals(_selectedLoaderKey, loaderKey, StringComparison.OrdinalIgnoreCase) &&
-           string.Equals(_selectedLoaderVersion, version, StringComparison.Ordinal);
+    {
+        if (version is null) return false;
+
+        if (string.Equals(loaderKey, FabricApiGroup.Key, StringComparison.OrdinalIgnoreCase))
+            return string.Equals(_selectedFabricApiVersion, version, StringComparison.Ordinal);
+
+        return loaderKey is not null &&
+               string.Equals(_selectedLoaderKey, loaderKey, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(_selectedLoaderVersion, version, StringComparison.Ordinal);
+    }
 
     private void SelectLoaderVersion(LoaderVersionItemViewModel item)
     {
+        // Fabric API 的选择独立于加载器单选。
+        if (string.Equals(item.LoaderKey, FabricApiGroup.Key, StringComparison.OrdinalIgnoreCase))
+        {
+            SelectFabricApiVersion(item);
+            return;
+        }
+
         // 加载器互不兼容：再次点击已选中的行即取消，只能保留一个选择。
         if (item.IsSelected)
         {
@@ -1509,28 +1573,135 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
+        var wasFabricApiVisible = IsFabricApiGroupVisible;
+
         _selectedLoaderKey = item.LoaderKey;
         _selectedLoaderVersion = item.Version;
 
         foreach (var group in LoaderGroups)
+        {
             foreach (var version in group.Versions)
                 version.IsSelected = ReferenceEquals(version, item);
+        }
 
         NotifyLoaderSelectionChanged();
         RefreshDefaultVersionName();
+
+        if (IsFabricApiGroupVisible != wasFabricApiVisible)
+            OnFabricApiVisibilityChanged(SelectedRemoteVersion?.Id);
     }
 
     private void ClearLoaderSelection()
     {
+        var wasFabricApiVisible = IsFabricApiGroupVisible;
+
         _selectedLoaderKey = null;
         _selectedLoaderVersion = null;
 
         foreach (var group in LoaderGroups)
+        {
             foreach (var version in group.Versions)
                 version.IsSelected = false;
+        }
 
         NotifyLoaderSelectionChanged();
         RefreshDefaultVersionName();
+
+        if (wasFabricApiVisible)
+            OnFabricApiVisibilityChanged(SelectedRemoteVersion?.Id);
+    }
+
+    /// <summary>Fabric API 分组的显示状态发生变化：出现时加载列表，隐藏时清除选择。</summary>
+    private void OnFabricApiVisibilityChanged(string? minecraftVersion)
+    {
+        OnPropertyChanged(nameof(IsFabricApiGroupVisible));
+
+        if (IsFabricApiGroupVisible && !string.IsNullOrEmpty(minecraftVersion))
+            PrepareFabricApiGroup(minecraftVersion);
+        else
+            ClearFabricApiSelection();
+
+        RebuildLoaderVersionRows();
+    }
+
+    /// <summary>展开 Fabric API 分组；同一游戏版本只请求一次。</summary>
+    private void PrepareFabricApiGroup(string minecraftVersion)
+    {
+        FabricApiGroup.IsExpanded = true;
+
+        if (string.Equals(_fabricApiLoadedVersion, minecraftVersion, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        _fabricApiLoadedVersion = minecraftVersion;
+        _selectedFabricApiVersion = null;
+        FabricApiGroup.Versions.Clear();
+        FabricApiGroup.IsAvailable = false;
+        FabricApiGroup.IsLoading = true;
+        FabricApiGroup.ErrorText = null;
+        FabricApiGroup.StatusText = "加载中…";
+
+        _fabricApiCts?.Cancel();
+        _fabricApiCts?.Dispose();
+
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _fabricApiCts = cts;
+
+        _ = LoadFabricApiGroupSafeAsync(minecraftVersion, cts.Token);
+    }
+
+    private async Task LoadFabricApiGroupSafeAsync(string minecraftVersion, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await LoadLoaderGroupAsync(
+                FabricApiGroup, minecraftVersion, _loaderVersionsGeneration, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            FabricApiGroup.IsLoading = false;
+            FabricApiGroup.ErrorText = exception.Message;
+            FabricApiGroup.StatusText = "获取失败";
+            UpdateLoaderGroupRows(FabricApiGroup);
+        }
+    }
+
+    private void SelectFabricApiVersion(LoaderVersionItemViewModel item)
+    {
+        if (item.IsSelected)
+        {
+            _selectedFabricApiVersion = null;
+
+            foreach (var version in FabricApiGroup.Versions)
+                version.IsSelected = false;
+        }
+        else
+        {
+            _selectedFabricApiVersion = item.Version;
+
+            foreach (var version in FabricApiGroup.Versions)
+                version.IsSelected = ReferenceEquals(version, item);
+        }
+
+        NotifyFabricApiSelectionChanged();
+    }
+
+    private void ClearFabricApiSelection()
+    {
+        _selectedFabricApiVersion = null;
+
+        foreach (var version in FabricApiGroup.Versions)
+            version.IsSelected = false;
+
+        NotifyFabricApiSelectionChanged();
+    }
+
+    private void NotifyFabricApiSelectionChanged()
+    {
+        OnPropertyChanged(nameof(PrimaryDownloadText));
+        OnPropertyChanged(nameof(CanDownloadSelected));
     }
 
     private void NotifyLoaderSelectionChanged()
@@ -2061,6 +2232,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 loaderVersion,
                 new LoaderInstallOptions
                 {
+                    FabricApiVersion = _selectedFabricApiVersion,
+                    IsolateVersion = DownloadVersionIsolated,
                     Mirror = ResolveLoaderMirror(loader),
                     JavaPath = javaPath,
                     VersionName = desiredName,

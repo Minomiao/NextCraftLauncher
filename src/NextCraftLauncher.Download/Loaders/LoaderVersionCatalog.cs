@@ -30,6 +30,19 @@ public static class LoaderVersionCatalog
     /// <summary>Forge 完整 maven 元数据体积较大，进程内短暂缓存，避免重复下载。</summary>
     private static readonly TimeSpan ForgeMavenCacheDuration = TimeSpan.FromMinutes(10);
 
+    private const string FabricApiMetadataUrl =
+        "https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml";
+
+    /// <summary>Fabric API 的完整版本表只有几十 KB，进程内缓存 12 小时，各游戏版本共用。</summary>
+    private static readonly TimeSpan FabricApiCacheDuration = TimeSpan.FromHours(12);
+
+    private static readonly SemaphoreSlim FabricApiGate = new(1, 1);
+    private static IReadOnlyList<string>? _fabricApiVersions;
+    private static DateTimeOffset _fabricApiFetchedAt;
+
+    private static string FabricApiCachePath => Path.Combine(
+        AppSettings.DataDirectory, "cache", "fabric-api", "maven-metadata.xml");
+
     /// <summary>
     /// 从网络获取加载器列表并写入本地缓存。
     /// 调用方先用 <see cref="LoaderVersionStore.TryLoad"/> 展示缓存，再调用本方法刷新；
@@ -60,6 +73,7 @@ public static class LoaderVersionCatalog
             result = loader.ToLowerInvariant() switch
             {
                 "fabric" => await LoadFabricAsync(minecraftVersion, mirror, cancellationToken),
+                "fabric-api" => await LoadFabricApiAsync(minecraftVersion, mirror, cancellationToken),
                 "forge" => await LoadForgeAsync(minecraftVersion, mirror, cancellationToken),
                 "neoforge" => await LoadNeoForgeAsync(minecraftVersion, mirror, cancellationToken),
                 _ => new LoaderVersionResult(Array.Empty<LoaderVersion>(), null),
@@ -107,6 +121,139 @@ public static class LoaderVersionCatalog
         }
 
         return new LoaderVersionResult(versions, null);
+    }
+
+    /// <summary>
+    /// Fabric API 与 loader 不同：它的版本号带 <c>+&lt;MC 版本&gt;</c> 后缀，
+    /// 因此直接读 maven 元数据并按后缀过滤，不依赖 Modrinth 之类的第三方接口。
+    /// </summary>
+    private static async Task<LoaderVersionResult> LoadFabricApiAsync(
+        string minecraftVersion,
+        DownloadMirror mirror,
+        CancellationToken cancellationToken)
+    {
+        var all = await GetFabricApiVersionsAsync(mirror, cancellationToken);
+        if (all.Count == 0)
+            return new LoaderVersionResult(
+                Array.Empty<LoaderVersion>(), "无法获取 Fabric API 版本列表");
+
+        var suffix = "+" + minecraftVersion;
+        var versions = all
+            .Where(version => version.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(version => version, VersionStringComparer.Instance)
+            .ToList();
+
+        var result = new List<LoaderVersion>(versions.Count);
+        for (var index = 0; index < versions.Count; index++)
+            result.Add(new LoaderVersion(versions[index], index == 0 ? "最新" : null));
+
+        return new LoaderVersionResult(result, null);
+    }
+
+    /// <summary>
+    /// 启动时后台预热 Fabric API 版本表：整个表只拉一次，之后各游戏版本的列表都在本地过滤。
+    /// </summary>
+    public static async Task PrimeFabricApiAsync(DownloadMirror mirror, CancellationToken cancellationToken)
+    {
+        // maven.fabricmc.net 偶尔会卡到超时，后台预热失败时换一组连接再试一次。
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            try
+            {
+                var versions = await GetFabricApiVersionsAsync(mirror, cancellationToken);
+                if (versions.Count > 0) return;
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception)
+            {
+                // 继续重试。
+            }
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
+
+    /// <summary>获取完整的 Fabric API 版本表；优先内存，其次磁盘缓存，最后联网。</summary>
+    private static async Task<IReadOnlyList<string>> GetFabricApiVersionsAsync(
+        DownloadMirror mirror,
+        CancellationToken cancellationToken)
+    {
+        if (IsFabricApiCacheFresh()) return _fabricApiVersions!;
+
+        await FabricApiGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (IsFabricApiCacheFresh()) return _fabricApiVersions!;
+
+            var bytes = await DownloadAsync(FabricApiMetadataUrl, mirror, cancellationToken);
+            if (bytes is { Length: > 0 })
+            {
+                var versions = ParseMavenVersions(bytes);
+                if (versions.Count > 0)
+                {
+                    _fabricApiVersions = versions;
+                    _fabricApiFetchedAt = DateTimeOffset.UtcNow;
+                    TrySaveFabricApiCache(bytes);
+                    return versions;
+                }
+            }
+
+            // 联网失败时回退到上次的磁盘缓存或内存里的旧结果。
+            var cached = TryLoadFabricApiCache();
+            if (cached.Count > 0)
+            {
+                _fabricApiVersions = cached;
+                return cached;
+            }
+
+            return _fabricApiVersions ?? Array.Empty<string>();
+        }
+        finally
+        {
+            FabricApiGate.Release();
+        }
+    }
+
+    private static bool IsFabricApiCacheFresh()
+        => _fabricApiVersions is { Count: > 0 } &&
+           DateTimeOffset.UtcNow - _fabricApiFetchedAt < FabricApiCacheDuration;
+
+    private static void TrySaveFabricApiCache(byte[] bytes)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(FabricApiCachePath);
+            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+            File.WriteAllBytes(FabricApiCachePath, bytes);
+        }
+        catch (Exception)
+        {
+            // 缓存写入失败不影响使用。
+        }
+    }
+
+    private static IReadOnlyList<string> TryLoadFabricApiCache()
+    {
+        try
+        {
+            if (!File.Exists(FabricApiCachePath)) return Array.Empty<string>();
+            return ParseMavenVersions(File.ReadAllBytes(FabricApiCachePath));
+        }
+        catch (Exception)
+        {
+            return Array.Empty<string>();
+        }
     }
 
     // ----------------------------------------------------------------- Forge

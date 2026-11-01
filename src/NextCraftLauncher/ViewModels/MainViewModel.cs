@@ -1427,6 +1427,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _fabricApiCts?.Cancel();
         _fabricApiLoadedVersion = null;
         _selectedFabricApiVersion = null;
+        FabricApiGroup.SelectedVersionText = null;
         FabricApiGroup.Versions.Clear();
         FabricApiGroup.IsAvailable = false;
         FabricApiGroup.IsExpanded = false;
@@ -1580,6 +1581,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         foreach (var group in LoaderGroups)
         {
+            group.SelectedVersionText = string.Equals(group.Key, item.LoaderKey, StringComparison.OrdinalIgnoreCase)
+                ? item.Version
+                : null;
+
             foreach (var version in group.Versions)
                 version.IsSelected = ReferenceEquals(version, item);
         }
@@ -1589,6 +1594,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (IsFabricApiGroupVisible != wasFabricApiVisible)
             OnFabricApiVisibilityChanged(SelectedRemoteVersion?.Id);
+
+        // 选完就收起该分组，标题旁已经能看到选中的版本。
+        CollapseGroup(item.LoaderKey);
+        RefreshLoaderGroupHeaders();
     }
 
     private void ClearLoaderSelection()
@@ -1600,6 +1609,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         foreach (var group in LoaderGroups)
         {
+            group.SelectedVersionText = null;
+
             foreach (var version in group.Versions)
                 version.IsSelected = false;
         }
@@ -1609,6 +1620,38 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (wasFabricApiVisible)
             OnFabricApiVisibilityChanged(SelectedRemoteVersion?.Id);
+        else
+            RefreshLoaderGroupHeaders();
+    }
+
+    /// <summary>重画所有分组的标题行（已选版本可能已变化）。</summary>
+    private void RefreshLoaderGroupHeaders()
+    {
+        foreach (var group in LoaderGroups)
+            UpdateLoaderGroupRows(group, contentChanged: false);
+
+        if (IsFabricApiGroupVisible)
+            UpdateLoaderGroupRows(FabricApiGroup, contentChanged: false);
+    }
+
+    /// <summary>收起某个分组；已收起时只刷新标题以显示新的选中版本。</summary>
+    private void CollapseGroup(string loaderKey)
+    {
+        var group = string.Equals(loaderKey, FabricApiGroup.Key, StringComparison.OrdinalIgnoreCase)
+            ? FabricApiGroup
+            : LoaderGroups.FirstOrDefault(candidate =>
+                string.Equals(candidate.Key, loaderKey, StringComparison.OrdinalIgnoreCase));
+
+        if (group is null) return;
+
+        if (group.IsExpanded)
+        {
+            group.IsExpanded = false;
+            UpdateLoaderGroupRows(group);
+            return;
+        }
+
+        UpdateLoaderGroupRows(group, contentChanged: false);
     }
 
     /// <summary>Fabric API 分组的显示状态发生变化：出现时加载列表，隐藏时清除选择。</summary>
@@ -1673,6 +1716,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (item.IsSelected)
         {
             _selectedFabricApiVersion = null;
+            FabricApiGroup.SelectedVersionText = null;
 
             foreach (var version in FabricApiGroup.Versions)
                 version.IsSelected = false;
@@ -1680,17 +1724,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
         else
         {
             _selectedFabricApiVersion = item.Version;
+            FabricApiGroup.SelectedVersionText = item.Version;
 
             foreach (var version in FabricApiGroup.Versions)
                 version.IsSelected = ReferenceEquals(version, item);
         }
 
         NotifyFabricApiSelectionChanged();
+        CollapseGroup(FabricApiGroup.Key);
     }
 
     private void ClearFabricApiSelection()
     {
         _selectedFabricApiVersion = null;
+        FabricApiGroup.SelectedVersionText = null;
 
         foreach (var version in FabricApiGroup.Versions)
             version.IsSelected = false;

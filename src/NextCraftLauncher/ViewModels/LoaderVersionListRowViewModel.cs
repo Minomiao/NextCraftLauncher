@@ -57,6 +57,11 @@ public sealed class LoaderVersionListRowViewModel
 
     public string? Status => Group?.StatusText;
 
+    /// <summary>分组标题旁显示的已选版本。</summary>
+    public string? SelectionText => Group?.SelectedVersionText;
+
+    public bool HasSelection => !string.IsNullOrEmpty(SelectionText);
+
     public string? Error => Group?.ErrorText;
 
     public string? Chevron => Group is null ? null : Group.IsExpanded ? "▾" : "▸";

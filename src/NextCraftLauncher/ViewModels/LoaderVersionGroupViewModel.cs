@@ -26,4 +26,7 @@ public partial class LoaderVersionGroupViewModel : ObservableObject
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _statusText = "加载中…";
     [ObservableProperty] private string? _errorText;
+
+    /// <summary>已选中的版本号，显示在分组标题旁边；未选中时为 null。</summary>
+    [ObservableProperty] private string? _selectedVersionText;
 }

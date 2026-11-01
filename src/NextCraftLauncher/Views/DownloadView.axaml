@@ -206,11 +206,20 @@
                                                                    Width="10"
                                                                    Opacity="0.5"
                                                                    VerticalAlignment="Center" />
-                                                        <TextBlock Grid.Column="1"
-                                                                   Text="{Binding Title}"
-                                                                   Classes="section"
-                                                                   FontSize="13"
-                                                                   VerticalAlignment="Center" />
+                                                        <StackPanel Grid.Column="1"
+                                                                    Orientation="Horizontal"
+                                                                    Spacing="6"
+                                                                    VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Title}"
+                                                                       Classes="section"
+                                                                       FontSize="13"
+                                                                       VerticalAlignment="Center" />
+                                                            <TextBlock Text="{Binding SelectionText}"
+                                                                       FontSize="12"
+                                                                       Opacity="0.7"
+                                                                       VerticalAlignment="Center"
+                                                                       IsVisible="{Binding HasSelection}" />
+                                                        </StackPanel>
                                                         <TextBlock Grid.Column="2"
                                                                    Text="{Binding Status}"
                                                                    FontSize="11"

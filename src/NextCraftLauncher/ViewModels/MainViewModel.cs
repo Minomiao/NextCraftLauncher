@@ -1257,14 +1257,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void ApplyRemoteManifest(MinecraftVersionManifestResult result, bool markLoaded)
     {
+        if (markLoaded) _remoteManifestLoaded = true;
+
+        // 启动时会先用缓存、再用网络结果各刷新一次。内容没变就不要重建集合：
+        // 重建会让列表整体 Reset，正在按下的行被替换，点击会被丢掉。
+        if (SameManifest(result.Versions))
+        {
+            UpdateRemoteInstalledStatus();
+            return;
+        }
+
         var selectedId = SelectedRemoteVersion?.Id;
 
         _allRemoteVersions.Clear();
         _remoteVersionRows.Clear();
         foreach (var entry in result.Versions)
             _allRemoteVersions.Add(new RemoteVersionItemViewModel(entry, SelectRemoteVersion));
-
-        if (markLoaded) _remoteManifestLoaded = true;
 
         // 重新构建集合后把选中的版本重新指向新实例，避免详情页引用旧对象。
         if (selectedId is not null)
@@ -1283,6 +1291,28 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         UpdateRemoteInstalledStatus();
         ApplyRemoteVersionFilter();
+        LauncherLog.Info($"版本清单已重建：{_allRemoteVersions.Count} 个版本");
+    }
+
+    /// <summary>比较版本列表是否与当前一致（不看 URL / 哈希，这些不影响列表展示）。</summary>
+    private bool SameManifest(IReadOnlyList<MinecraftVersionEntry> versions)
+    {
+        if (versions.Count != _allRemoteVersions.Count) return false;
+
+        for (var index = 0; index < versions.Count; index++)
+        {
+            var incoming = versions[index];
+            var current = _allRemoteVersions[index];
+
+            if (!string.Equals(incoming.Id, current.Id, StringComparison.Ordinal) ||
+                !string.Equals(incoming.Type ?? "unknown", current.Type, StringComparison.Ordinal) ||
+                incoming.ReleaseTime != current.ReleaseTime)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private async Task EnsureRemoteVersionsLoadedAsync()

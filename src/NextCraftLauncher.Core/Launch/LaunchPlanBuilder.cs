@@ -66,6 +66,8 @@ public static class LaunchPlanBuilder
             ["launcher_name"] = LauncherName,
             ["launcher_version"] = LauncherVersion,
             ["natives_directory"] = version.NativesDirectory,
+            ["library_directory"] = Path.Combine(version.MinecraftDirectory, "libraries"),
+            ["classpath_separator"] = Path.PathSeparator.ToString(),
             ["classpath"] = version.Classpath,
             ["resolution_width"] = options.Width.ToString(),
             ["resolution_height"] = options.Height.ToString(),

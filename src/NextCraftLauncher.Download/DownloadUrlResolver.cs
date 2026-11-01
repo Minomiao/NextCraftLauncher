@@ -18,27 +18,37 @@ public static class DownloadUrlResolver
         var hasAlternate = !string.IsNullOrWhiteSpace(alternate) &&
                            !string.Equals(alternate, url, StringComparison.OrdinalIgnoreCase);
 
-        var urls = new List<string>(3);
+        var cdn = ToNeoForgedCdn(url);
+        var hasCdn = !string.IsNullOrWhiteSpace(cdn) &&
+                     !string.Equals(cdn, url, StringComparison.OrdinalIgnoreCase);
+
+        var urls = new List<string>(4);
 
         switch (mirror)
         {
             case DownloadMirror.Official:
                 urls.Add(url);
+                if (hasCdn) urls.Add(cdn!);
                 if (hasAlternate) urls.Add(alternate!);
                 break;
 
             case DownloadMirror.MojangCdn:
                 if (hasAlternate) urls.Add(alternate!);
                 urls.Add(url);
+                if (hasCdn) urls.Add(cdn!);
                 break;
 
             case DownloadMirror.BmclApi:
+                if (hasCdn) urls.Add(cdn!);
                 if (hasMirror) urls.Add(mirrored);
                 urls.Add(url);
                 if (hasAlternate) urls.Add(alternate!);
                 break;
 
             default:
+                // NeoForged 的 maven 官方域名在部分网络下 DNS 被污染，而同一个 CDN 的主机名通常能直连，
+                // 因此自动模式下优先用 CDN 地址，官方域名作为备用。
+                if (hasCdn) urls.Add(cdn!);
                 urls.Add(url);
                 if (hasAlternate) urls.Add(alternate!);
                 if (hasMirror) urls.Add(mirrored);
@@ -47,6 +57,18 @@ public static class DownloadUrlResolver
 
         return urls.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
+
+    /// <summary>
+    /// NeoForged 的 maven 由 CDN 承载；直接使用 CDN 主机名可以绕开被污染的官方域名，
+    /// 返回的文件与官方完全一致（同一 CDN、同一路径）。
+    /// </summary>
+    private static string? ToNeoForgedCdn(string url)
+        => url.Contains("maven.neoforged.net", StringComparison.OrdinalIgnoreCase)
+            ? url.Replace(
+                "maven.neoforged.net",
+                "1755624453.rsc.cdn77.org",
+                StringComparison.OrdinalIgnoreCase)
+            : null;
 
     /// <summary>
     /// Mojang 元数据有两个互通的主机：launchermeta 与 piston-meta。

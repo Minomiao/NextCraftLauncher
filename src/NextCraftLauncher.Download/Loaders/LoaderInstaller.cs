@@ -30,7 +30,11 @@ public sealed class LoaderInstallOptions
 public sealed record LoaderInstallProgress(
     string Text,
     double? Percent,
-    MinecraftDownloadStage Stage);
+    MinecraftDownloadStage Stage)
+{
+    /// <summary>已下载字节数（累计）；非下载阶段为 null，界面据此计算下载速度。</summary>
+    public long? BytesDownloaded { get; init; }
+}
 
 public sealed record LoaderInstallResult(string VersionId, string VersionDirectory);
 
@@ -196,15 +200,30 @@ public static class LoaderInstaller
             AppSettings.DataDirectory, "cache", "installers", installerName);
 
         options.Progress?.Report(new LoaderInstallProgress(
-            $"正在下载 {displayName} 安装器…", 5, MinecraftDownloadStage.Preparing));
+            $"正在下载 {displayName} 安装器…", 0, MinecraftDownloadStage.Preparing));
 
         var downloadUrls = installerUrls
             .SelectMany(url => DownloadUrlResolver.Build(url, options.Mirror))
             .ToList();
 
+        // 安装器 jar 占进度的 0-40%，按字节上报，避免大文件下载期间进度条和速度一直倒退。
+        var jarProgress = new ForwardProgress<DownloadProgress>(report =>
+        {
+            var fraction = report.TotalBytes is > 0
+                ? Math.Min(1, report.BytesReceived / (double)report.TotalBytes.Value)
+                : 0;
+
+            options.Progress?.Report(new LoaderInstallProgress(
+                $"正在下载 {displayName} 安装器…", fraction * 40, MinecraftDownloadStage.Preparing)
+            {
+                BytesDownloaded = report.BytesReceived,
+            });
+        });
+
         await client.DownloadFileAsync(
             downloadUrls,
             installerPath,
+            progress: jarProgress,
             cancellationToken: cancellationToken);
 
         LauncherLog.Info($"{displayName} 安装器：{installerPath}，Java：{options.JavaPath}");
@@ -215,10 +234,11 @@ public static class LoaderInstaller
         // 安装器（Java 进程）会自己去官方 maven 下载它需要的库，在 DNS 被污染的网络下会卡住甚至失败。
         // 先用启动器自己的下载核心把这些库补齐，安装器校验通过后就不再访问网络。
         options.Progress?.Report(new LoaderInstallProgress(
-            $"正在补齐 {displayName} 安装器依赖…", 15, MinecraftDownloadStage.Preparing));
+            $"正在补齐 {displayName} 安装器依赖…", 40, MinecraftDownloadStage.Preparing));
 
         await PrepareInstallerLibrariesAsync(
-            client, minecraftDirectory, installerPath, options.Mirror, cancellationToken);
+            client, minecraftDirectory, installerPath, options.Mirror, displayName,
+            options.Progress, cancellationToken);
 
         var versionsRoot = Path.Combine(minecraftDirectory, "versions");
         var before = SnapshotVersions(versionsRoot);
@@ -274,16 +294,22 @@ public static class LoaderInstaller
         string minecraftDirectory,
         string installerPath,
         DownloadMirror mirror,
+        string displayName,
+        IProgress<LoaderInstallProgress>? progress,
         CancellationToken cancellationToken)
     {
         var libraries = ReadInstallerLibraries(installerPath);
         if (libraries.Count == 0) return;
 
+        var total = libraries.Count;
         var downloaded = 0;
-        foreach (var library in libraries)
+        var transferredBytes = 0L;
+
+        for (var index = 0; index < libraries.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            var library = libraries[index];
             var artifact = library.Downloads?.Artifact;
             var path = artifact?.Path;
             if (string.IsNullOrWhiteSpace(path))
@@ -302,17 +328,34 @@ public static class LoaderInstaller
             var destination = Path.Combine(
                 minecraftDirectory, "libraries", path.Replace('/', Path.DirectorySeparatorChar));
 
+            // 已完成的文件数决定基础进度。
+            var fileIndex = index;
+            var baseBytes = transferredBytes;
+            var fileProgress = new ForwardProgress<DownloadProgress>(report =>
+            {
+                progress?.Report(new LoaderInstallProgress(
+                    $"正在准备 {displayName} 安装器依赖 {fileIndex + 1}/{total}…",
+                    40 + fileIndex / (double)total * 50,
+                    MinecraftDownloadStage.Preparing)
+                {
+                    BytesDownloaded = baseBytes + report.BytesReceived,
+                });
+            });
+
             try
             {
                 var sha1 = string.IsNullOrWhiteSpace(artifact?.Sha1) ? null : artifact!.Sha1;
 
                 // 已存在且校验通过时 DownloadFileAsync 会直接返回，不产生网络请求。
-                await client.DownloadFileAsync(
+                var result = await client.DownloadFileAsync(
                     DownloadUrlResolver.Build(url!, mirror),
                     destination,
                     sha1,
                     artifact is { Size: > 0 } ? artifact.Size : null,
-                    cancellationToken: cancellationToken);
+                    fileProgress,
+                    cancellationToken);
+
+                transferredBytes += result.BytesWritten;
                 downloaded++;
             }
             catch (OperationCanceledException)
@@ -324,10 +367,24 @@ public static class LoaderInstaller
                 // 单个库失败不阻断安装，安装器自己还会再试一次。
                 LauncherLog.Warn($"安装器依赖 {path} 下载失败：{exception.Message}");
             }
+
+            progress?.Report(new LoaderInstallProgress(
+                $"正在准备 {displayName} 安装器依赖 {index + 1}/{total}…",
+                40 + (index + 1) / (double)total * 50,
+                MinecraftDownloadStage.Preparing)
+            {
+                BytesDownloaded = transferredBytes,
+            });
         }
 
         if (downloaded > 0)
             LauncherLog.Info($"安装器依赖：已准备 {downloaded} 个文件");
+    }
+
+    /// <summary>同步转发进度的包装类，真正的线程切换由调用方的 Progress&lt;T&gt; 负责。</summary>
+    private sealed class ForwardProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
     }
 
     private static IReadOnlyList<InstallerLibrary> ReadInstallerLibraries(string installerPath)

@@ -1928,6 +1928,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
                         if (mapped > VersionDownloadPercent) VersionDownloadPercent = mapped;
                     }
 
+                    if (report.BytesDownloaded > 0)
+                        _versionSpeedMeter.Feed(report.BytesDownloaded);
+
                     VersionDownloadText = report.TotalFiles > 0
                         ? $"正在下载原版文件 {report.CompletedFiles}/{report.TotalFiles}..."
                         : "正在下载原版文件...";
@@ -1941,6 +1944,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     vanillaProgress,
                     new MinecraftVersionDownloadOptions { Mirror = ResolveGameMirror() },
                     installCts.Token);
+
+                // 原版文件下载结束后重新计量，安装器阶段的字节从 0 开始。
+                _versionSpeedMeter.Reset();
+                NotifyDownloadStats();
             }
 
             string? javaPath = null;
@@ -1966,13 +1973,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 javaPath = java.Path;
             }
 
+            var lastInstallTicks = 0L;
             var installProgress = new Progress<LoaderInstallProgress>(report =>
             {
+                // 下载回调很密集，限制界面刷新频率；阶段切换与开始/结束阶段一定刷新。
+                var now = Environment.TickCount64;
+                var isPhaseChange = report.Percent is null or >= 100;
+                if (!isPhaseChange && now - lastInstallTicks < 100) return;
+                lastInstallTicks = now;
+
                 if (_versionStage != report.Stage)
                 {
                     _versionStage = report.Stage;
                     NotifyVersionStage();
                 }
+
+                // 安装器依赖与安装器 jar 的下载量累计上报，用于显示实时速度。
+                if (report.BytesDownloaded is long bytes)
+                    _versionSpeedMeter.Feed(bytes);
 
                 if (report.Percent is double percent)
                 {
@@ -1984,6 +2002,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 {
                     // Forge / NeoForge 安装器不提供百分比，由定时器推进进度条。
                     installerRunning = true;
+                    _versionSpeedMeter.Reset();
                 }
 
                 IsVersionInstallIndeterminate = false;

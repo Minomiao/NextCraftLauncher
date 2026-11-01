@@ -17,6 +17,9 @@ public static class LauncherLog
 
     public static string DirectoryPath => Path.Combine(AppSettings.DataDirectory, "log");
 
+    /// <summary>当天的日志文件路径；日志文件按天分，导出错误报告时用它定位。</summary>
+    public static string CurrentFilePath => Path.Combine(DirectoryPath, $"launcher-{DateTime.Now:yyyy-MM-dd}.log");
+
     public static void Initialize()
     {
         lock (Gate)

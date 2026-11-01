@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -329,6 +330,124 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private DownloadSection _currentDownloadSection = DownloadSection.Versions;
     [ObservableProperty] private bool _isVersionDeleteDialogOpen;
     [ObservableProperty] private string _versionDeleteDialogMessage = string.Empty;
+
+    // 下载/安装失败时的置顶错误弹窗。
+    [ObservableProperty] private bool _isDownloadErrorDialogOpen;
+    [ObservableProperty] private string _downloadErrorTitle = string.Empty;
+    [ObservableProperty] private string _downloadErrorHint = string.Empty;
+    private Exception? _downloadErrorException;
+    private string _downloadErrorContext = string.Empty;
+
+    public bool HasDownloadErrorHint => !string.IsNullOrEmpty(DownloadErrorHint);
+
+    partial void OnDownloadErrorHintChanged(string value)
+        => OnPropertyChanged(nameof(HasDownloadErrorHint));
+
+    [RelayCommand]
+    private void CloseDownloadErrorDialog()
+    {
+        IsDownloadErrorDialogOpen = false;
+        DownloadErrorTitle = string.Empty;
+        DownloadErrorHint = string.Empty;
+        _downloadErrorException = null;
+        _downloadErrorContext = string.Empty;
+    }
+
+    /// <summary>展示下载/安装失败的置顶弹窗；错误原因同时写入日志。</summary>
+    private void ShowDownloadError(string context, Exception exception)
+    {
+        _downloadErrorContext = context;
+        _downloadErrorException = exception;
+        DownloadErrorTitle = $"{context} 时出错";
+        DownloadErrorHint = DescribeLikelyCause(exception);
+        IsDownloadErrorDialogOpen = true;
+    }
+
+    /// <summary>生成给他人排查用的错误报告：操作、异常全文与最近的日志。</summary>
+    public string BuildErrorReport()
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("Next Craft Launcher 错误报告");
+        builder.AppendLine($"生成时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        builder.AppendLine($"系统：{Environment.OSVersion}");
+        builder.AppendLine($"运行时：.NET {Environment.Version}");
+        builder.AppendLine($"操作：{_downloadErrorContext}");
+        if (HasDownloadErrorHint)
+            builder.AppendLine($"推测：{DownloadErrorHint}");
+
+        builder.AppendLine();
+        builder.AppendLine("错误详情：");
+        builder.AppendLine(_downloadErrorException?.ToString() ?? "（无异常信息）");
+        builder.AppendLine();
+        builder.AppendLine("===== 最近的日志 =====");
+        builder.AppendLine(ReadRecentLog(400));
+        return builder.ToString();
+    }
+
+    private static string ReadRecentLog(int maxLines)
+    {
+        try
+        {
+            var path = LauncherLog.CurrentFilePath;
+            if (!File.Exists(path)) return "（没有日志文件）";
+
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+
+            var lines = new List<string>();
+            while (reader.ReadLine() is { } line)
+            {
+                lines.Add(line);
+                if (lines.Count > maxLines) lines.RemoveAt(0);
+            }
+
+            return string.Join(Environment.NewLine, lines);
+        }
+        catch (Exception exception)
+        {
+            return $"（读取日志失败：{exception.Message}）";
+        }
+    }
+
+    /// <summary>根据异常文本猜测可能的原因；无法判断时返回空字符串（界面不显示该行）。</summary>
+    private static string DescribeLikelyCause(Exception exception)
+    {
+        var messages = new StringBuilder();
+        for (var current = exception; current is not null; current = current.InnerException)
+            messages.Append(current.Message).Append(' ');
+
+        var text = messages.ToString();
+
+        if (Contains("certificate") || Contains("SSL") || Contains("TLS") || Contains("证书"))
+            return "TLS 证书校验失败：下载源节点证书异常，或网络中存在代理/劫持。可到「下载设置」切换游戏版本源后重试。";
+
+        if (Contains("429") || Contains("Too Many Requests") || Contains("限流"))
+            return "下载源正在限流：稍等几分钟再试，或切换下载源。";
+
+        if (Contains("503") || Contains("502") || Contains("504") || Contains("Bad Gateway") || Contains("Service Unavailable"))
+            return "下载源暂时不可用：可切换下载源后重试。";
+
+        if (Contains("404") || Contains("403") || Contains("Not Found") || Contains("Forbidden"))
+            return "下载源上找不到对应文件：建议把游戏版本源切到「官方」后重试。";
+
+        if (Contains("timed out") || Contains("timeout") || Contains("超时") || Contains("停滞") ||
+            Contains("拒绝连接") || Contains("actively refused") || Contains("无法连接") ||
+            Contains("Name or service not known") || Contains("无法解析"))
+            return "网络连接超时或不可达：检查网络/代理设置，或切换下载源后重试。";
+
+        if (Contains("No space") || Contains("disk full") || Contains("空间不足"))
+            return "磁盘空间不足：请清理游戏目录所在磁盘后重试。";
+
+        if (Contains("UnauthorizedAccess") || Contains("拒绝访问") || Contains("being used") || Contains("被占用"))
+            return "文件无法写入：游戏目录权限不足，或文件正被其他程序（包括正在运行的游戏）占用。";
+
+        if (Contains("SHA-1") || Contains("校验失败"))
+            return "文件校验失败：下载到的内容不完整，可能是下载源或网络问题，重试或切换下载源。";
+
+        return string.Empty;
+
+        bool Contains(string keyword) => text.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
 
     private DownloadSection _previousDownloadSection = DownloadSection.Versions;
 
@@ -1716,6 +1835,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             Status = "版本下载失败";
             VersionDownloadText = "下载失败";
             LauncherLog.Error($"版本 {item.Id} 下载失败", exception);
+            ShowDownloadError($"下载 Minecraft {item.Id}", exception);
         }
         finally
         {
@@ -1920,9 +2040,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            Status = $"加载器安装失败：{exception.Message}";
+            Status = $"{displayName} {loaderVersion} 安装失败";
             VersionDownloadText = "安装失败";
             LauncherLog.Error($"{displayName} {loaderVersion} 安装失败", exception);
+            ShowDownloadError($"安装 {displayName} {loaderVersion}", exception);
         }
         finally
         {
@@ -2171,6 +2292,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             Status = "Java 下载失败";
             JavaDownloadText = "下载失败";
             LauncherLog.Error($"{label} 下载失败", exception);
+            ShowDownloadError($"下载 {label}", exception);
         }
         finally
         {

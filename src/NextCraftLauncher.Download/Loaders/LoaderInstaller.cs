@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NextCraftLauncher.Core.Logging;
@@ -211,6 +212,14 @@ public static class LoaderInstaller
         if (string.IsNullOrWhiteSpace(options.JavaPath))
             throw new InvalidOperationException($"运行 {displayName} 安装器需要 Java，但没有找到可用的 Java。");
 
+        // 安装器（Java 进程）会自己去官方 maven 下载它需要的库，在 DNS 被污染的网络下会卡住甚至失败。
+        // 先用启动器自己的下载核心把这些库补齐，安装器校验通过后就不再访问网络。
+        options.Progress?.Report(new LoaderInstallProgress(
+            $"正在补齐 {displayName} 安装器依赖…", 15, MinecraftDownloadStage.Preparing));
+
+        await PrepareInstallerLibrariesAsync(
+            client, minecraftDirectory, installerPath, options.Mirror, cancellationToken);
+
         var versionsRoot = Path.Combine(minecraftDirectory, "versions");
         var before = SnapshotVersions(versionsRoot);
 
@@ -254,6 +263,124 @@ public static class LoaderInstaller
 
         return new LoaderInstallResult(
             finalId, Path.Combine(versionsRoot, finalId));
+    }
+
+    /// <summary>
+    /// 按安装器内置的 <c>install_profile.json</c> 预先下载它需要的库。
+    /// 安装器发现文件已存在且校验通过时就不会再联网，因此能绕开它自己请求官方 maven 的问题。
+    /// </summary>
+    private static async Task PrepareInstallerLibrariesAsync(
+        DownloadClient client,
+        string minecraftDirectory,
+        string installerPath,
+        DownloadMirror mirror,
+        CancellationToken cancellationToken)
+    {
+        var libraries = ReadInstallerLibraries(installerPath);
+        if (libraries.Count == 0) return;
+
+        var downloaded = 0;
+        foreach (var library in libraries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var artifact = library.Downloads?.Artifact;
+            var path = artifact?.Path;
+            if (string.IsNullOrWhiteSpace(path))
+                path = DeriveMavenPath(library.Name);
+            if (string.IsNullOrWhiteSpace(path)) continue;
+
+            var url = artifact?.Url;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                var baseUrl = string.IsNullOrWhiteSpace(library.Url)
+                    ? "https://maven.neoforged.net/releases/"
+                    : library.Url!;
+                url = baseUrl.TrimEnd('/') + "/" + path;
+            }
+
+            var destination = Path.Combine(
+                minecraftDirectory, "libraries", path.Replace('/', Path.DirectorySeparatorChar));
+
+            try
+            {
+                var sha1 = string.IsNullOrWhiteSpace(artifact?.Sha1) ? null : artifact!.Sha1;
+
+                // 已存在且校验通过时 DownloadFileAsync 会直接返回，不产生网络请求。
+                await client.DownloadFileAsync(
+                    DownloadUrlResolver.Build(url!, mirror),
+                    destination,
+                    sha1,
+                    artifact is { Size: > 0 } ? artifact.Size : null,
+                    cancellationToken: cancellationToken);
+                downloaded++;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                // 单个库失败不阻断安装，安装器自己还会再试一次。
+                LauncherLog.Warn($"安装器依赖 {path} 下载失败：{exception.Message}");
+            }
+        }
+
+        if (downloaded > 0)
+            LauncherLog.Info($"安装器依赖：已准备 {downloaded} 个文件");
+    }
+
+    private static IReadOnlyList<InstallerLibrary> ReadInstallerLibraries(string installerPath)
+    {
+        try
+        {
+            using var archive = ZipFile.OpenRead(installerPath);
+            var entry = archive.GetEntry("install_profile.json");
+            if (entry is null) return Array.Empty<InstallerLibrary>();
+
+            using var stream = entry.Open();
+            var profile = JsonSerializer.Deserialize<InstallerProfile>(stream, JsonOptions);
+
+            return profile?.Libraries?
+                .Where(library => library.Clientreq != false)
+                .ToList()
+                ?? (IReadOnlyList<InstallerLibrary>)Array.Empty<InstallerLibrary>();
+        }
+        catch (Exception exception)
+        {
+            LauncherLog.Warn($"读取安装器配置失败：{exception.Message}");
+            return Array.Empty<InstallerLibrary>();
+        }
+    }
+
+    private sealed class InstallerProfile
+    {
+        public List<InstallerLibrary>? Libraries { get; set; }
+    }
+
+    private sealed class InstallerLibrary
+    {
+        public string? Name { get; set; }
+
+        /// <summary>旧版安装配置的字段，false 表示只在服务端安装时使用。</summary>
+        public bool? Clientreq { get; set; }
+
+        public string? Url { get; set; }
+
+        public InstallerLibraryDownloads? Downloads { get; set; }
+    }
+
+    private sealed class InstallerLibraryDownloads
+    {
+        public InstallerLibraryArtifact? Artifact { get; set; }
+    }
+
+    private sealed class InstallerLibraryArtifact
+    {
+        public string? Path { get; set; }
+        public string? Url { get; set; }
+        public string? Sha1 { get; set; }
+        public long Size { get; set; }
     }
 
     private static async Task<(int ExitCode, IReadOnlyList<string> Output)> RunInstallerAsync(

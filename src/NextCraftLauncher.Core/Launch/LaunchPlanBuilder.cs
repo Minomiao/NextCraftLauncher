@@ -9,7 +9,8 @@ public sealed record LaunchOptions(
     int MemoryMb,
     bool IsolateGameDirectory,
     int Width = 854,
-    int Height = 480);
+    int Height = 480,
+    bool Fullscreen = false);
 
 public sealed class LaunchPlan
 {
@@ -105,6 +106,9 @@ public static class LaunchPlanBuilder
 
         foreach (var argument in BuildGameArguments(version, environment, placeholders))
             arguments.Add(argument);
+
+        if (options.Fullscreen)
+            arguments.Add("--fullscreen");
 
         return new LaunchPlan
         {

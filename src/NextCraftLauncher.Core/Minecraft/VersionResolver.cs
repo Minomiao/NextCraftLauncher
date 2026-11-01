@@ -1,3 +1,5 @@
+using NextCraftLauncher.Core.Settings;
+
 namespace NextCraftLauncher.Core.Minecraft;
 
 public sealed record ResolvedLibrary(string Name, string Path, string? Url);
@@ -32,7 +34,10 @@ public sealed class ResolvedVersion
 /// </summary>
 public static class VersionResolver
 {
-    public static ResolvedVersion Resolve(string minecraftDirectory, string versionId)
+    public static ResolvedVersion Resolve(
+        string minecraftDirectory,
+        string versionId,
+        DefaultIsolationMode defaultIsolation = DefaultIsolationMode.All)
     {
         var chain = LoadChain(minecraftDirectory, versionId);
         var merged = Merge(chain);
@@ -124,7 +129,8 @@ public static class VersionResolver
                 minecraftDirectory,
                 versionId,
                 merged.Type,
-                !string.IsNullOrEmpty(merged.InheritsFrom)),
+                !string.IsNullOrEmpty(merged.InheritsFrom),
+                defaultIsolation),
             Libraries = libraries,
             NativeLibraries = nativeLibraries,
             MissingFiles = missingFiles,

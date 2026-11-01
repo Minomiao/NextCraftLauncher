@@ -31,6 +31,27 @@ public sealed class AppSettings
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public DownloadMirror NeoForgeMirror { get; set; } = DownloadMirror.Automatic;
 
+    /// <summary>没有单独设置隔离方式的版本采用的默认策略。</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public DefaultIsolationMode DefaultIsolation { get; set; } = DefaultIsolationMode.All;
+
+    /// <summary>游戏启动后启动器窗口的处理方式。</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public LauncherVisibilityAfterLaunch LauncherVisibility { get; set; } = LauncherVisibilityAfterLaunch.Keep;
+
+    /// <summary>游戏进程优先级。</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public GameProcessPriority GameProcessPriority { get; set; } = GameProcessPriority.Normal;
+
+    /// <summary>游戏窗口大小模式。</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public GameWindowSizeMode GameWindowSize { get; set; } = GameWindowSizeMode.Default;
+
+    /// <summary>自定义窗口尺寸（仅在 <see cref="GameWindowSize"/> 为 Custom 时使用）。</summary>
+    public int GameWindowWidth { get; set; } = 1280;
+
+    public int GameWindowHeight { get; set; } = 720;
+
     /// <summary>启动器数据目录，固定位于启动器 exe 同级的 NCL 文件夹。</summary>
     public static string DataDirectory => Path.Combine(AppContext.BaseDirectory, "NCL");
 
@@ -71,6 +92,9 @@ public sealed class AppSettings
         ForgeMirror = NormalizeMirror(ForgeMirror);
         FabricMirror = NormalizeMirror(FabricMirror);
         NeoForgeMirror = NormalizeMirror(NeoForgeMirror);
+
+        GameWindowWidth = Math.Clamp(GameWindowWidth, 320, 7680);
+        GameWindowHeight = Math.Clamp(GameWindowHeight, 240, 4320);
 
         var directories = new List<string>();
 

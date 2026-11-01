@@ -8,15 +8,81 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using NextCraftLauncher.Core.Logging;
+using NextCraftLauncher.Core.Settings;
 using NextCraftLauncher.ViewModels;
 
 namespace NextCraftLauncher.Views;
 
 public partial class MainWindow : Window
 {
+    private MainViewModel? _viewModel;
+
     public MainWindow()
     {
         InitializeComponent();
+        SizeChanged += (_, _) => ReportMetrics();
+    }
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+
+        if (_viewModel is not null)
+        {
+            _viewModel.GameStarted -= OnGameStarted;
+            _viewModel.GameExited -= OnGameExited;
+        }
+
+        _viewModel = DataContext as MainViewModel;
+
+        if (_viewModel is not null)
+        {
+            _viewModel.GameStarted += OnGameStarted;
+            _viewModel.GameExited += OnGameExited;
+            ReportMetrics();
+        }
+    }
+
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        ReportMetrics();
+    }
+
+    /// <summary>把窗口尺寸与主屏工作区同步给启动设置（游戏窗口尺寸用物理像素）。</summary>
+    private void ReportMetrics()
+    {
+        if (_viewModel is null) return;
+
+        var scaling = RenderScaling <= 0 ? 1 : RenderScaling;
+        var screen = Screens.Primary?.WorkingArea ?? default;
+
+        _viewModel.UpdateLauncherWindowMetrics(
+            Bounds.Width * scaling,
+            Bounds.Height * scaling,
+            screen.Width,
+            screen.Height);
+    }
+
+    private void OnGameStarted(object? sender, LauncherVisibilityAfterLaunch visibility)
+    {
+        switch (visibility)
+        {
+            case LauncherVisibilityAfterLaunch.Minimize:
+                WindowState = WindowState.Minimized;
+                break;
+
+            case LauncherVisibilityAfterLaunch.Hide:
+                Hide();
+                break;
+        }
+    }
+
+    private void OnGameExited(object? sender, EventArgs e)
+    {
+        if (!IsVisible) Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
     }
 
     private void OnMinimizeClick(object? sender, RoutedEventArgs e)

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using NextCraftLauncher.Core.Settings;
 using NextCraftLauncher.Core.Util;
 
 namespace NextCraftLauncher.Core.Minecraft;
@@ -10,6 +11,7 @@ public enum VersionIsolationSource
     HmclVersionConfig,
     FolderLayout,
     PclGlobalConfig,
+    LauncherDefault,
 }
 
 public sealed record VersionIsolation(bool IsIsolated, VersionIsolationSource Source)
@@ -20,14 +22,14 @@ public sealed record VersionIsolation(bool IsIsolated, VersionIsolationSource So
         VersionIsolationSource.HmclVersionConfig => IsIsolated ? "开启（HMCL 版本设置）" : "关闭（HMCL 版本设置）",
         VersionIsolationSource.FolderLayout => "开启（版本目录内已有 Mod / 存档）",
         VersionIsolationSource.PclGlobalConfig => IsIsolated ? "开启（PCL2 全局设置）" : "关闭（PCL2 全局设置）",
+        VersionIsolationSource.LauncherDefault => IsIsolated ? "开启（启动器默认设置）" : "关闭（启动器默认设置）",
         _ => "关闭（未检测到隔离配置）",
     };
 }
 
 /// <summary>
-/// 按照 PCL2 的实际规则判断版本隔离：
-/// 版本级 VersionArgumentIndieV2/VersionArgumentIndie → 目录特征（mods 有文件 / saves 有子目录）
-/// → 全局 LaunchArgumentIndieV2 的 0–4 模式。隔离后游戏目录为 versions/&lt;id&gt;。
+/// 按优先级判断版本隔离：版本级 PCL2 / HMCL 配置 → 目录特征（mods 有文件 / saves 有子目录）
+/// → 启动器的「默认版本隔离」策略。隔离后游戏目录为 versions/&lt;id&gt;。
 /// </summary>
 public static class VersionIsolationDetector
 {
@@ -35,7 +37,8 @@ public static class VersionIsolationDetector
         string minecraftDirectory,
         string versionId,
         string? effectiveType = null,
-        bool modable = false)
+        bool modable = false,
+        DefaultIsolationMode defaultMode = DefaultIsolationMode.All)
     {
         var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionId);
         var versionIni = IniFile.Read(Path.Combine(versionDirectory, "PCL", "Setup.ini"));
@@ -57,28 +60,20 @@ public static class VersionIsolationDetector
         if (HasIsolationMarkers(versionDirectory))
             return new VersionIsolation(true, VersionIsolationSource.FolderLayout);
 
-        var globalIni = IniFile.Read(Path.Combine(minecraftDirectory, "PCL", "Setup.ini"));
-        if (globalIni.Exists)
+        var isRelease = !string.Equals(effectiveType, "snapshot", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(effectiveType, "old_beta", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(effectiveType, "old_alpha", StringComparison.OrdinalIgnoreCase);
+
+        var isolated = defaultMode switch
         {
-            // PCL2 的默认值是 4（隔离所有版本）。
-            var mode = globalIni.GetInt("LaunchArgumentIndieV2") ?? 4;
-            var isRelease = !string.Equals(effectiveType, "snapshot", StringComparison.OrdinalIgnoreCase) &&
-                            !string.Equals(effectiveType, "old_beta", StringComparison.OrdinalIgnoreCase) &&
-                            !string.Equals(effectiveType, "old_alpha", StringComparison.OrdinalIgnoreCase);
+            DefaultIsolationMode.Off => false,
+            DefaultIsolationMode.Moddable => modable,
+            DefaultIsolationMode.NonRelease => !isRelease,
+            DefaultIsolationMode.ModdableOrNonRelease => !isRelease || modable,
+            _ => true,
+        };
 
-            var isolated = mode switch
-            {
-                0 => false,
-                1 => modable,
-                2 => !isRelease,
-                3 => !isRelease || modable,
-                _ => true,
-            };
-
-            return new VersionIsolation(isolated, VersionIsolationSource.PclGlobalConfig);
-        }
-
-        return new VersionIsolation(false, VersionIsolationSource.None);
+        return new VersionIsolation(isolated, VersionIsolationSource.LauncherDefault);
     }
 
     private static bool? ReadHmclIsolation(string path)

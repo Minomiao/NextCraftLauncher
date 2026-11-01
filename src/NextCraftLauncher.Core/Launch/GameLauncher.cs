@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using NextCraftLauncher.Core.Settings;
 
 namespace NextCraftLauncher.Core.Launch;
 
@@ -11,6 +12,8 @@ public static class GameLauncher
     public static async Task<int> RunAsync(
         LaunchPlan plan,
         IProgress<string>? log = null,
+        GameProcessPriority priority = GameProcessPriority.Normal,
+        Action? started = null,
         CancellationToken cancellationToken = default)
     {
         var startInfo = new ProcessStartInfo(plan.JavaPath)
@@ -38,6 +41,9 @@ public static class GameLauncher
         if (!process.Start())
             throw new InvalidOperationException("无法启动 Java 进程。");
 
+        ApplyPriority(process, priority);
+        started?.Invoke();
+
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
@@ -54,6 +60,26 @@ public static class GameLauncher
         // 确保异步输出事件全部送达。
         process.WaitForExit();
         return process.ExitCode;
+    }
+
+    /// <summary>调整游戏进程优先级；权限不足时保持系统默认，不影响启动。</summary>
+    private static void ApplyPriority(Process process, GameProcessPriority priority)
+    {
+        try
+        {
+            process.PriorityClass = priority switch
+            {
+                GameProcessPriority.Low => ProcessPriorityClass.Idle,
+                GameProcessPriority.BelowNormal => ProcessPriorityClass.BelowNormal,
+                GameProcessPriority.AboveNormal => ProcessPriorityClass.AboveNormal,
+                GameProcessPriority.High => ProcessPriorityClass.High,
+                _ => ProcessPriorityClass.Normal,
+            };
+        }
+        catch (Exception)
+        {
+            // 高优先级需要额外权限，失败时保持默认。
+        }
     }
 
     public static string Describe(LaunchPlan plan)

@@ -63,6 +63,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _selectedFabricMirrorIndex = LoaderMirrorIndexFrom(_settings.FabricMirror);
         _selectedNeoForgeMirrorIndex = LoaderMirrorIndexFrom(_settings.NeoForgeMirror);
         _downloadVersionIsolated = _settings.DownloadVersionIsolated;
+        _selectedIsolationIndex = (int)_settings.DefaultIsolation;
+        _selectedLauncherVisibilityIndex = (int)_settings.LauncherVisibility;
+        _selectedProcessPriorityIndex = (int)_settings.GameProcessPriority;
+        _selectedWindowSizeIndex = (int)_settings.GameWindowSize;
+        _customWindowWidth = _settings.GameWindowWidth;
+        _customWindowHeight = _settings.GameWindowHeight;
 
         foreach (var directory in _settings.GameDirectories)
             GameFolders.Add(new GameFolderItemViewModel(directory));
@@ -296,6 +302,46 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<int> MemoryOptions { get; } = new(new[] { 1024, 2048, 4096, 6144, 8192, 12288, 16384 });
 
+    public IReadOnlyList<string> IsolationOptions { get; } = new[]
+    {
+        "关闭",
+        "隔离可安装 Mod 的版本",
+        "隔离非正式版",
+        "隔离可安装 Mod 的版本与非正式版",
+        "隔离所有版本",
+    };
+
+    public IReadOnlyList<string> LauncherVisibilityOptions { get; } = new[]
+    {
+        "游戏启动后保持不变",
+        "最小化",
+        "隐藏（启动器退到后台）",
+    };
+
+    public IReadOnlyList<string> ProcessPriorityOptions { get; } = new[]
+    {
+        "低",
+        "低于正常",
+        "正常（默认）",
+        "高于正常",
+        "高",
+    };
+
+    public IReadOnlyList<string> WindowSizeOptions { get; } = new[]
+    {
+        "全屏",
+        "默认",
+        "与启动器尺寸一致",
+        "自定义尺寸",
+        "最大化",
+    };
+
+    public bool IsCustomWindowSize =>
+        SelectedWindowSizeIndex == (int)GameWindowSizeMode.Custom;
+
+    /// <summary>当前版本隔离方式的来源说明；未选版本时为空。</summary>
+    public string IsolationDescription => _resolved?.Isolation.Description ?? string.Empty;
+
     public IReadOnlyList<string> DownloadMirrors { get; } = new[]
     {
         "自动",
@@ -333,6 +379,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private RemoteVersionItemViewModel? _selectedRemoteVersion;
     [ObservableProperty] private bool _isRemoteVersionDetailOpen;
     [ObservableProperty] private bool _downloadVersionIsolated = true;
+
+    // ---- 启动设置（与 PCL2 的「启动选项」对应） ----
+    [ObservableProperty] private int _selectedIsolationIndex;
+    [ObservableProperty] private int _selectedLauncherVisibilityIndex;
+    [ObservableProperty] private int _selectedProcessPriorityIndex;
+    [ObservableProperty] private int _selectedWindowSizeIndex;
+    [ObservableProperty] private double _customWindowWidth = 1280;
+    [ObservableProperty] private double _customWindowHeight = 720;
     [ObservableProperty] private bool _isDownloadingVersion;
     [ObservableProperty] private bool _isVersionInstallIndeterminate;
     [ObservableProperty] private string _versionName = string.Empty;
@@ -1034,6 +1088,68 @@ public partial class MainViewModel : ObservableObject, IDisposable
         apply(mirror);
         _settings.Save();
         _loaderMirrorDirty = true;
+    }
+
+    partial void OnSelectedIsolationIndexChanged(int value)
+    {
+        var mode = value is >= 0 and <= 4 ? (DefaultIsolationMode)value : DefaultIsolationMode.All;
+        if (_settings.DefaultIsolation == mode) return;
+
+        _settings.DefaultIsolation = mode;
+        _settings.Save();
+
+        // 重新解析当前版本，让隔离方式立即按新默认值生效。
+        if (SelectedVersion is not null)
+            _ = LoadDetailsAsync(SelectedVersion);
+    }
+
+    partial void OnSelectedLauncherVisibilityIndexChanged(int value)
+    {
+        var visibility = value is >= 0 and <= 2
+            ? (LauncherVisibilityAfterLaunch)value
+            : LauncherVisibilityAfterLaunch.Keep;
+        if (_settings.LauncherVisibility == visibility) return;
+
+        _settings.LauncherVisibility = visibility;
+        _settings.Save();
+    }
+
+    partial void OnSelectedProcessPriorityIndexChanged(int value)
+    {
+        var priority = value is >= 0 and <= 4 ? (GameProcessPriority)value : GameProcessPriority.Normal;
+        if (_settings.GameProcessPriority == priority) return;
+
+        _settings.GameProcessPriority = priority;
+        _settings.Save();
+    }
+
+    partial void OnSelectedWindowSizeIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsCustomWindowSize));
+
+        var size = value is >= 0 and <= 4 ? (GameWindowSizeMode)value : GameWindowSizeMode.Default;
+        if (_settings.GameWindowSize == size) return;
+
+        _settings.GameWindowSize = size;
+        _settings.Save();
+    }
+
+    partial void OnCustomWindowWidthChanged(double value)
+    {
+        var width = (int)Math.Clamp(value, 320, 7680);
+        if (_settings.GameWindowWidth == width) return;
+
+        _settings.GameWindowWidth = width;
+        _settings.Save();
+    }
+
+    partial void OnCustomWindowHeightChanged(double value)
+    {
+        var height = (int)Math.Clamp(value, 240, 4320);
+        if (_settings.GameWindowHeight == height) return;
+
+        _settings.GameWindowHeight = height;
+        _settings.Save();
     }
 
     private DownloadMirror ResolveGameMirror() => ToDownloadMirror(SelectedGameMirrorIndex);
@@ -2571,6 +2687,58 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>游戏启动后启动器窗口需要做何处理（由主窗口订阅执行）。</summary>
+    public event EventHandler<LauncherVisibilityAfterLaunch>? GameStarted;
+
+    /// <summary>游戏退出后通知主窗口恢复显示。</summary>
+    public event EventHandler? GameExited;
+
+    private int _launcherWindowWidth;
+    private int _launcherWindowHeight;
+    private int _primaryScreenWidth;
+    private int _primaryScreenHeight;
+
+    /// <summary>主窗口把自身尺寸与主屏幕工作区同步给启动设置使用。</summary>
+    public void UpdateLauncherWindowMetrics(
+        double windowWidth,
+        double windowHeight,
+        double screenWidth,
+        double screenHeight)
+    {
+        _launcherWindowWidth = (int)Math.Round(windowWidth);
+        _launcherWindowHeight = (int)Math.Round(windowHeight);
+        _primaryScreenWidth = (int)Math.Round(screenWidth);
+        _primaryScreenHeight = (int)Math.Round(screenHeight);
+    }
+
+    /// <summary>按「窗口大小」设置计算游戏窗口尺寸，并返回是否全屏。</summary>
+    private (int Width, int Height, bool Fullscreen) ResolveGameWindow()
+    {
+        switch (_settings.GameWindowSize)
+        {
+            case GameWindowSizeMode.Fullscreen:
+                return (854, 480, true);
+
+            case GameWindowSizeMode.SameAsLauncher:
+                return (
+                    _launcherWindowWidth > 0 ? _launcherWindowWidth : 854,
+                    _launcherWindowHeight > 0 ? _launcherWindowHeight : 480,
+                    false);
+
+            case GameWindowSizeMode.Custom:
+                return (_settings.GameWindowWidth, _settings.GameWindowHeight, false);
+
+            case GameWindowSizeMode.Maximized:
+                return (
+                    _primaryScreenWidth > 0 ? _primaryScreenWidth : 1280,
+                    _primaryScreenHeight > 0 ? _primaryScreenHeight : 720,
+                    false);
+
+            default:
+                return (854, 480, false);
+        }
+    }
+
     [RelayCommand]
     private async Task LaunchAsync()
     {
@@ -2579,19 +2747,30 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsLaunching = true;
         Status = "正在启动...";
 
+        var started = false;
+
         try
         {
-            var options = new LaunchOptions(PlayerName, MemoryMb, IsVersionIsolated);
+            var (width, height, fullscreen) = ResolveGameWindow();
+            var options = new LaunchOptions(
+                PlayerName, MemoryMb, IsVersionIsolated, width, height, fullscreen);
             var plan = LaunchPlanBuilder.Build(_resolved, SelectedJava, options);
 
             LauncherLog.Info($"启动游戏：{_resolved.Id}（Java {SelectedJava.MajorVersion}）");
 
             // 游戏输出直接在当前线程写入日志，不占用 UI 线程。
             var gameLog = new InlineProgress<string>(LauncherLog.Game);
+            var visibility = _settings.LauncherVisibility;
 
             var exitCode = await GameLauncher.RunAsync(
                 plan,
                 gameLog,
+                _settings.GameProcessPriority,
+                () =>
+                {
+                    started = true;
+                    GameStarted?.Invoke(this, visibility);
+                },
                 _lifetime.Token);
 
             Status = exitCode == 0 ? "游戏已退出" : $"游戏异常退出（代码 {exitCode}）";
@@ -2610,6 +2789,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         finally
         {
             IsLaunching = false;
+
+            if (started)
+                GameExited?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -2648,6 +2830,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             _resolved = null;
             VersionDetails = "请选择左侧版本。";
+            OnPropertyChanged(nameof(IsolationDescription));
             UpdateLaunchWarning();
             return;
         }
@@ -2658,12 +2841,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         try
         {
-            var resolved = await Task.Run(() => VersionResolver.Resolve(MinecraftDirectory, item.Id), _lifetime.Token);
+            var resolved = await Task.Run(
+                () => VersionResolver.Resolve(MinecraftDirectory, item.Id, _settings.DefaultIsolation),
+                _lifetime.Token);
             if (revision != _detailsRevision) return;
 
             _resolved = resolved;
             IsVersionIsolated = resolved.Isolation.IsIsolated;
             OnPropertyChanged(nameof(EffectiveGameDirectory));
+            OnPropertyChanged(nameof(IsolationDescription));
             VersionDetails = BuildDetailsText(resolved);
 
             var bestJava = JavaLocator.SelectBest(JavaRuntimes, resolved.RequiredJavaMajor);
@@ -2680,6 +2866,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             _resolved = null;
             VersionDetails = "解析失败: " + exception.Message;
+            OnPropertyChanged(nameof(IsolationDescription));
             UpdateLaunchWarning();
         }
     }

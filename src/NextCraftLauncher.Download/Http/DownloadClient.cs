@@ -100,8 +100,8 @@ public sealed class DownloadClient : IDisposable
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// 源级冷却：证书校验失败这类错误与路径无关，同一个源的所有地址都会失败，
-    /// 因此直接按源跳过，而不是等每个路径各自失败三次。
+    /// 源级冷却：证书校验失败这类错误与路径无关，同一个主机下的所有地址都会失败，
+    /// 因此直接按主机跳过，而不是等每个路径各自失败三次。
     /// </summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _sourceUnavailableUntil =
         new(StringComparer.OrdinalIgnoreCase);
@@ -603,14 +603,17 @@ public sealed class DownloadClient : IDisposable
         return null;
     }
 
+    private static string? GetHostKey(string url)
+        => Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host : null;
+
     private bool IsUnavailable(string url)
     {
         var prefix = GetPrefix(url);
         if (prefix is null) return false;
 
-        var source = GetSourceKey(url);
-        if (source is not null &&
-            _sourceUnavailableUntil.TryGetValue(source, out var sourceUntil) &&
+        var host = GetHostKey(url);
+        if (host is not null &&
+            _sourceUnavailableUntil.TryGetValue(host, out var sourceUntil) &&
             Environment.TickCount64 < sourceUntil)
         {
             return true;
@@ -656,10 +659,10 @@ public sealed class DownloadClient : IDisposable
             return;
         }
 
-        // 证书校验失败和具体路径无关，整个源一起跳过，避免几千个文件逐个撞同一个坏节点。
-        if (IsSourceLevelFailure(exception) && GetSourceKey(url) is { } source)
+        // 证书校验失败和具体路径无关，同一主机一起跳过，避免几千个文件逐个撞同一个坏节点。
+        if (IsSourceLevelFailure(exception) && GetHostKey(url) is { } host)
         {
-            _sourceUnavailableUntil[source] = Environment.TickCount64 + (long)ThrottleCooldown.TotalMilliseconds;
+            _sourceUnavailableUntil[host] = Environment.TickCount64 + (long)ThrottleCooldown.TotalMilliseconds;
             return;
         }
 

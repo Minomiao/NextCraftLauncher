@@ -41,7 +41,12 @@ public sealed class DownloadClient : IDisposable
     /// </summary>
     private static readonly TimeSpan MirrorHedgeDelay = TimeSpan.FromMilliseconds(800);
 
-    /// <summary>同一路径前缀连续失败多少次后跳过该源。</summary>
+    /// <summary>同一地址遇到证书错误的原地重试次数（镜像的 302 目标节点是轮换的）。</summary>
+    private const int RedirectRetryCount = 3;
+
+    /// <summary>
+    /// 同一路径前缀连续失败多少次后跳过该源。
+    /// </summary>
     private const int PrefixFailureThreshold = 3;
 
     /// <summary>平均速度低于该值时，如果还有备选源则切换。</summary>
@@ -92,6 +97,13 @@ public sealed class DownloadClient : IDisposable
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _throttledUntil =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 源级冷却：证书校验失败这类错误与路径无关，同一个源的所有地址都会失败，
+    /// 因此直接按源跳过，而不是等每个路径各自失败三次。
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _sourceUnavailableUntil =
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, double> _prefixSpeeds =
@@ -596,12 +608,32 @@ public sealed class DownloadClient : IDisposable
         var prefix = GetPrefix(url);
         if (prefix is null) return false;
 
+        var source = GetSourceKey(url);
+        if (source is not null &&
+            _sourceUnavailableUntil.TryGetValue(source, out var sourceUntil) &&
+            Environment.TickCount64 < sourceUntil)
+        {
+            return true;
+        }
+
         if (_throttledUntil.TryGetValue(prefix, out var until) && Environment.TickCount64 < until)
             return true;
 
         return _failureCounts.TryGetValue(prefix, out var failure)
                && failure.Count >= PrefixFailureThreshold
                && Environment.TickCount64 - failure.LastTicks < (long)FailureMemory.TotalMilliseconds;
+    }
+
+    /// <summary>源级别失效（证书不匹配等），需要整源降温而不是逐个路径计数。</summary>
+    private static bool IsSourceLevelFailure(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is System.Security.Authentication.AuthenticationException)
+                return true;
+        }
+
+        return false;
     }
 
     private void RecordFailure(string url, Exception exception)
@@ -621,6 +653,13 @@ public sealed class DownloadClient : IDisposable
             // 429 / 503 说明该节点整体不可用，直接冷却，后续文件不再尝试。
             _throttledUntil[prefix] = Environment.TickCount64 + (long)ThrottleCooldown.TotalMilliseconds;
             _failureCounts[prefix] = (PrefixFailureThreshold, Environment.TickCount64);
+            return;
+        }
+
+        // 证书校验失败和具体路径无关，整个源一起跳过，避免几千个文件逐个撞同一个坏节点。
+        if (IsSourceLevelFailure(exception) && GetSourceKey(url) is { } source)
+        {
+            _sourceUnavailableUntil[source] = Environment.TickCount64 + (long)ThrottleCooldown.TotalMilliseconds;
             return;
         }
 
@@ -665,22 +704,33 @@ public sealed class DownloadClient : IDisposable
             existingLength = 0;
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        if (existingLength > 0)
-            request.Headers.Range = new RangeHeaderValue(existingLength, null);
-
         using var idle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         HttpResponseMessage response;
-        try
+        for (var attempt = 1; ; attempt++)
         {
-            idle.CancelAfter(IdleTimeout);
-            response = await _httpClient.SendAsync(
-                request, HttpCompletionOption.ResponseHeadersRead, idle.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new TimeoutException($"连接 {url} 超时（{IdleTimeout.TotalSeconds:0} 秒无响应）。");
+            // 镜像会把请求 302 到随机节点，其中可能有证书配置错误的节点。
+            // 重新发一次请求就会换一个节点，所以证书错误优先原地重试，而不是直接换源。
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            if (existingLength > 0)
+                request.Headers.Range = new RangeHeaderValue(existingLength, null);
+
+            try
+            {
+                idle.CancelAfter(IdleTimeout);
+                response = await _httpClient.SendAsync(
+                    request, HttpCompletionOption.ResponseHeadersRead, idle.Token);
+                break;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException($"连接 {url} 超时（{IdleTimeout.TotalSeconds:0} 秒无响应）。");
+            }
+            catch (HttpRequestException exception)
+                when (attempt < RedirectRetryCount && IsSourceLevelFailure(exception))
+            {
+                await Task.Delay(150, cancellationToken);
+            }
         }
 
         using (response)

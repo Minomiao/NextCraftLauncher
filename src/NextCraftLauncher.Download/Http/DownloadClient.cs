@@ -179,6 +179,7 @@ public sealed class DownloadClient : IDisposable
         var partPath = fullPath + ".part";
         var candidates = OrderCandidates(urls);
         var hasAlternatives = candidates.Length > 1;
+        var failures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         Exception? lastError = null;
 
         for (var round = 0; round < MaxAttempts; round++)
@@ -199,6 +200,7 @@ public sealed class DownloadClient : IDisposable
                 catch (Exception exception)
                 {
                     lastError = exception;
+                    failures[url] = RootMessage(exception);
                     RecordFailure(url, exception);
                 }
             }
@@ -207,7 +209,53 @@ public sealed class DownloadClient : IDisposable
                 await Task.Delay(TimeSpan.FromMilliseconds(500 * (1 << round)), cancellationToken);
         }
 
-        throw new IOException($"下载失败：{destinationPath}（{lastError?.Message}）", lastError);
+        // 故障记忆按「主机 + 首段路径」计数，属于启发式：一次网络抖动就可能把还能用的源拉黑，
+        // 而剩下的源又恰好不可用。因此放弃前把被跳过的源完整再试一遍。
+        foreach (var url in urls.Where(url =>
+                     !candidates.Any(candidate =>
+                         string.Equals(candidate, url, StringComparison.OrdinalIgnoreCase))))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                return await DownloadFromUrlAsync(
+                    url, fullPath, partPath, expectedSha1, expectedSize, progress,
+                    hasAlternatives: true, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                lastError = exception;
+                failures[url] = RootMessage(exception);
+            }
+        }
+
+        throw new IOException(DescribeFailure(destinationPath, failures, lastError), lastError);
+    }
+
+    /// <summary>取最内层异常的消息：SSL 失败等信息只在最内层才有意义。</summary>
+    private static string RootMessage(Exception exception)
+    {
+        var current = exception;
+        while (current.InnerException is not null) current = current.InnerException;
+        return current.Message;
+    }
+
+    /// <summary>把每个候选源各自的错误写进日志，避免只有一个“最后一个错误”。</summary>
+    private static string DescribeFailure(
+        string target,
+        Dictionary<string, string> failures,
+        Exception? lastError)
+    {
+        if (failures.Count == 0)
+            return $"下载失败：{target}（{lastError?.Message ?? "未知错误"}）";
+
+        var detail = string.Join("；", failures.Select(pair => $"{pair.Key}（{pair.Value}）"));
+        return $"下载失败：{target}（{detail}）";
     }
 
     /// <summary>
@@ -222,6 +270,7 @@ public sealed class DownloadClient : IDisposable
         if (urls.Count == 0) throw new ArgumentException("至少需要一个下载地址。", nameof(urls));
 
         var candidates = OrderCandidates(urls);
+        var failures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         Exception? lastError = null;
 
         for (var round = 0; round < MaxAttempts; round++)
@@ -241,6 +290,7 @@ public sealed class DownloadClient : IDisposable
                 catch (Exception exception)
                 {
                     lastError = exception;
+                    failures[url] = RootMessage(exception);
                     RecordFailure(url, exception);
                 }
             }
@@ -249,7 +299,29 @@ public sealed class DownloadClient : IDisposable
                 await Task.Delay(TimeSpan.FromMilliseconds(500 * (1 << round)), cancellationToken);
         }
 
-        throw new IOException($"下载失败：{candidates[0]}（{lastError?.Message}）", lastError);
+        // 同 DownloadFileAsync：放弃前忽略故障记忆，把被跳过的源再完整试一遍。
+        foreach (var url in urls.Where(url =>
+                     !candidates.Any(candidate =>
+                         string.Equals(candidate, url, StringComparison.OrdinalIgnoreCase))))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                return await DownloadBytesFromUrlAsync(url, expectedSha1, expectedSize, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                lastError = exception;
+                failures[url] = RootMessage(exception);
+            }
+        }
+
+        throw new IOException(DescribeFailure(urls[0], failures, lastError), lastError);
     }
 
     /// <summary>

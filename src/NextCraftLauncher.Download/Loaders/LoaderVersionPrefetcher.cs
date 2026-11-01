@@ -156,6 +156,9 @@ public sealed class LoaderVersionPrefetcher
     {
         try
         {
+            // 前台开始下载 / 安装时立刻让路，避免跟镜像抢带宽。
+            await WaitWhileBusyAsync(cancellationToken);
+
             var mirror = _mirrorProvider(loader);
             var result = await LoaderVersionCatalog.LoadAsync(
                 loader,

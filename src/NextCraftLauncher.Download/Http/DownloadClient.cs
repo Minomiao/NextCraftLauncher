@@ -49,8 +49,12 @@ public sealed class DownloadClient : IDisposable
     /// </summary>
     private const int PrefixFailureThreshold = 3;
 
-    /// <summary>平均速度低于该值时，如果还有备选源则切换。</summary>
-    private const long MinSpeedBytesPerSecond = 512 * 1024;
+    /// <summary>
+    /// 平均速度低于该值时，如果还有备选源则切换。
+    /// 阈值定得低一些：并发下载时每条连接分到的带宽本来就低，
+    /// 只要没停滞就让它慢慢下完，比切换源后重建连接更划算。
+    /// </summary>
+    private const long MinSpeedBytesPerSecond = 128 * 1024;
 
     /// <summary>尚未测到高速文件时的速度下限，避免慢速宽带上误判。</summary>
     private const long InitialMinSpeedBytesPerSecond = 64 * 1024;
@@ -64,8 +68,14 @@ public sealed class DownloadClient : IDisposable
     /// <summary>普通失败计数的有效期。共享实例下必须过期，否则一次网络抖动会永久拉黑某个源。</summary>
     private static readonly TimeSpan FailureMemory = TimeSpan.FromMinutes(5);
 
-    /// <summary>低速检测的宽限时间，避免把正常的慢启动误判为慢速。</summary>
-    private static readonly TimeSpan SpeedCheckGrace = TimeSpan.FromSeconds(3);
+    /// <summary>低速检测的宽限时间，避免把正常的连接建立与慢启动误判为慢速。</summary>
+    private static readonly TimeSpan SpeedCheckGrace = TimeSpan.FromSeconds(8);
+
+    /// <summary>
+    /// 只有大于该阈值的文件才做低速换源：小文件本来就只有一两秒的传输，
+    /// 在 48 并发下每条连接分配到的带宽很低，按平均速度判断会把正常下载误判为“源太慢”。
+    /// </summary>
+    private const long SpeedCheckMinimumSize = 2 * 1024 * 1024;
 
     /// <summary>被限流后跳过该源的时长。</summary>
     private static readonly TimeSpan ThrottleCooldown = TimeSpan.FromMinutes(5);
@@ -785,7 +795,7 @@ public sealed class DownloadClient : IDisposable
                     written += read;
 
                     // 大文件如果平均速度长期低于阈值，且还有备用源，则立刻换源续传。
-                    if (hasAlternatives && expectedSize is >= 512 * 1024 &&
+                    if (hasAlternatives && expectedSize is >= SpeedCheckMinimumSize &&
                         speedClock.Elapsed >= SpeedCheckGrace &&
                         expectedSize - written > 256 * 1024)
                     {
@@ -804,7 +814,7 @@ public sealed class DownloadClient : IDisposable
                             : InitialMinSpeedBytesPerSecond;
 
                         if (bytesPerSecond < threshold)
-                            throw new SlowDownloadException(url);
+                            throw new SlowDownloadException();
                     }
 
                     progress?.Report(new DownloadProgress(
@@ -945,6 +955,6 @@ public sealed class DownloadClient : IDisposable
         return expectedSize is not null;
     }
 
-    private sealed class SlowDownloadException(string url)
-        : IOException($"下载速度过低，切换下载源：{url}");
+    private sealed class SlowDownloadException()
+        : IOException("下载速度过低，已切换下载源");
 }

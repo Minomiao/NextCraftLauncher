@@ -614,9 +614,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         !IsLaunching &&
         SelectedVersion is not null;
 
-    public bool HasVersionDownloadProgress => IsDownloadingVersion || !string.IsNullOrEmpty(VersionDownloadText);
-
-    public bool HasJavaDownloadProgress => IsDownloadingJava || !string.IsNullOrEmpty(JavaDownloadText);
 
     public double OverallDownloadPercent
     {
@@ -763,13 +760,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     partial void OnIsDownloadingJavaChanged(bool value)
     {
         OnPropertyChanged(nameof(CanDownloadJava));
-        OnPropertyChanged(nameof(HasJavaDownloadProgress));
         OnPropertyChanged(nameof(HasActiveDownloads));
         NotifyDownloadStats();
     }
 
-    partial void OnJavaDownloadTextChanged(string value)
-        => OnPropertyChanged(nameof(HasJavaDownloadProgress));
 
     partial void OnCurrentPageChanged(AppPage value)
     {
@@ -821,13 +815,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(CanDownloadSelectedVersion));
         OnPropertyChanged(nameof(CanDownloadSelected));
-        OnPropertyChanged(nameof(HasVersionDownloadProgress));
         OnPropertyChanged(nameof(HasActiveDownloads));
         NotifyDownloadStats();
     }
 
-    partial void OnVersionDownloadTextChanged(string value)
-        => OnPropertyChanged(nameof(HasVersionDownloadProgress));
 
     [RelayCommand]
     private void ShowLaunchPage() => CurrentPage = AppPage.Launch;

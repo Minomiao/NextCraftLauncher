@@ -152,7 +152,7 @@
                         </Grid>
 
                         <!-- 版本详情：加载器版本 + 原版下载 -->
-                        <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10"
+                        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="10"
                               IsVisible="{Binding IsRemoteVersionDetailOpen}">
 
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
@@ -285,21 +285,6 @@
                                         Padding="18,0"
                                         ToolTip.Tip="选中加载器时会与原版一起下载；同一版本只能选择一种加载器" />
                             </Grid>
-
-                            <Grid Grid.Row="3" RowDefinitions="Auto,Auto" RowSpacing="4"
-                                  IsVisible="{Binding HasVersionDownloadProgress}">
-                                <ProgressBar Minimum="0"
-                                             Maximum="100"
-                                             Value="{Binding VersionDownloadPercent}"
-                                             IsIndeterminate="{Binding IsVersionInstallIndeterminate}"
-                                             IsVisible="{Binding IsDownloadingVersion}"
-                                             Height="6" />
-                                <TextBlock Grid.Row="1"
-                                           Text="{Binding VersionDownloadText}"
-                                           FontSize="12"
-                                           Opacity="0.7"
-                                           TextWrapping="Wrap" />
-                            </Grid>
                         </Grid>
                     </Grid>
 
@@ -359,20 +344,6 @@
                                     Height="34"
                                     Padding="18,0"
                                     HorizontalAlignment="Left" />
-
-                            <Grid RowDefinitions="Auto,Auto" RowSpacing="4"
-                                  IsVisible="{Binding HasJavaDownloadProgress}">
-                                <ProgressBar Minimum="0"
-                                             Maximum="100"
-                                             Value="{Binding JavaDownloadPercent}"
-                                             IsVisible="{Binding IsDownloadingJava}"
-                                             Height="6" />
-                                <TextBlock Grid.Row="1"
-                                           Text="{Binding JavaDownloadText}"
-                                           FontSize="12"
-                                           Opacity="0.7"
-                                           TextWrapping="Wrap" />
-                            </Grid>
                         </StackPanel>
 
                         <Border Grid.Row="1" Classes="hline" />

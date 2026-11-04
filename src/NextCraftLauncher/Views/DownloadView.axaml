@@ -22,6 +22,12 @@
             <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
         </Style>
 
+        <!-- 任务卡片里的失败信息用错误色，与普通进度文字区分 -->
+        <Style Selector="TextBlock.meta.failed">
+            <Setter Property="Foreground" Value="#D13438" />
+            <Setter Property="Opacity" Value="0.9" />
+        </Style>
+
         <!-- 列表只负责虚拟化滚动，选中高亮由行内按钮控制 -->
         <Style Selector="ListBox.versionList ListBoxItem:pointerover /template/ Border#PART_Root">
             <Setter Property="Background" Value="Transparent" />
@@ -513,100 +519,79 @@
 
             <Border Grid.Column="1" Classes="vline" />
 
-            <!-- 任务列表 -->
+            <!-- 任务列表：每个下载/安装任务一张卡片，可同时存在多个 -->
             <Grid Grid.Column="2">
                 <TextBlock Text="没有正在进行的下载"
-                           IsVisible="{Binding !HasActiveDownloads}"
+                           IsVisible="{Binding !HasDownloadTasks}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            Opacity="0.45" />
 
-                <ScrollViewer IsVisible="{Binding HasActiveDownloads}"
+                <ScrollViewer IsVisible="{Binding HasDownloadTasks}"
                               VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="12">
+                    <ItemsControl ItemsSource="{Binding DownloadTasks}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="12" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
 
-                        <!-- 版本安装 -->
-                        <Border Classes="card" IsVisible="{Binding IsDownloadingVersion}">
-                            <StackPanel Spacing="10">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Text="{Binding VersionTaskTitle}"
-                                               FontSize="16"
-                                               FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <Button Grid.Column="1"
-                                            Classes="caption"
-                                            Content="✕"
-                                            ToolTip.Tip="取消"
-                                            Command="{Binding CancelVersionDownloadCommand}" />
-                                </Grid>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DownloadTaskViewModel">
+                                <Border Classes="card">
+                                    <StackPanel Spacing="10">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontSize="16"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <Button Grid.Column="1"
+                                                    Classes="caption"
+                                                    Content="✕"
+                                                    ToolTip.Tip="取消"
+                                                    IsVisible="{Binding IsRunning}"
+                                                    Command="{Binding CancelCommand}" />
+                                        </Grid>
 
-                                <StackPanel Spacing="4">
-                                    <Grid ColumnDefinitions="44,*">
-                                        <TextBlock Text="✓"
-                                                   Foreground="{DynamicResource SystemAccentColor}"
-                                                   IsVisible="{Binding IsVersionStepInfoDone}" />
-                                        <TextBlock Text="…"
-                                                   Foreground="{DynamicResource SystemAccentColor}"
-                                                   IsVisible="{Binding IsVersionStagePreparing}" />
-                                        <TextBlock Grid.Column="1" Text="版本信息" />
-                                    </Grid>
+                                        <ItemsControl ItemsSource="{Binding Steps}" IsVisible="{Binding HasSteps}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Spacing="4" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
 
-                                    <Grid ColumnDefinitions="44,*">
-                                        <TextBlock Text="✓"
-                                                   Foreground="{DynamicResource SystemAccentColor}"
-                                                   IsVisible="{Binding IsVersionStepFilesDone}" />
-                                        <TextBlock Text="{Binding VersionDownloadPercentText}"
-                                                   FontSize="12"
-                                                   Foreground="{DynamicResource SystemAccentColor}"
-                                                   IsVisible="{Binding IsVersionStageFiles}" />
-                                        <TextBlock Text="·"
-                                                   Opacity="0.35"
-                                                   IsVisible="{Binding IsVersionStagePreparing}" />
-                                        <TextBlock Grid.Column="1" Text="游戏文件" />
-                                    </Grid>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:DownloadTaskStepViewModel">
+                                                    <Grid ColumnDefinitions="44,*">
+                                                        <TextBlock Text="✓"
+                                                                   Foreground="{DynamicResource SystemAccentColor}"
+                                                                   IsVisible="{Binding IsDone}" />
+                                                        <TextBlock Text="{Binding Detail}"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource SystemAccentColor}"
+                                                                   IsVisible="{Binding IsActive}" />
+                                                        <TextBlock Text="·"
+                                                                   Opacity="0.35"
+                                                                   IsVisible="{Binding IsPending}" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Title}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
 
-                                    <Grid ColumnDefinitions="44,*">
-                                        <TextBlock Text="…"
-                                                   Foreground="{DynamicResource SystemAccentColor}"
-                                                   IsVisible="{Binding IsVersionStageFinalizing}" />
-                                        <TextBlock Text="·"
-                                                   Opacity="0.35"
-                                                   IsVisible="{Binding !IsVersionStageFinalizing}" />
-                                        <TextBlock Grid.Column="1" Text="写入配置" />
-                                    </Grid>
-                                </StackPanel>
-
-                                <ProgressBar Minimum="0"
-                                             Maximum="100"
-                                             Value="{Binding VersionDownloadPercent}"
-                                             IsIndeterminate="{Binding IsVersionInstallIndeterminate}"
-                                             Height="6" />
-                                <TextBlock Text="{Binding VersionDownloadText}" Classes="meta" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Java 运行时 -->
-                        <Border Classes="card" IsVisible="{Binding IsDownloadingJava}">
-                            <StackPanel Spacing="10">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Text="Java 运行时"
-                                               FontSize="16"
-                                               FontWeight="SemiBold" />
-                                    <Button Grid.Column="1"
-                                            Classes="caption"
-                                            Content="✕"
-                                            ToolTip.Tip="取消"
-                                            Command="{Binding CancelJavaDownloadCommand}" />
-                                </Grid>
-
-                                <ProgressBar Minimum="0"
-                                             Maximum="100"
-                                             Value="{Binding JavaDownloadPercent}"
-                                             Height="6" />
-                                <TextBlock Text="{Binding JavaDownloadText}" Classes="meta" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+                                        <ProgressBar Minimum="0"
+                                                     Maximum="100"
+                                                     Value="{Binding Percent}"
+                                                     IsIndeterminate="{Binding IsIndeterminate}"
+                                                     Height="6" />
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   Classes="meta"
+                                                   Classes.failed="{Binding IsFailed}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </ScrollViewer>
             </Grid>
         </Grid>

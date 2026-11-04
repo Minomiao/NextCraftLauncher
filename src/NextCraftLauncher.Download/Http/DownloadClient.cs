@@ -125,6 +125,13 @@ public sealed class DownloadClient : IDisposable
 
     private int _candidateCounter;
 
+    /// <summary>
+    /// 按目标路径的文件锁。多个任务可以同时下载不同的文件，但同一个文件只允许
+    /// 一个写入方，避免共用同一个 .part 时互相覆盖。
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> PathGates =
+        new(StringComparer.OrdinalIgnoreCase);
+
     public DownloadClient(HttpClient? httpClient = null)
     {
         _ownsClient = httpClient is null;
@@ -189,6 +196,30 @@ public sealed class DownloadClient : IDisposable
         if (string.IsNullOrWhiteSpace(destinationPath)) throw new ArgumentException("目标路径不能为空。", nameof(destinationPath));
 
         var fullPath = Path.GetFullPath(destinationPath);
+
+        // 多个任务同时安装时可能都需要同一个文件；按目标路径串行化，后到的请求
+        // 拿到锁后会发现文件已完整而直接跳过，也避免两个写入方同时写同一个 .part。
+        var gate = PathGates.GetOrAdd(fullPath, static _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            return await DownloadFileCoreAsync(
+                urls, fullPath, expectedSha1, expectedSize, progress, cancellationToken);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task<DownloadResult> DownloadFileCoreAsync(
+        IReadOnlyList<string> urls,
+        string fullPath,
+        string? expectedSha1,
+        long? expectedSize,
+        IProgress<DownloadProgress>? progress,
+        CancellationToken cancellationToken)
+    {
         var directory = Path.GetDirectoryName(fullPath);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
@@ -256,7 +287,7 @@ public sealed class DownloadClient : IDisposable
             }
         }
 
-        throw new IOException(DescribeFailure(destinationPath, failures, lastError), lastError);
+        throw new IOException(DescribeFailure(fullPath, failures, lastError), lastError);
     }
 
     /// <summary>取最内层异常的消息：SSL 失败等信息只在最内层才有意义。</summary>

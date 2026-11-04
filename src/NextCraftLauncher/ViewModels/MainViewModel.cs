@@ -30,10 +30,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private ResolvedVersion? _resolved;
     private int _detailsRevision;
     private Task _detailsTask = Task.CompletedTask;
-    private readonly TransferSpeedMeter _versionSpeedMeter = new();
-    private readonly TransferSpeedMeter _javaSpeedMeter = new();
-    private CancellationTokenSource? _versionDownloadCts;
-    private CancellationTokenSource? _javaDownloadCts;
     private CancellationTokenSource? _loaderVersionsCts;
     private int _loaderVersionsGeneration;
     private bool _loaderMirrorDirty;
@@ -45,12 +41,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool _versionNameEdited;
     private bool _updatingVersionName;
     private bool _initialized;
+    private int _activeTaskCount;
     private readonly LoaderVersionPrefetcher _loaderPrefetcher;
-    private MinecraftDownloadStage _versionStage = MinecraftDownloadStage.Preparing;
-    private int _versionCompletedFiles;
-    private int _versionTotalFiles;
-    private int _javaCompletedFiles;
-    private int _javaTotalFiles;
 
     public MainViewModel()
     {
@@ -84,7 +76,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // 后台慢慢补全各游戏版本的加载器列表，结果写入 NCL/cache/loaders。
         _loaderPrefetcher = new LoaderVersionPrefetcher(
             ResolvePrefetchMirror,
-            isBusy: () => IsDownloadingVersion || IsDownloadingJava || IsRemoteVersionsLoading);
+            isBusy: () => Volatile.Read(ref _activeTaskCount) > 0 || IsRemoteVersionsLoading);
         _loaderPrefetcher.LoaderVersionsCached += OnLoaderVersionsCached;
 
         // 搜索框延迟筛选，避免每敲一个字符都重建整张列表。
@@ -282,6 +274,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<RemoteJavaRuntimeItemViewModel> AvailableJavaRuntimes { get; } = new();
 
+    /// <summary>任务页里的下载/安装任务，每个任务一张卡片；可同时存在多个。</summary>
+    public ObservableCollection<DownloadTaskViewModel> DownloadTasks { get; } = new();
+
     public IReadOnlyList<string> RemoteVersionTypes { get; } = new[] { "全部", "正式版", "快照", "远古" };
 
     private readonly List<RemoteVersionItemViewModel> _allRemoteVersions = new();
@@ -371,7 +366,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _versionDetails = "请选择左侧版本。";
     [ObservableProperty] private string? _launchWarning;
     [ObservableProperty] private bool _isVersionIsolated;
-    [ObservableProperty] private bool _isDownloadingJava;
     [ObservableProperty] private string _remoteVersionSearch = string.Empty;
     [ObservableProperty] private string _remoteVersionType = "全部";
     [ObservableProperty] private string _remoteVersionsStatus = "尚未加载版本清单";
@@ -387,17 +381,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _selectedWindowSizeIndex;
     [ObservableProperty] private double _customWindowWidth = 1280;
     [ObservableProperty] private double _customWindowHeight = 720;
-    [ObservableProperty] private bool _isDownloadingVersion;
-    [ObservableProperty] private bool _isVersionInstallIndeterminate;
     [ObservableProperty] private string _versionName = string.Empty;
-    [ObservableProperty] private double _versionDownloadPercent;
-    [ObservableProperty] private string _versionDownloadText = string.Empty;
-    [ObservableProperty] private string _versionTaskTitle = "版本安装";
     [ObservableProperty] private bool _isJavaRuntimeCatalogLoading;
     [ObservableProperty] private string _javaRuntimeCatalogStatus = "尚未加载 Java 运行时列表";
     [ObservableProperty] private AppPage _currentPage = AppPage.Launch;
-    [ObservableProperty] private double _javaDownloadPercent;
-    [ObservableProperty] private string _javaDownloadText = string.Empty;
     [ObservableProperty] private int _selectedGameMirrorIndex;
     [ObservableProperty] private int _selectedForgeMirrorIndex;
     [ObservableProperty] private int _selectedFabricMirrorIndex;
@@ -545,7 +532,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public bool IsDownloadRunningSelected => CurrentDownloadSection == DownloadSection.Running;
 
-    public bool HasActiveDownloads => IsDownloadingVersion || IsDownloadingJava;
+    /// <summary>任务页当前有卡片可显示（含刚结束、等待自动移除的任务）。</summary>
+    public bool HasDownloadTasks => DownloadTasks.Count > 0;
+
+    public bool HasActiveDownloads => DownloadTasks.Any(task => task.IsRunning);
 
     public bool ShowRemoteVersionsLoading => IsRemoteVersionsLoading && RemoteVersionRows.Count == 0;
 
@@ -579,19 +569,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public bool CanDownloadJava =>
         !IsBusy &&
         !IsLaunching &&
-        !IsDownloadingJava &&
         _resolved is not null &&
         _resolved.RequiredJavaMajor > 0;
 
     public bool CanDownloadSelectedVersion =>
         !IsBusy &&
-        !IsDownloadingVersion &&
         SelectedRemoteVersion is not null;
 
     public bool CanDownloadSelected =>
         !IsBusy &&
         !IsLaunching &&
-        !IsDownloadingVersion &&
         SelectedRemoteVersion is not null &&
         VersionNaming.Normalize(VersionName).Length > 0;
 
@@ -615,54 +602,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
         SelectedVersion is not null;
 
 
+    /// <summary>所有运行中任务的平均进度。</summary>
     public double OverallDownloadPercent
     {
         get
         {
-            var sum = 0.0;
-            var count = 0;
-            if (IsDownloadingVersion) { sum += VersionDownloadPercent; count++; }
-            if (IsDownloadingJava) { sum += JavaDownloadPercent; count++; }
-            return count == 0 ? 0 : sum / count;
+            var running = DownloadTasks.Where(task => task.IsRunning).ToArray();
+            return running.Length == 0 ? 0 : running.Average(task => task.Percent);
         }
     }
 
     public string OverallDownloadPercentText => $"{OverallDownloadPercent:0.0} %";
 
-    public string CurrentDownloadSpeedText
-    {
-        get
-        {
-            var megabytesPerSecond = 0.0;
-            if (IsDownloadingVersion) megabytesPerSecond += _versionSpeedMeter.MegabytesPerSecond;
-            if (IsDownloadingJava) megabytesPerSecond += _javaSpeedMeter.MegabytesPerSecond;
-            return $"{megabytesPerSecond:0.00} MB/s";
-        }
-    }
+    /// <summary>所有运行中任务的合计速度。</summary>
+    public string CurrentDownloadSpeedText =>
+        $"{DownloadTasks.Where(task => task.IsRunning).Sum(task => task.SpeedMeter.MegabytesPerSecond):0.00} MB/s";
 
-    public int RemainingFilesCount
-    {
-        get
-        {
-            var remaining = 0;
-            if (IsDownloadingVersion) remaining += Math.Max(0, _versionTotalFiles - _versionCompletedFiles);
-            if (IsDownloadingJava) remaining += Math.Max(0, _javaTotalFiles - _javaCompletedFiles);
-            return remaining;
-        }
-    }
-
-    public string VersionDownloadPercentText =>
-        IsVersionInstallIndeterminate ? "安装中…" : $"{VersionDownloadPercent:0}%";
-
-    public bool IsVersionStagePreparing => _versionStage == MinecraftDownloadStage.Preparing;
-
-    public bool IsVersionStageFiles => _versionStage == MinecraftDownloadStage.Files;
-
-    public bool IsVersionStageFinalizing => _versionStage == MinecraftDownloadStage.Finalizing;
-
-    public bool IsVersionStepInfoDone => _versionStage != MinecraftDownloadStage.Preparing;
-
-    public bool IsVersionStepFilesDone => _versionStage == MinecraftDownloadStage.Finalizing;
+    public int RemainingFilesCount =>
+        DownloadTasks.Where(task => task.IsRunning).Sum(task => task.RemainingFiles);
 
     private void NotifyDownloadStats()
     {
@@ -671,21 +628,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CurrentDownloadSpeedText));
         OnPropertyChanged(nameof(RemainingFilesCount));
     }
-
-    private void NotifyVersionStage()
-    {
-        OnPropertyChanged(nameof(IsVersionStagePreparing));
-        OnPropertyChanged(nameof(IsVersionStageFiles));
-        OnPropertyChanged(nameof(IsVersionStageFinalizing));
-        OnPropertyChanged(nameof(IsVersionStepInfoDone));
-        OnPropertyChanged(nameof(IsVersionStepFilesDone));
-    }
-
-    partial void OnVersionDownloadPercentChanged(double value)
-        => OnPropertyChanged(nameof(VersionDownloadPercentText));
-
-    partial void OnIsVersionInstallIndeterminateChanged(bool value)
-        => OnPropertyChanged(nameof(VersionDownloadPercentText));
 
     partial void OnSelectedVersionChanged(VersionItemViewModel? value)
     {
@@ -757,13 +699,108 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanDownloadSelected));
     }
 
-    partial void OnIsDownloadingJavaChanged(bool value)
+    // ---- 下载任务卡片 ----
+
+    /// <summary>新建一个任务卡片并切到任务页；同一个去重键的任务已在运行时不重复创建。</summary>
+    private DownloadTaskViewModel? TryCreateTask(string title, DownloadTaskKind kind, string key)
     {
-        OnPropertyChanged(nameof(CanDownloadJava));
+        var duplicate = DownloadTasks.Any(task =>
+            task.IsRunning &&
+            task.Kind == kind &&
+            string.Equals(task.Key, key, StringComparison.OrdinalIgnoreCase));
+
+        if (duplicate)
+        {
+            Status = $"{title} 已在下载任务中";
+            return null;
+        }
+
+        var task = new DownloadTaskViewModel(title, key, kind, _lifetime.Token);
+        DownloadTasks.Add(task);
+        OnPropertyChanged(nameof(HasDownloadTasks));
+        RaiseActiveDownloadState();
+        return task;
+    }
+
+    /// <summary>结束任务：写回终态，并在几秒后自动移除卡片。</summary>
+    private void FinishTask(DownloadTaskViewModel task, DownloadTaskState state, string statusText)
+    {
+        task.StatusText = statusText;
+        task.State = state;
+        RaiseActiveDownloadState();
+
+        try
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                RemoveTask(task);
+            };
+            timer.Start();
+        }
+        catch (Exception)
+        {
+            // 启动器正在关闭时调度器已停止，卡片留着也无影响。
+        }
+    }
+
+    private void RemoveTask(DownloadTaskViewModel task)
+    {
+        if (!DownloadTasks.Remove(task)) return;
+
+        OnPropertyChanged(nameof(HasDownloadTasks));
+        RaiseActiveDownloadState();
+        task.Dispose();
+    }
+
+    /// <summary>任务增减会影响左侧的聚合统计与入口按钮。</summary>
+    private void RaiseActiveDownloadState()
+    {
+        // 后台预取会从另一个线程询问「是否忙」，不能直接读 ObservableCollection。
+        Volatile.Write(ref _activeTaskCount, DownloadTasks.Count(task => task.IsRunning));
         OnPropertyChanged(nameof(HasActiveDownloads));
         NotifyDownloadStats();
     }
 
+    /// <summary>把版本下载阶段映射到卡片上的三行步骤。</summary>
+    private static void ApplyVersionStage(DownloadTaskViewModel task, MinecraftDownloadStage stage)
+    {
+        if (task.Steps.Count < 3) return;
+
+        var (first, second, third) = (task.Steps[0], task.Steps[1], task.Steps[2]);
+
+        switch (stage)
+        {
+            case MinecraftDownloadStage.Preparing:
+                first.SetState(DownloadStepState.Active, "…");
+                second.SetState(DownloadStepState.Pending);
+                third.SetState(DownloadStepState.Pending);
+                break;
+
+            case MinecraftDownloadStage.Files:
+                first.SetState(DownloadStepState.Done);
+                if (second.State != DownloadStepState.Active)
+                    second.SetState(DownloadStepState.Active, "…");
+                third.SetState(DownloadStepState.Pending);
+                break;
+
+            case MinecraftDownloadStage.Finalizing:
+                first.SetState(DownloadStepState.Done);
+                second.SetState(DownloadStepState.Done);
+                third.SetState(DownloadStepState.Active, "…");
+                break;
+        }
+    }
+
+    /// <summary>给版本任务卡片添上三步流程。</summary>
+    private static void AddVersionSteps(DownloadTaskViewModel task)
+    {
+        task.AddStep("版本信息");
+        task.AddStep("游戏文件");
+        task.AddStep("写入配置");
+        ApplyVersionStage(task, MinecraftDownloadStage.Preparing);
+    }
 
     partial void OnCurrentPageChanged(AppPage value)
     {
@@ -811,13 +848,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanDownloadSelected));
     }
 
-    partial void OnIsDownloadingVersionChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanDownloadSelectedVersion));
-        OnPropertyChanged(nameof(CanDownloadSelected));
-        OnPropertyChanged(nameof(HasActiveDownloads));
-        NotifyDownloadStats();
-    }
 
 
     [RelayCommand]
@@ -855,11 +885,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         CurrentDownloadSection = DownloadSection.Running;
     }
 
-    [RelayCommand]
-    private void CancelVersionDownload() => _versionDownloadCts?.Cancel();
-
-    [RelayCommand]
-    private void CancelJavaDownload() => _javaDownloadCts?.Cancel();
 
     [RelayCommand]
     private void ShowDownloadPage() => CurrentPage = AppPage.Download;
@@ -2089,24 +2114,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (!TryResolveVersionName(item.Id, loaderSelected: false, out var desiredName))
             return;
 
-        using var downloadCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-        _versionDownloadCts = downloadCts;
+        var task = TryCreateTask(desiredName, DownloadTaskKind.Version, item.Id);
+        if (task is null) return;
 
-        IsDownloadingVersion = true;
+        AddVersionSteps(task);
+        task.StatusText = "正在准备下载...";
+
         CurrentPage = AppPage.Download;
         EnterTaskSection();
-        VersionTaskTitle = desiredName;
-        VersionDownloadPercent = 0;
-        VersionDownloadText = "正在准备下载...";
-        IsVersionInstallIndeterminate = false;
-        _versionStage = MinecraftDownloadStage.Preparing;
-        _versionCompletedFiles = 0;
-        _versionTotalFiles = 0;
-        _versionSpeedMeter.Reset();
-        NotifyVersionStage();
-        NotifyDownloadStats();
         Status = $"正在下载 Minecraft {item.Id}...";
         LauncherLog.Info($"开始下载版本 {item.Id}（目标名称 {desiredName}）");
+
+        var stage = MinecraftDownloadStage.Preparing;
 
         try
         {
@@ -2116,7 +2135,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var lastUiTicks = 0L;
             var progress = new Progress<MinecraftVersionDownloadProgress>(report =>
             {
-                var stageChanged = _versionStage != report.Stage;
+                var stageChanged = stage != report.Stage;
                 var now = Environment.TickCount64;
                 var isFinal = report.Percent is >= 100 ||
                               (report.TotalFiles > 0 && report.CompletedFiles >= report.TotalFiles);
@@ -2129,23 +2148,26 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
                 if (stageChanged)
                 {
-                    _versionStage = report.Stage;
-                    NotifyVersionStage();
+                    stage = report.Stage;
+                    ApplyVersionStage(task, stage);
                 }
 
-                _versionCompletedFiles = report.CompletedFiles;
-                _versionTotalFiles = report.TotalFiles;
+                task.CompletedFiles = report.CompletedFiles;
+                task.TotalFiles = report.TotalFiles;
 
                 var percent = report.Percent is double value ? $"（{value:0}%）" : string.Empty;
                 var megabytes = report.BytesDownloaded / 1024.0 / 1024.0;
-                var speed = _versionSpeedMeter.Feed(report.BytesDownloaded);
+                var speed = task.SpeedMeter.Feed(report.BytesDownloaded);
                 var speedText = speed.Length > 0 ? $"，{speed}" : string.Empty;
 
                 // 并发下载时进度可能因文件完成顺序出现瞬时回落，进度条只允许前进。
-                if (report.Percent is double currentPercent && currentPercent > VersionDownloadPercent)
-                    VersionDownloadPercent = currentPercent;
+                if (report.Percent is double currentPercent && currentPercent > task.Percent)
+                    task.Percent = currentPercent;
 
-                VersionDownloadText = $"{report.CompletedFiles}/{report.TotalFiles} 个文件，{megabytes:0.0} MB{speedText}";
+                if (stage == MinecraftDownloadStage.Files && report.Percent is double filePercent)
+                    task.Steps[1].Detail = $"{filePercent:0}%";
+
+                task.StatusText = $"{report.CompletedFiles}/{report.TotalFiles} 个文件，{megabytes:0.0} MB{speedText}";
                 Status = report.TotalFiles > 0
                     ? $"正在下载 {item.Id}：{report.CompletedFiles}/{report.TotalFiles} 个文件，{megabytes:0.0} MB{speedText}{percent}"
                     : $"正在下载 {item.Id}...";
@@ -2161,10 +2183,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 {
                     Mirror = mirror,
                 },
-                downloadCts.Token);
+                task.Token);
 
-            VersionDownloadPercent = 100;
-            VersionDownloadText = "下载完成";
+            task.Percent = 100;
 
             var finalId = VersionNaming.RenameInstalledVersion(
                 MinecraftDirectory, result.VersionId, desiredName);
@@ -2178,25 +2199,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
             UpdateRemoteInstalledStatus();
             Status = $"版本 {finalId} 下载完成";
             LauncherLog.Info($"版本 {finalId} 下载完成");
+            FinishTask(task, DownloadTaskState.Completed, $"版本 {finalId} 下载完成");
         }
         catch (OperationCanceledException)
         {
             Status = "版本下载已取消";
-            VersionDownloadText = "下载已取消";
             LauncherLog.Warn($"版本 {item.Id} 下载已取消");
+            FinishTask(task, DownloadTaskState.Canceled, "下载已取消");
         }
         catch (Exception exception)
         {
             Status = "版本下载失败";
-            VersionDownloadText = "下载失败";
             LauncherLog.Error($"版本 {item.Id} 下载失败", exception);
             ShowDownloadError($"下载 Minecraft {item.Id}", exception);
-        }
-        finally
-        {
-            IsDownloadingVersion = false;
-            IsVersionInstallIndeterminate = false;
-            if (ReferenceEquals(_versionDownloadCts, downloadCts)) _versionDownloadCts = null;
+            FinishTask(task, DownloadTaskState.Failed, "下载失败");
         }
     }
 
@@ -2206,7 +2222,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (SelectedRemoteVersion is null ||
             _selectedLoaderKey is null ||
             _selectedLoaderVersion is null ||
-            IsDownloadingVersion || IsBusy || IsLaunching)
+            IsBusy || IsLaunching)
         {
             return;
         }
@@ -2219,22 +2235,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (!TryResolveVersionName(item.Id, loaderSelected: true, out var desiredName))
             return;
 
-        using var installCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-        _versionDownloadCts = installCts;
+        var task = TryCreateTask(desiredName, DownloadTaskKind.Version, item.Id);
+        if (task is null) return;
 
-        IsDownloadingVersion = true;
+        AddVersionSteps(task);
+        task.StatusText = "正在准备安装...";
+
         CurrentPage = AppPage.Download;
         EnterTaskSection();
-        VersionTaskTitle = desiredName;
-        VersionDownloadPercent = 0;
-        VersionDownloadText = "正在准备安装...";
-        IsVersionInstallIndeterminate = false;
-        _versionStage = MinecraftDownloadStage.Preparing;
-        _versionCompletedFiles = 0;
-        _versionTotalFiles = 0;
-        _versionSpeedMeter.Reset();
-        NotifyVersionStage();
-        NotifyDownloadStats();
         Status = $"正在安装 {displayName} {loaderVersion}...";
         LauncherLog.Info($"开始安装 {displayName} {loaderVersion} → {desiredName}");
 
@@ -2244,13 +2252,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var needsVanilla = !File.Exists(vanillaJson);
         var vanillaPhase = needsVanilla ? 65.0 : 0.0;
         var installerRunning = false;
+        var stage = MinecraftDownloadStage.Preparing;
 
         var creepTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         creepTimer.Tick += (_, _) =>
         {
             if (!installerRunning) return;
-            if (VersionDownloadPercent < 95)
-                VersionDownloadPercent = Math.Min(95, VersionDownloadPercent + 0.4);
+            if (task.Percent < 95)
+                task.Percent = Math.Min(95, task.Percent + 0.4);
         };
         creepTimer.Start();
 
@@ -2261,7 +2270,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 var lastVanillaTicks = 0L;
                 var vanillaProgress = new Progress<MinecraftVersionDownloadProgress>(report =>
                 {
-                    var stageChanged = _versionStage != report.Stage;
+                    var stageChanged = stage != report.Stage;
                     var now = Environment.TickCount64;
                     var isFinal = report.Percent is >= 100 ||
                                   (report.TotalFiles > 0 && report.CompletedFiles >= report.TotalFiles);
@@ -2273,20 +2282,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
                     if (stageChanged)
                     {
-                        _versionStage = report.Stage;
-                        NotifyVersionStage();
+                        stage = report.Stage;
+                        ApplyVersionStage(task, stage);
                     }
 
                     if (report.Percent is double percent)
                     {
                         var mapped = percent * vanillaPhase / 100.0;
-                        if (mapped > VersionDownloadPercent) VersionDownloadPercent = mapped;
+                        if (mapped > task.Percent) task.Percent = mapped;
                     }
 
                     if (report.BytesDownloaded > 0)
-                        _versionSpeedMeter.Feed(report.BytesDownloaded);
+                        task.SpeedMeter.Feed(report.BytesDownloaded);
 
-                    VersionDownloadText = report.TotalFiles > 0
+                    task.CompletedFiles = report.CompletedFiles;
+                    task.TotalFiles = report.TotalFiles;
+                    task.StatusText = report.TotalFiles > 0
                         ? $"正在下载原版文件 {report.CompletedFiles}/{report.TotalFiles}..."
                         : "正在下载原版文件...";
                     NotifyDownloadStats();
@@ -2298,10 +2309,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     DownloadVersionIsolated,
                     vanillaProgress,
                     new MinecraftVersionDownloadOptions { Mirror = ResolveGameMirror() },
-                    installCts.Token);
+                    task.Token);
 
                 // 原版文件下载结束后重新计量，安装器阶段的字节从 0 开始。
-                _versionSpeedMeter.Reset();
+                task.SpeedMeter.Reset();
                 NotifyDownloadStats();
             }
 
@@ -2313,7 +2324,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 var runtimes = JavaRuntimes.Count > 0
                     ? (IEnumerable<JavaRuntime>)JavaRuntimes
                     : await JavaLocator.DiscoverAsync(
-                        MinecraftDirectory, _settings.JavaPath, installCts.Token);
+                        MinecraftDirectory, _settings.JavaPath, task.Token);
 
                 var java = SelectedJava is not null && SelectedJava.MajorVersion >= requiredJava
                     ? SelectedJava
@@ -2337,32 +2348,32 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 if (!isPhaseChange && now - lastInstallTicks < 100) return;
                 lastInstallTicks = now;
 
-                if (_versionStage != report.Stage)
+                if (stage != report.Stage)
                 {
-                    _versionStage = report.Stage;
-                    NotifyVersionStage();
+                    stage = report.Stage;
+                    ApplyVersionStage(task, stage);
                 }
 
                 // 安装器依赖与安装器 jar 的下载量累计上报，用于显示实时速度。
                 if (report.BytesDownloaded is long bytes)
-                    _versionSpeedMeter.Feed(bytes);
+                    task.SpeedMeter.Feed(bytes);
 
                 if (report.Percent is double percent)
                 {
                     installerRunning = false;
                     var mapped = vanillaPhase + percent * (100 - vanillaPhase) / 100.0;
-                    if (mapped > VersionDownloadPercent) VersionDownloadPercent = mapped;
+                    if (mapped > task.Percent) task.Percent = mapped;
                 }
                 else
                 {
                     // Forge / NeoForge 安装器不提供百分比，由定时器推进进度条。
                     installerRunning = true;
-                    _versionSpeedMeter.Reset();
+                    task.SpeedMeter.Reset();
                 }
 
-                IsVersionInstallIndeterminate = false;
+                task.IsIndeterminate = false;
 
-                VersionDownloadText = report.Text;
+                task.StatusText = report.Text;
                 Status = report.Text;
                 NotifyDownloadStats();
             });
@@ -2375,7 +2386,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 if (now - lastLogTicks < 200) return;
                 lastLogTicks = now;
 
-                VersionDownloadText = line;
+                task.StatusText = line;
                 Status = line;
             });
 
@@ -2394,10 +2405,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     Progress = installProgress,
                     Log = installLog,
                 },
-                installCts.Token);
+                task.Token);
 
-            VersionDownloadPercent = 100;
-            VersionDownloadText = "安装完成";
+            task.Percent = 100;
 
             await RefreshAsync();
 
@@ -2407,26 +2417,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             Status = $"{displayName} {loaderVersion} 安装完成";
             LauncherLog.Info($"{displayName} {loaderVersion} 安装完成 → {result.VersionId}");
+            FinishTask(task, DownloadTaskState.Completed, $"{displayName} {loaderVersion} 安装完成");
         }
         catch (OperationCanceledException)
         {
             Status = "加载器安装已取消";
-            VersionDownloadText = "安装已取消";
             LauncherLog.Warn($"{displayName} {loaderVersion} 安装已取消");
+            FinishTask(task, DownloadTaskState.Canceled, "安装已取消");
         }
         catch (Exception exception)
         {
             Status = $"{displayName} {loaderVersion} 安装失败";
-            VersionDownloadText = "安装失败";
             LauncherLog.Error($"{displayName} {loaderVersion} 安装失败", exception);
             ShowDownloadError($"安装 {displayName} {loaderVersion}", exception);
+            FinishTask(task, DownloadTaskState.Failed, "安装失败");
         }
         finally
         {
             creepTimer.Stop();
-            IsDownloadingVersion = false;
-            IsVersionInstallIndeterminate = false;
-            if (ReferenceEquals(_versionDownloadCts, installCts)) _versionDownloadCts = null;
         }
     }
 
@@ -2567,20 +2575,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private async Task DownloadJavaRuntimeAsync(string? component, int requiredMajor, string label)
     {
-        if (IsDownloadingJava || requiredMajor <= 0) return;
+        if (requiredMajor <= 0) return;
 
-        using var downloadCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-        _javaDownloadCts = downloadCts;
+        var task = TryCreateTask(label, DownloadTaskKind.Java, label);
+        if (task is null) return;
 
-        IsDownloadingJava = true;
+        task.StatusText = "正在获取下载信息...";
+
         CurrentPage = AppPage.Download;
         EnterTaskSection();
-        JavaDownloadPercent = 0;
-        JavaDownloadText = "正在获取下载信息...";
-        _javaCompletedFiles = 0;
-        _javaTotalFiles = 0;
-        _javaSpeedMeter.Reset();
-        NotifyDownloadStats();
         Status = $"正在获取 {label} 下载信息...";
         LauncherLog.Info($"开始下载 {label}");
 
@@ -2600,15 +2603,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
                 lastUiTicks = now;
 
-                _javaCompletedFiles = report.CompletedFiles;
-                _javaTotalFiles = report.TotalFiles;
+                task.CompletedFiles = report.CompletedFiles;
+                task.TotalFiles = report.TotalFiles;
 
                 var percent = report.Percent is double value ? $"（{value:0}%）" : string.Empty;
                 var megabytes = report.BytesDownloaded / 1024.0 / 1024.0;
-                var speed = _javaSpeedMeter.Feed(report.BytesDownloaded);
+                var speed = task.SpeedMeter.Feed(report.BytesDownloaded);
                 var speedText = speed.Length > 0 ? $"，{speed}" : string.Empty;
-                JavaDownloadPercent = report.Percent ?? 0;
-                JavaDownloadText = $"{report.CompletedFiles}/{report.TotalFiles} 个文件，{megabytes:0.0} MB{speedText}";
+                task.Percent = report.Percent ?? 0;
+                task.StatusText = $"{report.CompletedFiles}/{report.TotalFiles} 个文件，{megabytes:0.0} MB{speedText}";
                 Status = report.TotalFiles > 0
                     ? $"正在下载 {label}：{report.CompletedFiles}/{report.TotalFiles} 个文件，{megabytes:0.0} MB{speedText}{percent}"
                     : $"正在下载 {label}...";
@@ -2624,7 +2627,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 {
                     Mirror = mirror,
                 },
-                downloadCts.Token);
+                task.Token);
 
             var runtime = await JavaLocator.ProbeAsync(
                 result.JavaExecutablePath, MinecraftDirectory, _lifetime.Token);
@@ -2632,7 +2635,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             if (runtime is null)
             {
                 Status = $"{label} 下载完成，但无法运行";
-                JavaDownloadText = "下载完成，但无法运行";
+                FinishTask(task, DownloadTaskState.Failed, "下载完成，但无法运行");
                 return;
             }
 
@@ -2645,8 +2648,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 runtime = existing;
 
             SelectedJava = runtime;
-            JavaDownloadPercent = 100;
-            JavaDownloadText = $"已安装 {label}";
+            task.Percent = 100;
             Status = $"{label} 下载完成";
             LauncherLog.Info($"{label} 下载完成：{runtime.Path}");
 
@@ -2656,24 +2658,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     item.IsInstalled = true;
             }
             UpdateJavaRuntimeCatalogStatus();
+
+            FinishTask(task, DownloadTaskState.Completed, $"已安装 {label}");
         }
         catch (OperationCanceledException)
         {
             Status = "Java 下载已取消";
-            JavaDownloadText = "下载已取消";
             LauncherLog.Warn($"{label} 下载已取消");
+            FinishTask(task, DownloadTaskState.Canceled, "下载已取消");
         }
         catch (Exception exception)
         {
             Status = "Java 下载失败";
-            JavaDownloadText = "下载失败";
             LauncherLog.Error($"{label} 下载失败", exception);
             ShowDownloadError($"下载 {label}", exception);
+            FinishTask(task, DownloadTaskState.Failed, "下载失败");
         }
         finally
         {
-            IsDownloadingJava = false;
-            if (ReferenceEquals(_javaDownloadCts, downloadCts)) _javaDownloadCts = null;
             UpdateJavaRuntimeInstalledStatus();
         }
     }

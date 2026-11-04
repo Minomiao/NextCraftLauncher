@@ -2070,7 +2070,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             : $"显示 {_filteredRemoteVersionCount} / {_allRemoteVersions.Count} 个版本 · 已安装 {installedCount} 个";
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task DownloadSelectedAsync()
     {
         if (!CanDownloadSelected || SelectedRemoteVersion is null) return;
@@ -2108,7 +2108,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return true;
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task DownloadSelectedVersionAsync()
     {
         if (!CanDownloadSelectedVersion || SelectedRemoteVersion is null) return;
@@ -2220,7 +2220,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task InstallSelectedLoaderAsync()
     {
         if (SelectedRemoteVersion is null ||
@@ -2566,7 +2566,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         JavaRuntimeCatalogStatus = $"已安装 {installedCount} / {_allJavaRuntimes.Count}";
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task DownloadJavaAsync()
     {
         if (!CanDownloadJava || _resolved is null) return;

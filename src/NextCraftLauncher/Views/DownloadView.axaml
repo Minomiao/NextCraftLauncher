@@ -66,11 +66,11 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" Spacing="8">
-                    <!-- 所有任务的合计进度；无任务时置灰 -->
+                    <!-- 所有任务的合计进度；无任务时只剩置灰的空进度条 -->
                     <StackPanel Spacing="4"
                                 Classes="taskProgress"
                                 Classes.idle="{Binding !HasActiveDownloads}">
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasActiveDownloads}">
                             <TextBlock Text="下载进度"
                                        FontSize="12"
                                        Opacity="0.75"

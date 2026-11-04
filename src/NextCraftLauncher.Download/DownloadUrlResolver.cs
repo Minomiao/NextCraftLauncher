@@ -14,10 +14,6 @@ public static class DownloadUrlResolver
         var mirrored = ToBmclApi(url);
         var hasMirror = !string.Equals(mirrored, url, StringComparison.OrdinalIgnoreCase);
 
-        var legacyMirror = ToBmclApiLegacy(url);
-        var hasLegacyMirror = !string.Equals(legacyMirror, url, StringComparison.OrdinalIgnoreCase) &&
-                              !string.Equals(legacyMirror, mirrored, StringComparison.OrdinalIgnoreCase);
-
         var alternate = ToAlternateOfficial(url);
         var hasAlternate = !string.IsNullOrWhiteSpace(alternate) &&
                            !string.Equals(alternate, url, StringComparison.OrdinalIgnoreCase);
@@ -51,7 +47,6 @@ public static class DownloadUrlResolver
             case DownloadMirror.BmclApi:
                 if (hasCdn) urls.Add(cdn!);
                 if (hasMirror) urls.Add(mirrored);
-                if (hasLegacyMirror) urls.Add(legacyMirror);
                 urls.Add(url);
                 if (hasForgeAlternate) urls.Add(forgeAlternate!);
                 if (hasAlternate) urls.Add(alternate!);
@@ -65,7 +60,6 @@ public static class DownloadUrlResolver
                 if (hasForgeAlternate) urls.Add(forgeAlternate!);
                 if (hasAlternate) urls.Add(alternate!);
                 if (hasMirror) urls.Add(mirrored);
-                if (hasLegacyMirror) urls.Add(legacyMirror);
                 break;
         }
 
@@ -111,9 +105,6 @@ public static class DownloadUrlResolver
     }
 
     private static string ToBmclApi(string url) => ToBmclApi(url, "bmclapi2.bangbang93.com");
-
-    /// <summary>BMCLAPI 的旧入口域名，与主域名共用同一套路径，作为第二个尝试入口。</summary>
-    private static string ToBmclApiLegacy(string url) => ToBmclApi(url, "bmclapi.bangbang93.com");
 
     private static string ToBmclApi(string url, string host) => url
         .Replace("piston-meta.mojang.com", host, StringComparison.OrdinalIgnoreCase)

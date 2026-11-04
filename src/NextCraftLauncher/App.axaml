@@ -22,6 +22,13 @@
             <Setter Property="Background" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
         </Style>
 
+        <!-- 任务卡片：任务页里每个下载任务一张，后续新增任务沿用同一外观 -->
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16" />
+        </Style>
+
         <Style Selector="TextBlock.section">
             <Setter Property="FontSize" Value="15" />
             <Setter Property="FontWeight" Value="SemiBold" />

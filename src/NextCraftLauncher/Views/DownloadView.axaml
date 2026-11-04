@@ -542,20 +542,21 @@
 
             <Border Grid.Column="1" Classes="vline" />
 
-                <!-- 任务列表 -->
-                <Grid Grid.Column="2">
-                    <TextBlock Text="没有正在进行的下载"
-                               IsVisible="{Binding !HasActiveDownloads}"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Opacity="0.45" />
+            <!-- 任务列表 -->
+            <Grid Grid.Column="2">
+                <TextBlock Text="没有正在进行的下载"
+                           IsVisible="{Binding !HasActiveDownloads}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Opacity="0.45" />
 
-                    <ScrollViewer IsVisible="{Binding HasActiveDownloads}"
-                                  VerticalScrollBarVisibility="Auto">
-                        <StackPanel Spacing="24">
+                <ScrollViewer IsVisible="{Binding HasActiveDownloads}"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="12">
 
-                            <!-- 版本安装 -->
-                            <StackPanel Spacing="10" IsVisible="{Binding IsDownloadingVersion}">
+                        <!-- 版本安装 -->
+                        <Border Classes="card" IsVisible="{Binding IsDownloadingVersion}">
+                            <StackPanel Spacing="10">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Text="{Binding VersionTaskTitle}"
                                                FontSize="16"
@@ -611,9 +612,11 @@
                                              Height="6" />
                                 <TextBlock Text="{Binding VersionDownloadText}" Classes="meta" />
                             </StackPanel>
+                        </Border>
 
-                            <!-- Java 运行时 -->
-                            <StackPanel Spacing="10" IsVisible="{Binding IsDownloadingJava}">
+                        <!-- Java 运行时 -->
+                        <Border Classes="card" IsVisible="{Binding IsDownloadingJava}">
+                            <StackPanel Spacing="10">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Text="Java 运行时"
                                                FontSize="16"
@@ -631,9 +634,10 @@
                                              Height="6" />
                                 <TextBlock Text="{Binding JavaDownloadText}" Classes="meta" />
                             </StackPanel>
-                        </StackPanel>
-                    </ScrollViewer>
-                </Grid>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
         </Grid>
     </Grid>
 

@@ -809,7 +809,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (value == AppPage.Download)
         {
-            if (HasActiveDownloads) EnterTaskSection();
+            if (HasActiveDownloads) EnterTaskSection(leaveVersionDetail: true);
             _ = EnsureRemoteVersionsLoadedAsync();
             _ = EnsureJavaRuntimesLoadedAsync();
 
@@ -877,8 +877,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ReturnFromDownloadTasks() => CurrentDownloadSection = _previousDownloadSection;
 
-    private void EnterTaskSection()
+    private void EnterTaskSection(bool leaveVersionDetail = false)
     {
+        // 从下载页跳到任务页时，把版本详情收起来，返回后回到版本列表而不是停在详情页。
+        if (leaveVersionDetail && IsRemoteVersionDetailOpen)
+            CloseRemoteVersionDetail();
+
         if (CurrentDownloadSection != DownloadSection.Running)
             _previousDownloadSection = CurrentDownloadSection;
 
@@ -2121,7 +2125,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         task.StatusText = "正在准备下载...";
 
         CurrentPage = AppPage.Download;
-        EnterTaskSection();
+        EnterTaskSection(leaveVersionDetail: true);
         Status = $"正在下载 Minecraft {item.Id}...";
         LauncherLog.Info($"开始下载版本 {item.Id}（目标名称 {desiredName}）");
 
@@ -2242,7 +2246,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         task.StatusText = "正在准备安装...";
 
         CurrentPage = AppPage.Download;
-        EnterTaskSection();
+        EnterTaskSection(leaveVersionDetail: true);
         Status = $"正在安装 {displayName} {loaderVersion}...";
         LauncherLog.Info($"开始安装 {displayName} {loaderVersion} → {desiredName}");
 
@@ -2583,7 +2587,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         task.StatusText = "正在获取下载信息...";
 
         CurrentPage = AppPage.Download;
-        EnterTaskSection();
+        EnterTaskSection(leaveVersionDetail: true);
         Status = $"正在获取 {label} 下载信息...";
         LauncherLog.Info($"开始下载 {label}");
 

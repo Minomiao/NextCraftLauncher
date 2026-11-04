@@ -7,6 +7,7 @@
     <RootNamespace>NextCraftLauncher</RootNamespace>
     <AssemblyName>NextCraftLauncher</AssemblyName>
     <ApplicationTitle>Next Craft Launcher</ApplicationTitle>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>

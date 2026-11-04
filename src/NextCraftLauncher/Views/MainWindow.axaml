@@ -8,7 +8,7 @@
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="820"
         x:Class="NextCraftLauncher.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/app.ico"
         Title="Next Craft Launcher"
         Width="900" Height="620"
         MinWidth="820" MinHeight="540"

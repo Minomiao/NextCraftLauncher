@@ -84,6 +84,18 @@ public sealed class DownloadClient : IDisposable
     private static readonly TimeSpan SlowCooldown = TimeSpan.FromMinutes(2);
 
     /// <summary>
+    /// 超过该大小的文件按段并发下载。国内到 Mojang CDN 的单连接往往只有一两百 KB/s，
+    /// 大文件若只靠一条连接，尾部就会长时间卡在“最后几个文件”。
+    /// </summary>
+    private const long SegmentedMinimumSize = 4 * 1024 * 1024;
+
+    /// <summary>单片的最小字节数；分片太多只会把握手和重试开销放大。</summary>
+    private const long SegmentMinimumSize = 2 * 1024 * 1024;
+
+    /// <summary>单个文件最多拆成几片。片数与每片速度的乘积才是单文件吞吐。</summary>
+    private const int MaxSegments = 16;
+
+    /// <summary>
     /// 应用级共享实例：复用连接池、DNS 结果和源健康度记忆。
     /// 该实例随进程存活，调用方不要释放。
     /// </summary>
@@ -740,6 +752,27 @@ public sealed class DownloadClient : IDisposable
         bool hasAlternatives,
         CancellationToken cancellationToken)
     {
+        // 大文件按段并发：单连接在这类网络上只有一两百 KB/s，
+        // 分片后最后剩下的大文件不会再由一条连接慢慢拉完。
+        if (expectedSize is long segmentedTotal && segmentedTotal >= SegmentedMinimumSize)
+        {
+            var segments = (int)Math.Min(MaxSegments, segmentedTotal / SegmentMinimumSize);
+            if (segments >= 2)
+            {
+                try
+                {
+                    return await DownloadInSegmentsAsync(
+                        url, destinationPath, partPath, expectedSha1, segmentedTotal, segments, progress,
+                        cancellationToken);
+                }
+                catch (RangeNotSupportedException)
+                {
+                    // 服务器不认 Range，退回下面的单连接路径。
+                    DeleteSegmentFiles(partPath);
+                }
+            }
+        }
+
         var existingLength = File.Exists(partPath) ? new FileInfo(partPath).Length : 0;
 
         if (expectedSize is long expected && existingLength > expected)
@@ -853,11 +886,6 @@ public sealed class DownloadClient : IDisposable
                 }
             }
 
-            if (expectedSize is long size && new FileInfo(partPath).Length != size)
-            {
-                throw new InvalidDataException($"文件大小不匹配：期望 {size}，实际 {new FileInfo(partPath).Length}。");
-            }
-
             var transferredBytes = written - startOffset;
             if (transferredBytes >= 512 * 1024)
             {
@@ -869,16 +897,149 @@ public sealed class DownloadClient : IDisposable
                 RecordSpeed(url, transferredBytes / Math.Max(speedClock.Elapsed.TotalSeconds, 0.001));
             }
 
-            if (expectedSha1 is not null && !HashMatches(partPath, expectedSha1))
-            {
-                File.Delete(partPath);
-                throw new InvalidDataException("SHA-1 校验失败。");
-            }
-
-            File.Move(partPath, destinationPath, overwrite: true);
-            return new DownloadResult(destinationPath, written, Skipped: false, HashVerified: expectedSha1 is not null);
+            return CompleteDownload(partPath, destinationPath, expectedSha1, written, expectedSize);
         }
     }
+
+    /// <summary>
+    /// 把一个大文件拆成多段并发下载，各段写入独立的 .part.N 文件，全部完成后拼接。
+    /// 已经下完的段会直接复用，因此换源重试不必重新下整份。
+    /// </summary>
+    private async Task<DownloadResult> DownloadInSegmentsAsync(
+        string url,
+        string destinationPath,
+        string partPath,
+        string? expectedSha1,
+        long totalSize,
+        int segments,
+        IProgress<DownloadProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var chunk = totalSize / segments;
+        var received = new long[segments];
+        var fileName = Path.GetFileName(destinationPath);
+
+        async Task DownloadSegmentAsync(int index)
+        {
+            var start = index * chunk;
+            var end = index == segments - 1 ? totalSize - 1 : start + chunk - 1;
+            var length = end - start + 1;
+            var segmentPath = $"{partPath}.{index}";
+
+            if (File.Exists(segmentPath) && new FileInfo(segmentPath).Length == length)
+            {
+                Interlocked.Exchange(ref received[index], length);
+                return;
+            }
+
+            using var idle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Range = new RangeHeaderValue(start, end);
+
+            idle.CancelAfter(IdleTimeout);
+            using var response = await _httpClient.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, idle.Token);
+
+            // 服务器忽略 Range 时会回 200 并带上整个文件，这种情况必须退回单连接。
+            if (response.StatusCode != HttpStatusCode.PartialContent)
+                throw new RangeNotSupportedException();
+
+            response.EnsureSuccessStatusCode();
+
+            await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await using var target = new FileStream(
+                segmentPath, FileMode.Create, FileAccess.Write, FileShare.Read, BufferSize, useAsync: true);
+
+            var buffer = new byte[BufferSize];
+            long written = 0;
+            while (true)
+            {
+                int read;
+                try
+                {
+                    idle.CancelAfter(IdleTimeout);
+                    read = await source.ReadAsync(buffer, idle.Token);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    throw new TimeoutException($"下载 {url} 停滞超过 {IdleTimeout.TotalSeconds:0} 秒。");
+                }
+
+                if (read == 0) break;
+
+                await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                written += read;
+                Interlocked.Exchange(ref received[index], written);
+
+                long sum = 0;
+                foreach (ref var value in received.AsSpan()) sum += value;
+                progress?.Report(new DownloadProgress(fileName, sum, totalSize));
+            }
+
+            if (written != length)
+                throw new InvalidDataException($"分片大小不匹配：期望 {length}，实际 {written}。");
+        }
+
+        var tasks = new Task[segments];
+        for (var index = 0; index < segments; index++)
+        {
+            var captured = index;
+            tasks[index] = Task.Run(() => DownloadSegmentAsync(captured), cancellationToken);
+        }
+
+        await Task.WhenAll(tasks);
+
+        // 拼接成完整的 .part，再走统一的校验与落盘流程。
+        await using (var target = new FileStream(
+                         partPath, FileMode.Create, FileAccess.Write, FileShare.Read, BufferSize, useAsync: true))
+        {
+            for (var index = 0; index < segments; index++)
+            {
+                await using var source = new FileStream(
+                    $"{partPath}.{index}", FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize, useAsync: true);
+                await source.CopyToAsync(target, BufferSize, cancellationToken);
+            }
+        }
+
+        DeleteSegmentFiles(partPath);
+
+        return CompleteDownload(partPath, destinationPath, expectedSha1, totalSize, totalSize);
+    }
+
+    private static void DeleteSegmentFiles(string partPath)
+    {
+        for (var index = 0; index < MaxSegments; index++)
+        {
+            var segmentPath = $"{partPath}.{index}";
+            if (File.Exists(segmentPath)) File.Delete(segmentPath);
+        }
+    }
+
+    /// <summary>大小与时 SHA-1 校验后原子落盘。</summary>
+    private static DownloadResult CompleteDownload(
+        string partPath,
+        string destinationPath,
+        string? expectedSha1,
+        long bytesReceived,
+        long? expectedSize)
+    {
+        if (expectedSize is long size && new FileInfo(partPath).Length != size)
+        {
+            throw new InvalidDataException($"文件大小不匹配：期望 {size}，实际 {new FileInfo(partPath).Length}。");
+        }
+
+        if (expectedSha1 is not null && !HashMatches(partPath, expectedSha1))
+        {
+            File.Delete(partPath);
+            throw new InvalidDataException("SHA-1 校验失败。");
+        }
+
+        File.Move(partPath, destinationPath, overwrite: true);
+        return new DownloadResult(destinationPath, bytesReceived, Skipped: false, HashVerified: expectedSha1 is not null);
+    }
+
+    /// <summary>服务器不支持按段请求。</summary>
+    private sealed class RangeNotSupportedException : Exception;
 
     private async Task<byte[]> DownloadBytesFromUrlAsync(
         string url,

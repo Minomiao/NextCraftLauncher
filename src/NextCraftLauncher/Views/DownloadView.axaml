@@ -28,6 +28,11 @@
             <Setter Property="Opacity" Value="0.9" />
         </Style>
 
+        <!-- 侧边栏的合计进度：没有任务时整体置灰 -->
+        <Style Selector="StackPanel.taskProgress.idle">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+
         <!-- 列表只负责虚拟化滚动，选中高亮由行内按钮控制 -->
         <Style Selector="ListBox.versionList ListBoxItem:pointerover /template/ Border#PART_Root">
             <Setter Property="Background" Value="Transparent" />
@@ -60,10 +65,30 @@
                             Command="{Binding ShowDownloadSettingsCommand}" />
                 </StackPanel>
 
-                <Button Grid.Row="1"
-                        Classes="side"
-                        Content="任务"
-                        Command="{Binding ShowDownloadRunningCommand}" />
+                <StackPanel Grid.Row="1" Spacing="8">
+                    <!-- 所有任务的合计进度；无任务时置灰 -->
+                    <StackPanel Spacing="4"
+                                Classes="taskProgress"
+                                Classes.idle="{Binding !HasActiveDownloads}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="下载进度"
+                                       FontSize="12"
+                                       Opacity="0.75"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding OverallDownloadPercentText}"
+                                       FontSize="12" />
+                        </Grid>
+                        <ProgressBar Minimum="0"
+                                     Maximum="100"
+                                     Value="{Binding OverallDownloadPercent}"
+                                     Height="4" />
+                    </StackPanel>
+
+                    <Button Classes="side"
+                            Content="任务"
+                            Command="{Binding ShowDownloadRunningCommand}" />
+                </StackPanel>
             </Grid>
 
             <Border Grid.Column="1" Classes="vline" />

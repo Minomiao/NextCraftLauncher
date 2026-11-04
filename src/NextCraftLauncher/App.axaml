@@ -9,6 +9,22 @@
         <local:ViewLocator />
     </Application.DataTemplates>
 
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- 任务卡片：始终比页面底色浅的悬浮面 -->
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="TaskCardBackgroundBrush" Color="#FFFFFFFF" />
+                    <SolidColorBrush x:Key="TaskCardBorderBrush" Color="#E4E4E7" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="TaskCardBackgroundBrush" Color="#2AFFFFFF" />
+                    <SolidColorBrush x:Key="TaskCardBorderBrush" Color="#33FFFFFF" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
 
@@ -24,7 +40,9 @@
 
         <!-- 任务卡片：任务页里每个下载任务一张，后续新增任务沿用同一外观 -->
         <Style Selector="Border.card">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource TaskCardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TaskCardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="16" />
         </Style>

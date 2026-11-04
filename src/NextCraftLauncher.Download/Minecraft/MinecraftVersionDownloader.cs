@@ -11,10 +11,11 @@ public sealed class MinecraftVersionDownloadOptions
 {
     public DownloadMirror Mirror { get; init; } = DownloadMirror.Automatic;
 
-    public int MaxDegreeOfParallelism { get; init; } = 16;
-
-    /// <summary>小文件（主要是 assets objects）的并发数；尾段大量小文件靠并发掩盖请求延迟。</summary>
-    public int SmallFileMaxDegreeOfParallelism { get; init; } = 48;
+    /// <summary>
+    /// 并发下载上限。所有文件共用一个队列并按大小从大到小取，
+    /// 这样最后剩下的都是几十 KB 的 assets，不会出现“最后几个大文件单连接收尾”。
+    /// </summary>
+    public int MaxDegreeOfParallelism { get; init; } = 64;
 
     /// <summary>仅用于测试或“只补客户端/库”的场景。</summary>
     public bool DownloadAssets { get; init; } = true;
@@ -351,43 +352,21 @@ public static class MinecraftVersionDownloader
             ReportProgress(item.DisplayName, force: false);
         }
 
-        // 尾段主要是大量 assets 小文件，受请求延迟影响；给它们更高的并发。
-        // 两者并行执行，避免所有小文件都等到最后才开始。
-        const long smallFileThreshold = 1024 * 1024;
-        var largeFiles = work
-            .Where(item => item.Size >= smallFileThreshold)
-            .OrderByDescending(item => item.Size)
-            .ToList();
-        var smallFiles = work
-            .Where(item => item.Size < smallFileThreshold)
+        // 所有文件共用一个队列，按大小降序分发：大文件先开跑，收尾时剩下的都是小文件。
+        var ordered = work
             .OrderByDescending(item => item.Size)
             .ToList();
 
         using var poolCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        var largeTask = Parallel.ForEachAsync(
-            largeFiles,
+        await Parallel.ForEachAsync(
+            ordered,
             new ParallelOptions
             {
                 MaxDegreeOfParallelism = Math.Max(1, options.MaxDegreeOfParallelism),
                 CancellationToken = poolCts.Token,
             },
             DownloadItemAsync);
-
-        var smallTask = Parallel.ForEachAsync(
-            smallFiles,
-            new ParallelOptions
-            {
-                MaxDegreeOfParallelism = Math.Max(1, options.SmallFileMaxDegreeOfParallelism),
-                CancellationToken = poolCts.Token,
-            },
-            DownloadItemAsync);
-
-        // 任一池失败时立即取消另一池，避免一个坏文件让整批下载跑到结束才报错。
-        _ = CancelPoolOnFaultAsync(largeTask, poolCts);
-        _ = CancelPoolOnFaultAsync(smallTask, poolCts);
-
-        await Task.WhenAll(largeTask, smallTask);
 
         // 5. 最后写入版本 JSON，避免中断时留下不完整版本
         stage = MinecraftDownloadStage.Finalizing;
@@ -414,33 +393,6 @@ public static class MinecraftVersionDownloader
             totalFiles,
             totalBytes,
             isolate);
-    }
-
-
-    /// <summary>
-    /// 观察一个下载池；它因异常结束时取消另一个池。
-    /// 取消（用户中断或对侧失败）不重复处理。
-    /// </summary>
-    private static async Task CancelPoolOnFaultAsync(Task poolTask, CancellationTokenSource poolCts)
-    {
-        try
-        {
-            await poolTask.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception)
-        {
-            try
-            {
-                poolCts.Cancel();
-            }
-            catch (ObjectDisposedException)
-            {
-                // 下载已结束并释放了令牌源。
-            }
-        }
     }
 
     private static string? DeriveMavenPath(string? name)

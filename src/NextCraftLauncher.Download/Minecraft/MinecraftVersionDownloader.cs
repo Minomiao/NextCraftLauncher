@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NextCraftLauncher.Core.Logging;
@@ -123,15 +124,34 @@ public static class MinecraftVersionDownloader
         var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionId);
         Directory.CreateDirectory(versionDirectory);
 
+        // 准备阶段的每一步都先上报一条，避免卡片长时间停在「正在准备下载…」看起来像卡住。
+        void ReportPreparing(string message)
+            => progress?.Report(new MinecraftVersionDownloadProgress(0, 0, message, 0, null)
+            {
+                Stage = MinecraftDownloadStage.Preparing,
+            });
+
+        // 准备阶段没有进度可看，把两步各自的耗时写进日志，以后能直接从日志判断慢在哪。
+        var prepareClock = Stopwatch.StartNew();
+        var indexClock = new Stopwatch();
+        var versionJsonMs = 0L;
+        var indexMs = 0L;
+
         // 1. 版本 JSON：本地已存在且校验通过时直接复用，补文件时省掉一次往返。
         var versionJsonPath = Path.Combine(versionDirectory, versionId + ".json");
-        var versionJsonBytes = TryReadVerified(versionJsonPath, entry.Sha1, expectedSize: null)
-                               ?? await client.DownloadBytesAutoAsync(
-                                   DownloadUrlResolver.Build(entry.Url, options.Mirror),
-                                   options.Mirror,
-                                   string.IsNullOrWhiteSpace(entry.Sha1) ? null : entry.Sha1,
-                                   expectedSize: null,
-                                   cancellationToken: cancellationToken);
+        var versionJsonBytes = TryReadVerified(versionJsonPath, entry.Sha1, expectedSize: null);
+        if (versionJsonBytes is null)
+        {
+            ReportPreparing("版本信息");
+            versionJsonBytes = await client.DownloadBytesAutoAsync(
+                DownloadUrlResolver.Build(entry.Url, options.Mirror),
+                options.Mirror,
+                string.IsNullOrWhiteSpace(entry.Sha1) ? null : entry.Sha1,
+                expectedSize: null,
+                cancellationToken: cancellationToken);
+        }
+
+        versionJsonMs = prepareClock.ElapsedMilliseconds;
 
         var versionInfo = JsonSerializer.Deserialize<VersionInfo>(versionJsonBytes, JsonOptions)
                           ?? throw new InvalidDataException("无法解析版本 JSON。");
@@ -233,6 +253,9 @@ public static class MinecraftVersionDownloader
 
             if (assetIndexBytes is null)
             {
+                ReportPreparing("资源索引");
+                indexClock.Restart();
+
                 assetIndexBytes = await client.DownloadBytesAutoAsync(
                     DownloadUrlResolver.Build(assetIndex.Url, options.Mirror),
                     options.Mirror,
@@ -241,6 +264,7 @@ public static class MinecraftVersionDownloader
                     cancellationToken);
 
                 WriteFile(assetIndexPath, assetIndexBytes);
+                indexMs = indexClock.ElapsedMilliseconds;
             }
 
             if (options.DownloadAssets)
@@ -321,6 +345,9 @@ public static class MinecraftVersionDownloader
             ReportProgress("资源索引", force: true);
 
         stage = MinecraftDownloadStage.Files;
+
+        LauncherLog.Info(
+            $"下载准备（{versionId}）：版本信息 {versionJsonMs} ms，资源索引 {indexMs} ms，共 {prepareClock.ElapsedMilliseconds} ms");
 
         async ValueTask DownloadItemAsync(DownloadWork item, CancellationToken token)
         {

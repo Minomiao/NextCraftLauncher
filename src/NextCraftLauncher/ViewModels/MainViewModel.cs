@@ -2139,6 +2139,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var lastUiTicks = 0L;
             var progress = new Progress<MinecraftVersionDownloadProgress>(report =>
             {
+                // 准备阶段没有百分比，直接把当前在拉的东西写在卡片上，避免看上去卡死。
+                if (report.Stage == MinecraftDownloadStage.Preparing && report.CompletedFiles == 0)
+                {
+                    task.StatusText = $"正在获取{report.CurrentFile}…";
+                    return;
+                }
+
                 var stageChanged = stage != report.Stage;
                 var now = Environment.TickCount64;
                 var isFinal = report.Percent is >= 100 ||
@@ -2274,6 +2281,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 var lastVanillaTicks = 0L;
                 var vanillaProgress = new Progress<MinecraftVersionDownloadProgress>(report =>
                 {
+                    if (report.Stage == MinecraftDownloadStage.Preparing && report.CompletedFiles == 0)
+                    {
+                        task.StatusText = $"正在获取{report.CurrentFile}…";
+                        return;
+                    }
+
                     var stageChanged = stage != report.Stage;
                     var now = Environment.TickCount64;
                     var isFinal = report.Percent is >= 100 ||

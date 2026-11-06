@@ -181,7 +181,7 @@ public sealed class DownloadClient : IDisposable
             AllowAutoRedirect = true,
             AutomaticDecompression = decompression,
             ConnectTimeout = ConnectTimeout,
-            MaxConnectionsPerServer = 64,
+            MaxConnectionsPerServer = 256,
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
         })
         {

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using NextCraftLauncher.Core.Logging;
 using NextCraftLauncher.Core.Minecraft;
 using NextCraftLauncher.Core.Settings;
 using NextCraftLauncher.Core.Util;
@@ -12,10 +13,21 @@ public sealed class MinecraftVersionDownloadOptions
     public DownloadMirror Mirror { get; init; } = DownloadMirror.Automatic;
 
     /// <summary>
-    /// 并发下载上限。所有文件共用一个队列并按大小从大到小取，
+    /// 并发的上限。所有文件共用一个队列并按大小从大到小取，
     /// 这样最后剩下的都是几十 KB 的 assets，不会出现“最后几个大文件单连接收尾”。
+    /// 运行时从 <see cref="InitialDegreeOfParallelism"/> 起步，速度掉到水位以下且仍有排队时逐步上调到这里。
+    /// 实测 128 是拐点：再往上吞吐不再提升，反而更容易触发限流。
     /// </summary>
-    public int MaxDegreeOfParallelism { get; init; } = 64;
+    public int MaxDegreeOfParallelism { get; init; } = 128;
+
+    /// <summary>起步并发。先用保守值跑，只在确实慢的时候才抬高，避免一上来就把源打限流。</summary>
+    public int InitialDegreeOfParallelism { get; init; } = 64;
+
+    /// <summary>聚合速度低于该值且所有并发槽都在忙时，认为被延迟卡住，调高并发（单位：字节/秒）。</summary>
+    public long SpeedUpBelowBytesPerSecond { get; init; } = 2 * 1024 * 1024;
+
+    /// <summary>每次上调的幅度。</summary>
+    public int SpeedUpStep { get; init; } = 32;
 
     /// <summary>仅用于测试或“只补客户端/库”的场景。</summary>
     public bool DownloadAssets { get; init; } = true;
@@ -359,14 +371,93 @@ public static class MinecraftVersionDownloader
 
         using var poolCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        await Parallel.ForEachAsync(
-            ordered,
-            new ParallelOptions
+        // 先按保守并发跑；聚合速度掉到水位以下且并发槽全满时再加槽，避免一上来就被源限流。
+        var maxDegree = Math.Max(1, options.MaxDegreeOfParallelism);
+        var degree = Math.Clamp(options.InitialDegreeOfParallelism, 1, maxDegree);
+        using var slots = new SemaphoreSlim(degree, int.MaxValue);
+        var tasks = new List<Task>(ordered.Count);
+
+        async Task DownloadWithSlotAsync(DownloadWork item)
+        {
+            try
             {
-                MaxDegreeOfParallelism = Math.Max(1, options.MaxDegreeOfParallelism),
-                CancellationToken = poolCts.Token,
-            },
-            DownloadItemAsync);
+                await DownloadItemAsync(item, poolCts.Token);
+            }
+            catch
+            {
+                // 任一文件失败就停止派发新任务，避免白跑完整个队列。
+                try { poolCts.Cancel(); } catch (ObjectDisposedException) { }
+                throw;
+            }
+            finally
+            {
+                slots.Release();
+            }
+        }
+
+        async Task RaiseDegreeWhenSlowAsync()
+        {
+            var lastBytes = 0L;
+            var lastTick = Environment.TickCount64;
+
+            while (!poolCts.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(500, poolCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+
+                long bytes;
+                lock (progressGate) bytes = completedBytes;
+
+                var now = Environment.TickCount64;
+                var elapsed = Math.Max((now - lastTick) / 1000.0, 0.001);
+                var speed = (bytes - lastBytes) / elapsed;
+                lastBytes = bytes;
+                lastTick = now;
+
+                // 速度达标，或者还有空槽（说明没被延迟卡住），都不需要加并发。
+                if (speed >= options.SpeedUpBelowBytesPerSecond) continue;
+                if (slots.CurrentCount > 0) continue;
+
+                var target = Math.Min(maxDegree, degree + options.SpeedUpStep);
+                if (target <= degree) continue;
+
+                slots.Release(target - degree);
+                degree = target;
+                LauncherLog.Info($"下载并发提升到 {target}（当前 {speed / 1048576:0.0} MB/s）");
+            }
+        }
+
+        var speedUp = RaiseDegreeWhenSlowAsync();
+
+        try
+        {
+            foreach (var item in ordered)
+            {
+                await slots.WaitAsync(poolCts.Token);
+                tasks.Add(DownloadWithSlotAsync(item));
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // 某个文件失败导致停止派发，真实异常由下面的 WhenAll 抛出。
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户中断：先让已派发的任务安静退出，再把取消原样抛给调用方。
+            try { await Task.WhenAll(tasks); } catch { }
+            throw;
+        }
+
+        await Task.WhenAll(tasks);
+
+        try { poolCts.Cancel(); } catch (ObjectDisposedException) { }
+        try { await speedUp; } catch (OperationCanceledException) { }
 
         // 5. 最后写入版本 JSON，避免中断时留下不完整版本
         stage = MinecraftDownloadStage.Finalizing;

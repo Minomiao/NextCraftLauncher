@@ -2201,7 +2201,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var finalId = VersionNaming.RenameInstalledVersion(
                 MinecraftDirectory, result.VersionId, desiredName);
 
-            await RefreshAsync();
+            // 只重扫版本：下载不会改变系统里的 Java，重新发现只会把收尾拖长。
+            await RefreshCoreAsync(refreshJava: false);
 
             var local = Versions.FirstOrDefault(version =>
                 string.Equals(version.Id, finalId, StringComparison.OrdinalIgnoreCase));
@@ -2426,7 +2427,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             task.Percent = 100;
 
-            await RefreshAsync();
+            // 只重扫版本：安装加载器不会改变系统里的 Java。
+            await RefreshCoreAsync(refreshJava: false);
 
             var local = Versions.FirstOrDefault(version =>
                 string.Equals(version.Id, result.VersionId, StringComparison.OrdinalIgnoreCase));

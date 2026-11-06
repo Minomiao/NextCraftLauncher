@@ -87,10 +87,10 @@ public sealed class DownloadClient : IDisposable
     /// 超过该大小的文件按段并发下载。国内到 Mojang CDN 的单连接往往只有一两百 KB/s，
     /// 大文件若只靠一条连接，尾部就会长时间卡在“最后几个文件”。
     /// </summary>
-    private const long SegmentedMinimumSize = 4 * 1024 * 1024;
+    private const long SegmentedMinimumSize = 1024 * 1024;
 
     /// <summary>单片的最小字节数；分片太多只会把握手和重试开销放大。</summary>
-    private const long SegmentMinimumSize = 2 * 1024 * 1024;
+    private const long SegmentMinimumSize = 256 * 1024;
 
     /// <summary>单个文件最多拆成几片。片数与每片速度的乘积才是单文件吞吐。</summary>
     private const int MaxSegments = 16;

@@ -33,6 +33,12 @@ public sealed class DownloadClient : IDisposable
     /// </summary>
     private static readonly TimeSpan MetadataIdleTimeout = TimeSpan.FromSeconds(8);
 
+    /// <summary>
+    /// 小文件用更短的停滞超时。几百 KB 的文件正常几秒内就该有数据，
+    /// 沿用 20 秒会让「只剩几个文件」的阶段看起来完全定住。
+    /// </summary>
+    private const long SmallFileIdleThreshold = 1024 * 1024;
+
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
 
     /// <summary>
@@ -817,6 +823,9 @@ public sealed class DownloadClient : IDisposable
 
         using var idle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
+        // 小文件不该等 20 秒才判定停滞。
+        var idleTimeout = expectedSize is < SmallFileIdleThreshold ? MetadataIdleTimeout : IdleTimeout;
+
         HttpResponseMessage response;
         for (var attempt = 1; ; attempt++)
         {
@@ -828,14 +837,14 @@ public sealed class DownloadClient : IDisposable
 
             try
             {
-                idle.CancelAfter(IdleTimeout);
+                idle.CancelAfter(idleTimeout);
                 response = await _httpClient.SendAsync(
                     request, HttpCompletionOption.ResponseHeadersRead, idle.Token);
                 break;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                throw new TimeoutException($"连接 {url} 超时（{IdleTimeout.TotalSeconds:0} 秒无响应）。");
+                throw new TimeoutException($"连接 {url} 超时（{idleTimeout.TotalSeconds:0} 秒无响应）。");
             }
             catch (HttpRequestException exception)
                 when (attempt < RedirectRetryCount && IsSourceLevelFailure(exception))
@@ -879,12 +888,12 @@ public sealed class DownloadClient : IDisposable
                     int read;
                     try
                     {
-                        idle.CancelAfter(IdleTimeout);
+                        idle.CancelAfter(idleTimeout);
                         read = await responseStream.ReadAsync(buffer, idle.Token);
                     }
                     catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                     {
-                        throw new TimeoutException($"下载 {url} 停滞超过 {IdleTimeout.TotalSeconds:0} 秒。");
+                        throw new TimeoutException($"下载 {url} 停滞超过 {idleTimeout.TotalSeconds:0} 秒。");
                     }
 
                     if (read == 0) break;

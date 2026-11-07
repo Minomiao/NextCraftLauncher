@@ -2185,15 +2185,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 NotifyDownloadStats();
             });
 
-            var result = await MinecraftVersionDownloader.DownloadAsync(
-                MinecraftDirectory,
-                item.Entry,
-                DownloadVersionIsolated,
-                progress,
-                new MinecraftVersionDownloadOptions
-                {
-                    Mirror = mirror,
-                },
+            // 下载本身是纯 IO / 校验，放到线程池：其中「文件已存在 → 校验并跳过」的路径
+            // 几乎全是同步工作，留在 UI 线程会让整个窗口卡住（进度和输入都没反应）。
+            var result = await Task.Run(
+                () => MinecraftVersionDownloader.DownloadAsync(
+                    MinecraftDirectory,
+                    item.Entry,
+                    DownloadVersionIsolated,
+                    progress,
+                    new MinecraftVersionDownloadOptions
+                    {
+                        Mirror = mirror,
+                    },
+                    task.Token),
                 task.Token);
 
             // 收尾（改名、重扫版本列表）也算任务时间，进度先停在 99，真正完成才打满。
@@ -2332,16 +2336,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 NotifyDownloadStats();
             });
 
-            await MinecraftVersionDownloader.DownloadAsync(
-                MinecraftDirectory,
-                item.Entry,
-                DownloadVersionIsolated,
-                vanillaProgress,
-                new MinecraftVersionDownloadOptions
-                {
-                    Mirror = ResolveGameMirror(),
-                    TargetVersionId = desiredName,
-                },
+            // 同理放到线程池：这一轮经常几乎全是「已存在 → 校验 → 跳过」的同步工作。
+            await Task.Run(
+                () => MinecraftVersionDownloader.DownloadAsync(
+                    MinecraftDirectory,
+                    item.Entry,
+                    DownloadVersionIsolated,
+                    vanillaProgress,
+                    new MinecraftVersionDownloadOptions
+                    {
+                        Mirror = ResolveGameMirror(),
+                        TargetVersionId = desiredName,
+                    },
+                    task.Token),
                 task.Token);
 
             // 原版文件下载结束后重新计量，安装器阶段的字节从 0 开始。
@@ -2436,21 +2443,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 Status = line;
             });
 
-            var result = await LoaderInstaller.InstallAsync(
-                MinecraftDirectory,
-                item.Id,
-                loader,
-                loaderVersion,
-                new LoaderInstallOptions
-                {
-                    FabricApiVersion = _selectedFabricApiVersion,
-                    IsolateVersion = DownloadVersionIsolated,
-                    Mirror = ResolveLoaderMirror(loader),
-                    JavaPath = javaPath,
-                    VersionName = desiredName,
-                    Progress = installProgress,
-                    Log = installLog,
-                },
+            // 安装过程中有解压安装器、解析 JSON、拷贝库等同步工作，同样放线程池，避免界面卡住。
+            var result = await Task.Run(
+                () => LoaderInstaller.InstallAsync(
+                    MinecraftDirectory,
+                    item.Id,
+                    loader,
+                    loaderVersion,
+                    new LoaderInstallOptions
+                    {
+                        FabricApiVersion = _selectedFabricApiVersion,
+                        IsolateVersion = DownloadVersionIsolated,
+                        Mirror = ResolveLoaderMirror(loader),
+                        JavaPath = javaPath,
+                        VersionName = desiredName,
+                        Progress = installProgress,
+                        Log = installLog,
+                    },
+                    task.Token),
                 task.Token);
 
             task.Percent = 99;
@@ -2667,15 +2677,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 NotifyDownloadStats();
             });
 
-            var result = await JavaRuntimeDownloader.DownloadAsync(
-                MinecraftDirectory,
-                component,
-                requiredMajor,
-                progress,
-                new JavaRuntimeDownloadOptions
-                {
-                    Mirror = mirror,
-                },
+            var result = await Task.Run(
+                () => JavaRuntimeDownloader.DownloadAsync(
+                    MinecraftDirectory,
+                    component,
+                    requiredMajor,
+                    progress,
+                    new JavaRuntimeDownloadOptions
+                    {
+                        Mirror = mirror,
+                    },
+                    task.Token),
                 task.Token);
 
             var runtime = await JavaLocator.ProbeAsync(

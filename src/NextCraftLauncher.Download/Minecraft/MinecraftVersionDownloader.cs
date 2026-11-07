@@ -470,12 +470,19 @@ public static class MinecraftVersionDownloader
 
         var speedUp = RaiseDegreeWhenSlowAsync();
 
+        var dispatched = 0;
         try
         {
             foreach (var item in ordered)
             {
                 await slots.WaitAsync(poolCts.Token);
                 tasks.Add(DownloadWithSlotAsync(item));
+
+                // 已存在且校验通过的文件不会产生真正的异步等待，整个派发循环会同步跑完。
+                // 调用方通常是 UI 线程，这一段会把界面冻结好几秒（下载加载器时原版文件
+                // 几乎都在本地，表现就是“跳过了下载原版的显示”），所以定期让出。
+                if (++dispatched % 8 == 0)
+                    await Task.Yield();
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

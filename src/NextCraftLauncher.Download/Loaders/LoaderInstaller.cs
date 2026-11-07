@@ -438,10 +438,13 @@ public static class LoaderInstaller
             if (File.Exists(installedJarPath))
                 File.Copy(installedJarPath, versionJarPath, overwrite: true);
 
-            // 安装器补齐的库最终仍要放进真实的 libraries。
-            CopyDirectory(
-                Path.Combine(tempRoot, "libraries"),
-                Path.Combine(minecraftDirectory, "libraries"));
+            // 安装器补齐的库最终仍要放进真实的 libraries；文件可能有几十 MB，
+            // 不在界面线程上拷贝，避免收尾时又卡住一下。
+            await Task.Run(
+                () => CopyDirectory(
+                    Path.Combine(tempRoot, "libraries"),
+                    Path.Combine(minecraftDirectory, "libraries")),
+                cancellationToken);
         }
         finally
         {

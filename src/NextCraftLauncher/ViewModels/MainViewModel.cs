@@ -2314,6 +2314,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 {
                     var mapped = percent * vanillaPhase / 100.0;
                     if (mapped > task.Percent) task.Percent = Math.Min(mapped, 99);
+
+                    // 和普通版本下载一致，让“游戏文件”这一步也带上百分比。
+                    if (stage == MinecraftDownloadStage.Files && task.Steps.Count > 1)
+                        task.Steps[1].Detail = $"{percent:0}%";
                 }
 
                 if (report.BytesDownloaded > 0)
@@ -2324,6 +2328,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 task.StatusText = report.TotalFiles > 0
                     ? $"正在下载原版文件 {report.CompletedFiles}/{report.TotalFiles}..."
                     : "正在下载原版文件...";
+                Status = task.StatusText;
                 NotifyDownloadStats();
             });
 

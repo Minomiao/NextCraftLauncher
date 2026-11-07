@@ -141,6 +141,14 @@ public sealed class DownloadClient : IDisposable
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, double> _sourceSpeeds =
         new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// 是否根据实测速度重新排序候选源。
+    /// 目前关闭：同一个源在同一分钟内实测波动可达 10 倍以上（BMCL 每次请求 302 到不同节点），
+    /// 而样本只来自 256 KB–1 MB 的非分片文件，排序结果不可复现，反而可能选到更慢的源。
+    /// 采集代码与数据保留，等采样补齐（分片路径、聚合吞吐、TTL）后再打开。
+    /// </summary>
+    private static readonly bool UseMeasuredSourceSpeed = false;
+
     private int _candidateCounter;
 
     /// <summary>
@@ -621,7 +629,8 @@ public sealed class DownloadClient : IDisposable
     }
 
     /// <summary>
-    /// 过滤掉正在限流/连续失败的源，并按实测速度排序；定期试探未测速的源。
+    /// 过滤掉正在限流 / 连续失败 / 暂时不可用的源。
+    /// 实测速度排序见 <see cref="UseMeasuredSourceSpeed"/>，关闭时保持调用方给出的静态顺序。
     /// </summary>
     private string[] OrderCandidates(IReadOnlyList<string> urls)
     {
@@ -632,6 +641,9 @@ public sealed class DownloadClient : IDisposable
         var candidates = available.Length > 0 ? available : all;
 
         if (candidates.Length <= 1) return candidates;
+
+        // 关闭速度排序时保留调用方给的顺序：静态优先级 + 失败切换，与 PCL2 一致。
+        if (!UseMeasuredSourceSpeed) return candidates;
 
         // 每 16 个文件抽一个去试未测速的源，避免“一直用第一个源”而永远不知道另一个源更快。
         if (Interlocked.Increment(ref _candidateCounter) % 16 == 0)

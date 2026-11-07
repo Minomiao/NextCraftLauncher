@@ -124,18 +124,21 @@ public static class LoaderInstaller
         var knownBytes = libraries.Sum(library => Math.Max(0, library.Size));
         var transferredBytes = 0L;
         var gate = new SemaphoreSlim(16);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
 
         // 有大小信息时按字节推进（可看出速度和进度），否则退回按文件数推进。
         void ReportFabricProgress()
         {
             var done = Volatile.Read(ref completed);
             var bytes = Interlocked.Read(ref transferredBytes);
-            var percent = knownBytes > 0
-                ? Math.Min(99, bytes / (double)knownBytes * 100)
-                : Math.Min(99, done / (double)total * 100);
+
+            // Fabric 的 profile 里并非每个库都带大小，按字节算的百分比会提前打满，
+            // 因此百分比按完成文件数走，字节数只用于显示速度与已下量。
+            var percent = Math.Min(99, done / (double)total * 100);
+            var amount = bytes > 0 ? $"（已下 {bytes / 1048576.0:0.0} MB）" : string.Empty;
 
             options.Progress?.Report(new LoaderInstallProgress(
-                $"正在下载 Fabric 库文件 {Math.Min(done + 1, total)}/{libraries.Count}…",
+                $"正在下载 Fabric 库文件 {Math.Min(done + 1, total)}/{libraries.Count}{amount}…",
                 percent,
                 MinecraftDownloadStage.Files)
             {
@@ -181,6 +184,9 @@ public static class LoaderInstaller
         });
 
         await Task.WhenAll(tasks);
+
+        LauncherLog.Info(
+            $"Fabric 库文件 {libraries.Count} 个（{knownBytes / 1048576.0:0.0} MB）已处理，用时 {clock.ElapsedMilliseconds} ms");
 
         options.Progress?.Report(new LoaderInstallProgress(
             "正在写入 Fabric 版本配置…", 99, MinecraftDownloadStage.Finalizing));

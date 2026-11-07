@@ -2198,6 +2198,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             // 收尾（改名、重扫版本列表）也算任务时间，进度先停在 99，真正完成才打满。
             task.Percent = 99;
+            NotifyDownloadStats();
 
             var finalId = VersionNaming.RenameInstalledVersion(
                 MinecraftDirectory, result.VersionId, desiredName);
@@ -2277,6 +2278,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
             // 安装器不提供百分比，用「逐步逼近 97%」推进：
             // 刚开始明显往前走，越接近上限越慢，不会像固定步长那样一分钟只动几个点。
             task.Percent = Math.Min(97, task.Percent + Math.Max(0.4, (97 - task.Percent) * 0.06));
+
+            // 侧边栏的总进度也来自 task.Percent，这里不通知会和卡片进度条对不上。
+            NotifyDownloadStats();
         };
         creepTimer.Start();
 
@@ -2364,8 +2368,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             var lastInstallTicks = 0L;
             var lastInstallBytes = 0L;
+            var lastInstallText = string.Empty;
             var installProgress = new Progress<LoaderInstallProgress>(report =>
             {
+                // 阶段文本变化时记一笔，事后能从日志看出每一步的进度值。
+                if (report.Text != lastInstallText)
+                {
+                    lastInstallText = report.Text;
+                    LauncherLog.Info($"安装阶段：{report.Text}（{report.Percent?.ToString("0.0") ?? "无百分比"}）");
+                }
                 // 下载回调很密集，限制界面刷新频率；阶段切换与开始/结束阶段一定刷新。
                 var now = Environment.TickCount64;
                 var isPhaseChange = report.Percent is null or >= 100;
@@ -2437,6 +2448,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 task.Token);
 
             task.Percent = 99;
+            NotifyDownloadStats();
 
             // 只重扫版本：安装加载器不会改变系统里的 Java。
             await RefreshCoreAsync(refreshJava: false);

@@ -121,7 +121,7 @@ public static class LoaderInstaller
 
         var completed = 0;
         var total = Math.Max(libraries.Count, 1);
-        var gate = new SemaphoreSlim(8);
+        var gate = new SemaphoreSlim(16);
 
         var tasks = libraries.Select(async library =>
         {
@@ -340,84 +340,110 @@ public static class LoaderInstaller
         var libraries = ReadInstallerLibraries(installerPath);
         if (libraries.Count == 0) return;
 
+        // 安装器依赖只有几 MB 但文件数不少，串行下载时每个文件都要等一次完整往返。
+        // 用有限并发并行拉，与版本文件下载共用同一套下载核心。
         var total = libraries.Count;
         var downloaded = 0;
         var transferredBytes = 0L;
+        var completed = 0;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        using var gate = new SemaphoreSlim(Math.Min(16, total));
 
-        for (var index = 0; index < libraries.Count; index++)
+        var tasks = libraries.Select(async (library, index) =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var library = libraries[index];
-            var artifact = library.Downloads?.Artifact;
-            var path = artifact?.Path;
-            if (string.IsNullOrWhiteSpace(path))
-                path = DeriveMavenPath(library.Name);
-            if (string.IsNullOrWhiteSpace(path)) continue;
-
-            var url = artifact?.Url;
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                var baseUrl = string.IsNullOrWhiteSpace(library.Url)
-                    ? "https://maven.neoforged.net/releases/"
-                    : library.Url!;
-                url = baseUrl.TrimEnd('/') + "/" + path;
-            }
-
-            var destination = Path.Combine(
-                minecraftDirectory, "libraries", path.Replace('/', Path.DirectorySeparatorChar));
-
-            // 已完成的文件数决定基础进度。
-            var fileIndex = index;
-            var baseBytes = transferredBytes;
-            var fileProgress = new ForwardProgress<DownloadProgress>(report =>
-            {
-                progress?.Report(new LoaderInstallProgress(
-                    $"正在准备 {displayName} 安装器依赖 {fileIndex + 1}/{total}…",
-                    40 + fileIndex / (double)total * 50,
-                    MinecraftDownloadStage.Preparing)
-                {
-                    BytesDownloaded = baseBytes + report.BytesReceived,
-                });
-            });
-
+            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                var sha1 = string.IsNullOrWhiteSpace(artifact?.Sha1) ? null : artifact!.Sha1;
+                cancellationToken.ThrowIfCancellationRequested();
 
-                // 已存在且校验通过时 DownloadFileAsync 会直接返回，不产生网络请求。
-                var result = await client.DownloadFileAsync(
-                    DownloadUrlResolver.Build(url!, mirror),
-                    destination,
-                    sha1,
-                    artifact is { Size: > 0 } ? artifact.Size : null,
-                    fileProgress,
-                    cancellationToken);
+                var artifact = library.Downloads?.Artifact;
+                var path = artifact?.Path;
+                if (string.IsNullOrWhiteSpace(path))
+                    path = DeriveMavenPath(library.Name);
+                if (string.IsNullOrWhiteSpace(path)) return;
 
-                transferredBytes += result.BytesWritten;
-                downloaded++;
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                // 单个库失败不阻断安装，安装器自己还会再试一次。
-                LauncherLog.Warn($"安装器依赖 {path} 下载失败：{exception.Message}");
-            }
+                var url = artifact?.Url;
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    var baseUrl = string.IsNullOrWhiteSpace(library.Url)
+                        ? "https://maven.neoforged.net/releases/"
+                        : library.Url!;
+                    url = baseUrl.TrimEnd('/') + "/" + path;
+                }
 
-            progress?.Report(new LoaderInstallProgress(
-                $"正在准备 {displayName} 安装器依赖 {index + 1}/{total}…",
-                40 + (index + 1) / (double)total * 50,
-                MinecraftDownloadStage.Preparing)
+                var destination = Path.Combine(
+                    minecraftDirectory, "libraries", path.Replace('/', Path.DirectorySeparatorChar));
+
+                var lastBytes = 0L;
+                var lastReportTicks = 0L;
+                var fileProgress = new ForwardProgress<DownloadProgress>(report =>
+                {
+                    // 并发后回调密度是原来的十几倍，限制一下刷新频率。
+                    var now = Environment.TickCount64;
+                    if (now - lastReportTicks < 100) return;
+                    lastReportTicks = now;
+
+                    var delta = report.BytesReceived - lastBytes;
+                    if (delta != 0)
+                    {
+                        lastBytes = report.BytesReceived;
+                        Interlocked.Add(ref transferredBytes, delta);
+                    }
+
+                    var done = Volatile.Read(ref completed);
+                    progress?.Report(new LoaderInstallProgress(
+                        $"正在准备 {displayName} 安装器依赖 {Math.Min(done + 1, total)}/{total}…",
+                        40 + done / (double)total * 50,
+                        MinecraftDownloadStage.Preparing)
+                    {
+                        BytesDownloaded = Interlocked.Read(ref transferredBytes),
+                    });
+                });
+
+                try
+                {
+                    var sha1 = string.IsNullOrWhiteSpace(artifact?.Sha1) ? null : artifact!.Sha1;
+
+                    // 已存在且校验通过时 DownloadFileAsync 会直接返回，不产生网络请求。
+                    await client.DownloadFileAsync(
+                        DownloadUrlResolver.Build(url!, mirror),
+                        destination,
+                        sha1,
+                        artifact is { Size: > 0 } ? artifact.Size : null,
+                        fileProgress,
+                        cancellationToken);
+
+                    Interlocked.Increment(ref downloaded);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    // 单个库失败不阻断安装，安装器自己还会再试一次。
+                    LauncherLog.Warn($"安装器依赖 {path} 下载失败：{exception.Message}");
+                }
+
+                var finished = Interlocked.Increment(ref completed);
+                progress?.Report(new LoaderInstallProgress(
+                    $"正在准备 {displayName} 安装器依赖 {finished}/{total}…",
+                    40 + finished / (double)total * 50,
+                    MinecraftDownloadStage.Preparing)
+                {
+                    BytesDownloaded = Interlocked.Read(ref transferredBytes),
+                });
+            }
+            finally
             {
-                BytesDownloaded = transferredBytes,
-            });
-        }
+                gate.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
 
         if (downloaded > 0)
-            LauncherLog.Info($"安装器依赖：已准备 {downloaded} 个文件");
+            LauncherLog.Info($"安装器依赖：已准备 {downloaded} 个文件，用时 {clock.ElapsedMilliseconds} ms");
     }
 
     /// <summary>同步转发进度的包装类，真正的线程切换由调用方的 Progress&lt;T&gt; 负责。</summary>

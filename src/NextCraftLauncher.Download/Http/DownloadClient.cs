@@ -244,6 +244,15 @@ public sealed class DownloadClient : IDisposable
         var partPath = fullPath + ".part";
         var candidates = OrderCandidates(urls);
         var hasAlternatives = candidates.Length > 1;
+
+        // maven 元数据里不一定带大小（典型的例子是 Forge 安装器 jar），
+        // 先用 Range: bytes=0-0 探一次，拿到总大小才能走分片。
+        if (expectedSize is null)
+        {
+            var probed = await TryProbeSizeAsync(candidates[0], cancellationToken);
+            if (probed is > 0) expectedSize = probed;
+        }
+
         var failures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         Exception? lastError = null;
 
@@ -300,6 +309,31 @@ public sealed class DownloadClient : IDisposable
         }
 
         throw new IOException(DescribeFailure(fullPath, failures, lastError), lastError);
+    }
+
+    /// <summary>用一次 0 字节的 Range 请求问出文件总大小，失败则返回 null。</summary>
+    private async Task<long?> TryProbeSizeAsync(string url, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Range = new RangeHeaderValue(0, 0);
+
+            using var idle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            idle.CancelAfter(MetadataIdleTimeout);
+            using var response = await _httpClient.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, idle.Token);
+
+            if (response.StatusCode != HttpStatusCode.PartialContent) return null;
+
+            var range = response.Content.Headers.ContentRange;
+            return range?.Unit == "bytes" && range.Length is > 0 ? range.Length.Value : null;
+        }
+        catch (Exception)
+        {
+            // 探测失败不影响正常下载，按未知大小处理。
+            return null;
+        }
     }
 
     /// <summary>取最内层异常的消息：SSL 失败等信息只在最内层才有意义。</summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -809,6 +810,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (value == AppPage.Download)
         {
+            var clock = Stopwatch.StartNew();
+
             if (HasActiveDownloads) EnterTaskSection(leaveVersionDetail: true);
             _ = EnsureRemoteVersionsLoadedAsync();
             _ = EnsureJavaRuntimesLoadedAsync();
@@ -816,6 +819,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
             // 预取在启动时完成；若此处仍未完成，界面会显示“正在获取版本清单”。
             if (_remoteManifestLoaded && _filteredRemoteVersionCount == 0 && _allRemoteVersions.Count > 0)
                 ApplyRemoteVersionFilter();
+
+            // 首次打开要完成页面模板解析与布局；只在真的卡了的时候记一笔，
+            // 平时（几毫秒）不刷日志。Background 低于 Render，能覆盖到渲染。
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    var elapsed = clock.ElapsedMilliseconds;
+                    if (elapsed >= 50)
+                        LauncherLog.Info($"[PERF] 下载页首帧：{elapsed} ms");
+                },
+                DispatcherPriority.Background);
         }
     }
 
@@ -1434,6 +1448,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
+        var clock = Stopwatch.StartNew();
         var selectedId = SelectedRemoteVersion?.Id;
 
         _allRemoteVersions.Clear();
@@ -1458,7 +1473,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         UpdateRemoteInstalledStatus();
         ApplyRemoteVersionFilter();
-        LauncherLog.Info($"版本清单已重建：{_allRemoteVersions.Count} 个版本");
+        LauncherLog.Info($"版本清单已重建：{_allRemoteVersions.Count} 个版本（{clock.ElapsedMilliseconds} ms）");
     }
 
     /// <summary>比较版本列表是否与当前一致（不看 URL / 哈希，这些不影响列表展示）。</summary>
@@ -2531,6 +2546,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         IsJavaRuntimeCatalogLoading = true;
         JavaRuntimeCatalogStatus = "正在获取 Mojang Java 运行时列表...";
+        var clock = Stopwatch.StartNew();
 
         try
         {
@@ -2550,6 +2566,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _javaRuntimeCatalogLoaded = true;
             UpdateJavaRuntimeInstalledStatus();
             UpdateJavaRuntimeCatalogStatus();
+
+            LauncherLog.Info($"[PERF] Java 运行时列表处理：{_allJavaRuntimes.Count} 项，{clock.ElapsedMilliseconds} ms");
 
             Status = $"已加载 {_allJavaRuntimes.Count} 个 Java 运行时（{result.Platform}）";
         }

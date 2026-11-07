@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using NextCraftLauncher.Core.Logging;
 using NextCraftLauncher.ViewModels;
 using NextCraftLauncher.Views;
@@ -83,11 +84,46 @@ public partial class App : Application
             return;
         }
 
+        // 下载页的首次布局与模板解析约 0.3–0.4 s。趁启动画面还在、窗口还完全透明时先跑一遍，
+        // 用户第一次点开下载页时就只剩几毫秒。启动画面是静态的，这一小段不会被察觉。
+        var warmWatch = System.Diagnostics.Stopwatch.StartNew();
+        window.Opacity = 0;
         window.Show();
         window.Activate();
         desktop.MainWindow = window;
+        var shownMilliseconds = warmWatch.ElapsedMilliseconds;
+
+        try
+        {
+            await WarmUpDownloadPageAsync(viewModel);
+        }
+        catch (Exception exception)
+        {
+            // 预热失败不影响启动，只是第一次打开下载页会稍慢。
+            LauncherLog.Warn($"预热下载页失败：{exception.Message}");
+        }
+        finally
+        {
+            window.Opacity = 1;
+        }
+
         splash.Close();
 
-        LauncherLog.Info($"进入主界面（窗口构建 {buildMilliseconds} ms，显示 {buildWatch.ElapsedMilliseconds} ms）");
+        LauncherLog.Info(
+            $"进入主界面（窗口构建 {buildMilliseconds} ms，显示 {buildWatch.ElapsedMilliseconds} ms，" +
+            $"窗口 {shownMilliseconds} ms，预热 {warmWatch.ElapsedMilliseconds - shownMilliseconds} ms）");
+    }
+
+    /// <summary>
+    /// 预热下载页：切过去让它完成一次完整布局，再切回启动页。
+    /// 全程通过 Dispatcher 让出，不在调用线程上同步等待。
+    /// </summary>
+    private static async Task WarmUpDownloadPageAsync(MainViewModel viewModel)
+    {
+        viewModel.ShowDownloadPageCommand.Execute(null);
+        await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+
+        viewModel.ShowLaunchPageCommand.Execute(null);
+        await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
     }
 }

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using NextCraftLauncher.Core.Logging;
 using NextCraftLauncher.Core.Settings;
@@ -16,7 +17,10 @@ public sealed class LoaderInstallOptions
     /// <summary>运行 Forge / NeoForge 安装器所需的 Java（Fabric 不需要）。</summary>
     public string? JavaPath { get; init; }
 
-    /// <summary>安装后的版本目录名称；为空时沿用安装器 / profile 的默认 id。</summary>
+    /// <summary>
+    /// 安装后的版本目录名称。加载器安装必须提供：调用方需要先把原版文件下载到
+    /// <c>versions/{VersionName}</c>，安装器只把加载器配置合并进这一份版本 JSON。
+    /// </summary>
     public string? VersionName { get; init; }
 
     /// <summary>可选的 Fabric API 版本；安装完成后会下载到 mods 目录。</summary>
@@ -48,9 +52,11 @@ public sealed record LoaderInstallResult(string VersionId, string VersionDirecto
 /// 安装模组加载器：
 /// <list type="bullet">
 /// <item>Fabric：下载官方 profile JSON，再按其中的 maven 坐标补齐库文件；</item>
-/// <item>Forge / NeoForge：下载官方 installer，调用 <c>--installClient</c> 完成安装。</item>
+/// <item>Forge / NeoForge：下载官方 installer，在临时游戏目录里运行 <c>--installClient</c>。</item>
 /// </list>
-/// 原版版本需要事先安装（由调用方保证，Fabric 的 inheritsFrom 依赖它）。
+/// 与原版一样只有一个版本目录：调用方先把原版文件下载到 <c>versions/{VersionName}</c>，
+/// 这里再把加载器的 JSON 合并进同一份文件（去掉 inheritsFrom），
+/// 所以真实的 <c>versions</c> 下不会多出一个只有原版内容的版本。
 /// </summary>
 public static class LoaderInstaller
 {
@@ -68,6 +74,13 @@ public static class LoaderInstaller
         CancellationToken cancellationToken = default)
     {
         options ??= new LoaderInstallOptions();
+
+        if (string.IsNullOrWhiteSpace(options.VersionName))
+        {
+            throw new ArgumentException(
+                "安装加载器时必须指定版本名称（LoaderInstallOptions.VersionName）。",
+                nameof(options));
+        }
 
         return loader.ToLowerInvariant() switch
         {
@@ -106,18 +119,25 @@ public static class LoaderInstaller
         var profile = JsonSerializer.Deserialize<FabricProfile>(profileBytes, JsonOptions)
                       ?? throw new InvalidDataException("无法解析 Fabric 安装信息。");
 
-        var versionId = string.IsNullOrWhiteSpace(profile.Id)
+        var profileId = string.IsNullOrWhiteSpace(profile.Id)
             ? $"fabric-loader-{loaderVersion}-{minecraftVersion}"
             : profile.Id!;
 
+        var versionId = ResolveTargetName(options, profileId);
         var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionId);
+        var versionJsonPath = Path.Combine(versionDirectory, versionId + ".json");
+
+        // 原版 JSON 由调用方先下载到同一目录；Fabric profile 只有 inheritsFrom 以外的部分，
+        // 合并成一份自包含的版本文件后才能删掉对原版目录的依赖。
+        var vanillaBytes = await ReadVanillaJsonAsync(versionJsonPath, cancellationToken);
+
         Directory.CreateDirectory(versionDirectory);
 
         var libraries = (profile.Libraries ?? new List<FabricLibrary>())
             .Where(library => !string.IsNullOrWhiteSpace(library.Name))
             .ToList();
 
-        LauncherLog.Info($"Fabric profile {versionId}，需要 {libraries.Count} 个库文件");
+        LauncherLog.Info($"Fabric profile {profileId}，需要 {libraries.Count} 个库文件");
 
         var completed = 0;
         var total = Math.Max(libraries.Count, 1);
@@ -191,20 +211,16 @@ public static class LoaderInstaller
         options.Progress?.Report(new LoaderInstallProgress(
             "正在写入 Fabric 版本配置…", 99, MinecraftDownloadStage.Finalizing));
 
-        var jsonPath = Path.Combine(versionDirectory, versionId + ".json");
-        await File.WriteAllBytesAsync(jsonPath, profileBytes, cancellationToken);
-
-        var finalId = VersionNaming.RenameInstalledVersion(
-            minecraftDirectory, versionId, options.VersionName);
-        var finalDirectory = Path.Combine(minecraftDirectory, "versions", finalId);
+        var mergedBytes = BuildMergedVersionJson(vanillaBytes, profileBytes, versionId);
+        await File.WriteAllBytesAsync(versionJsonPath, mergedBytes, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(options.FabricApiVersion))
-            await InstallFabricApiAsync(client, minecraftDirectory, finalDirectory, options, cancellationToken);
+            await InstallFabricApiAsync(client, minecraftDirectory, versionDirectory, options, cancellationToken);
 
         options.Progress?.Report(new LoaderInstallProgress(
             "Fabric 安装完成", 100, MinecraftDownloadStage.Finalizing));
 
-        return new LoaderInstallResult(finalId, finalDirectory);
+        return new LoaderInstallResult(versionId, versionDirectory);
     }
 
     /// <summary>把选中的 Fabric API 下载到该版本对应的 mods 目录。</summary>
@@ -293,6 +309,15 @@ public static class LoaderInstaller
         var client = options.Client ?? DownloadClient.Shared;
         var displayName = loader == "neoforge" ? "NeoForge" : "Forge";
 
+        var versionId = VersionNaming.Normalize(options.VersionName);
+        var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionId);
+        var versionJsonPath = Path.Combine(versionDirectory, versionId + ".json");
+        var versionJarPath = Path.Combine(versionDirectory, versionId + ".jar");
+
+        // 调用方已经把原版文件下载到目标目录。安装器需要的父版本 json / jar 只放进临时目录，
+        // 安装完成后合并进目标版本的 JSON，真实的 versions 下不会多出一个普通版本。
+        var vanillaBytes = await ReadVanillaJsonAsync(versionJsonPath, cancellationToken);
+
         var installerUrls = BuildInstallerUrls(loader, minecraftVersion, loaderVersion);
         var installerName = $"{loader}-{minecraftVersion}-{loaderVersion}-installer.jar";
         var installerPath = Path.Combine(
@@ -335,53 +360,98 @@ public static class LoaderInstaller
         options.Progress?.Report(new LoaderInstallProgress(
             $"正在补齐 {displayName} 安装器依赖…", 30, MinecraftDownloadStage.Preparing));
 
-        await PrepareInstallerLibrariesAsync(
-            client, minecraftDirectory, installerPath, options.Mirror, displayName,
-            options.Progress, cancellationToken);
+        // 临时游戏目录：安装器的产物先生在这里，最后只把合并后的版本配置写回真实目录。
+        var tempRoot = Path.Combine(
+            Path.GetTempPath(), "ncl-loader-" + Guid.NewGuid().ToString("N"));
 
-        var versionsRoot = Path.Combine(minecraftDirectory, "versions");
-        var before = SnapshotVersions(versionsRoot);
-
-        // Forge / NeoForge 安装器会检查 launcher_profiles.json，缺失时直接报错退出。
-        EnsureLauncherProfiles(minecraftDirectory);
-
-        options.Progress?.Report(new LoaderInstallProgress(
-            $"正在运行 {displayName} 安装器…", null, MinecraftDownloadStage.Files));
-
-        var (exitCode, output) = await RunInstallerAsync(
-            options.JavaPath!, installerPath, minecraftDirectory, options.Log, cancellationToken);
-
-        // 部分安装器在失败时仍然返回 0，需要同时检查输出。
-        var failed = exitCode != 0 ||
-                     output.Any(line => line.Contains(
-                         "There was an error during installation",
-                         StringComparison.OrdinalIgnoreCase));
-
-        if (failed)
+        try
         {
-            var detail = string.Join(Environment.NewLine, output.TakeLast(12));
-            throw new InvalidOperationException(
-                $"{displayName} 安装器未完成安装（退出码 {exitCode}）。{Environment.NewLine}{detail}");
+            // 安装器会校验父版本：把原版的 json / jar 放到临时目录的同名位置。
+            var parentVersionDirectory = Path.Combine(tempRoot, "versions", minecraftVersion);
+            Directory.CreateDirectory(parentVersionDirectory);
+            await File.WriteAllBytesAsync(
+                Path.Combine(parentVersionDirectory, minecraftVersion + ".json"),
+                vanillaBytes,
+                cancellationToken);
+
+            if (File.Exists(versionJarPath))
+            {
+                File.Copy(
+                    versionJarPath,
+                    Path.Combine(parentVersionDirectory, minecraftVersion + ".jar"),
+                    overwrite: true);
+            }
+
+            await PrepareInstallerLibrariesAsync(
+                client, tempRoot, installerPath, options.Mirror, displayName,
+                DefaultMavenBase(loader), options.Progress, cancellationToken);
+
+            // Forge / NeoForge 安装器会检查 launcher_profiles.json，缺失时直接报错退出。
+            EnsureLauncherProfiles(tempRoot);
+
+            var versionsRoot = Path.Combine(tempRoot, "versions");
+            var before = SnapshotVersions(versionsRoot);
+
+            options.Progress?.Report(new LoaderInstallProgress(
+                $"正在运行 {displayName} 安装器…", null, MinecraftDownloadStage.Files));
+
+            var (exitCode, output) = await RunInstallerAsync(
+                options.JavaPath!, installerPath, tempRoot, options.Log, cancellationToken);
+
+            // 部分安装器在失败时仍然返回 0，需要同时检查输出。
+            var failed = exitCode != 0 ||
+                         output.Any(line => line.Contains(
+                             "There was an error during installation",
+                             StringComparison.OrdinalIgnoreCase));
+
+            if (failed)
+            {
+                var detail = string.Join(Environment.NewLine, output.TakeLast(12));
+                throw new InvalidOperationException(
+                    $"{displayName} 安装器未完成安装（退出码 {exitCode}）。{Environment.NewLine}{detail}");
+            }
+
+            var installedId = DetectInstalledVersion(
+                versionsRoot, before, loader, loaderVersion);
+
+            if (installedId is null)
+            {
+                var detail = string.Join(Environment.NewLine, output.TakeLast(12));
+                throw new InvalidOperationException(
+                    $"{displayName} 安装器已结束，但没有找到新生成的版本目录。{Environment.NewLine}{detail}");
+            }
+
+            var installedDirectory = Path.Combine(versionsRoot, installedId);
+            var loaderBytes = await File.ReadAllBytesAsync(
+                Path.Combine(installedDirectory, installedId + ".json"), cancellationToken);
+
+            options.Progress?.Report(new LoaderInstallProgress(
+                "正在写入版本配置…", 99, MinecraftDownloadStage.Finalizing));
+
+            // 合并成一份自包含的版本文件，去掉 inheritsFrom，这样不再依赖一个单独的原版版本。
+            var mergedBytes = BuildMergedVersionJson(vanillaBytes, loaderBytes, versionId);
+            Directory.CreateDirectory(versionDirectory);
+            await File.WriteAllBytesAsync(versionJsonPath, mergedBytes, cancellationToken);
+
+            // 旧版 Forge 安装器会生成打过补丁的客户端 jar；有就用它替换原来的原版 jar。
+            var installedJarPath = Path.Combine(installedDirectory, installedId + ".jar");
+            if (File.Exists(installedJarPath))
+                File.Copy(installedJarPath, versionJarPath, overwrite: true);
+
+            // 安装器补齐的库最终仍要放进真实的 libraries。
+            CopyDirectory(
+                Path.Combine(tempRoot, "libraries"),
+                Path.Combine(minecraftDirectory, "libraries"));
         }
-
-        var versionId = DetectInstalledVersion(
-            versionsRoot, before, loader, loaderVersion);
-
-        if (versionId is null)
+        finally
         {
-            var detail = string.Join(Environment.NewLine, output.TakeLast(12));
-            throw new InvalidOperationException(
-                $"{displayName} 安装器已结束，但没有找到新生成的版本目录。{Environment.NewLine}{detail}");
+            TryDeleteDirectory(tempRoot);
         }
 
         options.Progress?.Report(new LoaderInstallProgress(
             $"{displayName} 安装完成", 100, MinecraftDownloadStage.Finalizing));
 
-        var finalId = VersionNaming.RenameInstalledVersion(
-            minecraftDirectory, versionId, options.VersionName);
-
-        return new LoaderInstallResult(
-            finalId, Path.Combine(versionsRoot, finalId));
+        return new LoaderInstallResult(versionId, versionDirectory);
     }
 
     /// <summary>
@@ -394,6 +464,7 @@ public static class LoaderInstaller
         string installerPath,
         DownloadMirror mirror,
         string displayName,
+        string defaultMavenBase,
         IProgress<LoaderInstallProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -426,7 +497,7 @@ public static class LoaderInstaller
                 if (string.IsNullOrWhiteSpace(url))
                 {
                     var baseUrl = string.IsNullOrWhiteSpace(library.Url)
-                        ? "https://maven.neoforged.net/releases/"
+                        ? defaultMavenBase
                         : library.Url!;
                     url = baseUrl.TrimEnd('/') + "/" + path;
                 }
@@ -752,6 +823,180 @@ public static class LoaderInstaller
     }
 
     // ---------------------------------------------------------------- 工具
+
+    private static string DefaultMavenBase(string loader)
+        => loader == "forge"
+            ? "https://maven.minecraftforge.net/"
+            : "https://maven.neoforged.net/releases/";
+
+    /// <summary>目标版本名：优先用调用方指定的名称，否则退回加载器默认 id。</summary>
+    private static string ResolveTargetName(LoaderInstallOptions options, string fallback)
+    {
+        var name = VersionNaming.Normalize(options.VersionName);
+        return name.Length > 0 ? name : VersionNaming.Normalize(fallback);
+    }
+
+    private static async Task<byte[]> ReadVanillaJsonAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException(
+                $"找不到原版版本配置：{path}。安装加载器前需要先把原版文件下载到该目录。", path);
+        }
+
+        return await File.ReadAllBytesAsync(path, cancellationToken);
+    }
+
+    /// <summary>
+    /// 把加载器 JSON 合并进原版 JSON，生成一份自包含的版本文件：
+    /// 库与参数按继承链会得到的顺序拼接，最后去掉 <c>inheritsFrom</c>。
+    /// 这样 <c>versions</c> 下只需要一个目录，不会因为父版本而多出一个普通版本。
+    /// </summary>
+    private static byte[] BuildMergedVersionJson(byte[] vanillaBytes, byte[] loaderBytes, string id)
+    {
+        var vanilla = JsonNode.Parse(vanillaBytes) as JsonObject
+                      ?? throw new InvalidDataException("原版版本 JSON 格式不正确。");
+        var loader = JsonNode.Parse(loaderBytes) as JsonObject
+                     ?? throw new InvalidDataException("加载器版本 JSON 格式不正确。");
+
+        // 库：加载器优先，并按 group:artifact:classifier 去重，与原版继承链的解析顺序一致。
+        var libraries = new JsonArray();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (loader["libraries"] is JsonArray loaderLibraries)
+        {
+            foreach (var library in loaderLibraries)
+            {
+                if (library is not JsonObject item) continue;
+                libraries.Add(item.DeepClone());
+                if (LibraryKey(item["name"]?.GetValue<string>()) is { } key) seen.Add(key);
+            }
+        }
+
+        if (vanilla["libraries"] is JsonArray vanillaLibraries)
+        {
+            foreach (var library in vanillaLibraries)
+            {
+                if (library is not JsonObject item) continue;
+                var key = LibraryKey(item["name"]?.GetValue<string>());
+                if (key is not null && !seen.Add(key)) continue;
+                libraries.Add(item.DeepClone());
+            }
+        }
+
+        vanilla["libraries"] = libraries;
+
+        // 参数：原版在前、加载器在后，与原版继承链的拼接顺序一致。
+        if (loader["arguments"] is JsonObject loaderArguments)
+        {
+            if (vanilla["arguments"] is not JsonObject vanillaArguments)
+            {
+                vanillaArguments = new JsonObject();
+                vanilla["arguments"] = vanillaArguments;
+            }
+
+            MergeArgumentArray(vanillaArguments, loaderArguments, "game");
+            MergeArgumentArray(vanillaArguments, loaderArguments, "jvm");
+            MergeArgumentArray(vanillaArguments, loaderArguments, "default-user-jvm");
+        }
+
+        // 其余标量字段（mainClass、type、releaseTime 等）以加载器为准。
+        foreach (var property in loader)
+        {
+            switch (property.Key)
+            {
+                case "id":
+                case "inheritsFrom":
+                case "jar":
+                case "libraries":
+                case "arguments":
+                case "minecraftArguments":
+                case "downloads":
+                    continue;
+            }
+
+            vanilla[property.Key] = property.Value?.DeepClone();
+        }
+
+        // 旧版 Forge / Fabric 用 minecraftArguments（子版本优先）。
+        if (loader["minecraftArguments"] is JsonNode legacyArguments)
+            vanilla["minecraftArguments"] = legacyArguments.DeepClone();
+
+        vanilla.Remove("inheritsFrom");
+        vanilla.Remove("jar");
+        vanilla["id"] = id;
+
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+            vanilla.WriteTo(writer);
+
+        LauncherLog.Info($"版本配置合并完成：{id}，共 {libraries.Count} 个库");
+        return stream.ToArray();
+    }
+
+    private static void MergeArgumentArray(JsonObject target, JsonObject source, string key)
+    {
+        if (source[key] is not JsonArray sourceArray) return;
+
+        if (target[key] is not JsonArray targetArray)
+        {
+            targetArray = new JsonArray();
+            target[key] = targetArray;
+        }
+
+        foreach (var entry in sourceArray)
+            targetArray.Add(entry?.DeepClone());
+    }
+
+    private static string? LibraryKey(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+
+        var parts = name.Split(':');
+        if (parts.Length < 3) return name;
+
+        var classifier = parts.Length > 3 ? parts[3] : string.Empty;
+        return $"{parts[0]}:{parts[1]}:{classifier}";
+    }
+
+    /// <summary>安装器在临时目录里补齐的库并回真实 libraries；已存在且大小相同的文件直接跳过。</summary>
+    private static void CopyDirectory(string source, string destination)
+    {
+        if (!Directory.Exists(source)) return;
+
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var target = Path.Combine(destination, Path.GetRelativePath(source, file));
+            var directory = Path.GetDirectoryName(target);
+            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+
+            if (File.Exists(target) && new FileInfo(target).Length == new FileInfo(file).Length)
+                continue;
+
+            File.Copy(file, target, overwrite: true);
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (Exception exception)
+            {
+                if (attempt == 2)
+                    LauncherLog.Warn($"清理临时目录失败：{path}，{exception.Message}");
+
+                Thread.Sleep(200);
+            }
+        }
+    }
 
     private static string? DeriveMavenPath(string? name)
     {

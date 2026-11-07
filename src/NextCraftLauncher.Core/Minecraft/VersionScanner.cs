@@ -88,8 +88,8 @@ public static class VersionScanner
 
     private static string? DetectLoader(string id, string? mainClass, string? inheritsFrom)
     {
-        if (inheritsFrom is null) return null;
-
+        // 加载器版本不再带 inheritsFrom（安装时已合并成自包含的 JSON），
+        // 所以先按名称识别，再退回主类。
         var lower = id.ToLowerInvariant();
         if (lower.Contains("neoforge")) return "NeoForge";
         if (lower.Contains("fabric")) return "Fabric";
@@ -101,7 +101,7 @@ public static class VersionScanner
         if (mainClass?.Contains("quiltmc", StringComparison.OrdinalIgnoreCase) == true) return "Quilt";
         if (mainClass?.Contains("bootstraplauncher", StringComparison.OrdinalIgnoreCase) == true) return "NeoForge";
 
-        return "Modded";
+        return inheritsFrom is null ? null : "Modded";
     }
 
     private static int TypePriority(string type) => type switch

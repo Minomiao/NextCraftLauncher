@@ -2261,11 +2261,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         Status = $"正在安装 {displayName} {loaderVersion}...";
         LauncherLog.Info($"开始安装 {displayName} {loaderVersion} → {desiredName}");
 
-        // 原版下载占进度条前 65%，加载器安装占剩余部分，整个流程一条进度不重置。
-        var vanillaJson = Path.Combine(
-            MinecraftDirectory, "versions", item.Id, item.Id + ".json");
-        var needsVanilla = !File.Exists(vanillaJson);
-        var vanillaPhase = needsVanilla ? 65.0 : 0.0;
+        // 原版文件直接下载到最终版本目录（versions/{desiredName}），
+        // 加载器安装只把配置合并进同一份 JSON，不会多出一个普通版本。
+        const double vanillaPhase = 65.0;
         var installerRunning = false;
         var stage = MinecraftDownloadStage.Preparing;
 
@@ -2286,68 +2284,71 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         try
         {
-            if (needsVanilla)
+            // 每次安装都重新铺一遍原版文件：目标目录是新的，库与 assets 已存在时会被校验后跳过。
+            var lastVanillaTicks = 0L;
+            var vanillaProgress = new Progress<MinecraftVersionDownloadProgress>(report =>
             {
-                var lastVanillaTicks = 0L;
-                var vanillaProgress = new Progress<MinecraftVersionDownloadProgress>(report =>
+                if (report.Stage == MinecraftDownloadStage.Preparing && report.CompletedFiles == 0)
                 {
-                    if (report.Stage == MinecraftDownloadStage.Preparing && report.CompletedFiles == 0)
-                    {
-                        task.StatusText = $"正在获取{report.CurrentFile}…";
-                        return;
-                    }
+                    task.StatusText = $"正在获取{report.CurrentFile}…";
+                    return;
+                }
 
-                    var stageChanged = stage != report.Stage;
-                    var now = Environment.TickCount64;
-                    var isFinal = report.Percent is >= 100 ||
-                                  (report.TotalFiles > 0 && report.CompletedFiles >= report.TotalFiles);
+                var stageChanged = stage != report.Stage;
+                var now = Environment.TickCount64;
+                var isFinal = report.Percent is >= 100 ||
+                              (report.TotalFiles > 0 && report.CompletedFiles >= report.TotalFiles);
 
-                    if (!stageChanged && !isFinal && now - lastVanillaTicks < 100)
-                        return;
+                if (!stageChanged && !isFinal && now - lastVanillaTicks < 100)
+                    return;
 
-                    lastVanillaTicks = now;
+                lastVanillaTicks = now;
 
-                    if (stageChanged)
-                    {
-                        stage = report.Stage;
-                        ApplyVersionStage(task, stage);
-                    }
+                if (stageChanged)
+                {
+                    stage = report.Stage;
+                    ApplyVersionStage(task, stage);
+                }
 
-                    if (report.Percent is double percent)
-                    {
-                        var mapped = percent * vanillaPhase / 100.0;
-                        if (mapped > task.Percent) task.Percent = Math.Min(mapped, 99);
-                    }
+                if (report.Percent is double percent)
+                {
+                    var mapped = percent * vanillaPhase / 100.0;
+                    if (mapped > task.Percent) task.Percent = Math.Min(mapped, 99);
+                }
 
-                    if (report.BytesDownloaded > 0)
-                        task.SpeedMeter.Feed(report.BytesDownloaded);
+                if (report.BytesDownloaded > 0)
+                    task.SpeedMeter.Feed(report.BytesDownloaded);
 
-                    task.CompletedFiles = report.CompletedFiles;
-                    task.TotalFiles = report.TotalFiles;
-                    task.StatusText = report.TotalFiles > 0
-                        ? $"正在下载原版文件 {report.CompletedFiles}/{report.TotalFiles}..."
-                        : "正在下载原版文件...";
-                    NotifyDownloadStats();
-                });
-
-                await MinecraftVersionDownloader.DownloadAsync(
-                    MinecraftDirectory,
-                    item.Entry,
-                    DownloadVersionIsolated,
-                    vanillaProgress,
-                    new MinecraftVersionDownloadOptions { Mirror = ResolveGameMirror() },
-                    task.Token);
-
-                // 原版文件下载结束后重新计量，安装器阶段的字节从 0 开始。
-                task.SpeedMeter.Reset();
+                task.CompletedFiles = report.CompletedFiles;
+                task.TotalFiles = report.TotalFiles;
+                task.StatusText = report.TotalFiles > 0
+                    ? $"正在下载原版文件 {report.CompletedFiles}/{report.TotalFiles}..."
+                    : "正在下载原版文件...";
                 NotifyDownloadStats();
-            }
+            });
+
+            await MinecraftVersionDownloader.DownloadAsync(
+                MinecraftDirectory,
+                item.Entry,
+                DownloadVersionIsolated,
+                vanillaProgress,
+                new MinecraftVersionDownloadOptions
+                {
+                    Mirror = ResolveGameMirror(),
+                    TargetVersionId = desiredName,
+                },
+                task.Token);
+
+            // 原版文件下载结束后重新计量，安装器阶段的字节从 0 开始。
+            task.SpeedMeter.Reset();
+            NotifyDownloadStats();
 
             string? javaPath = null;
 
             if (loader is "forge" or "neoforge")
             {
-                var requiredJava = ReadRequiredJavaMajor(item.Id, loader);
+                // 原版 json 现在就在目标版本目录里，用它的 javaVersion 选安装器用的 Java。
+                var requiredJava = ReadRequiredJavaMajor(desiredName, loader);
                 var runtimes = JavaRuntimes.Count > 0
                     ? (IEnumerable<JavaRuntime>)JavaRuntimes
                     : await JavaLocator.DiscoverAsync(
@@ -2482,14 +2483,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>读取原版 JSON 中要求的 Java 主版本；Forge 至少 8，NeoForge 至少 17。</summary>
-    private int ReadRequiredJavaMajor(string minecraftVersion, string loader)
+    private int ReadRequiredJavaMajor(string versionId, string loader)
     {
         var fallback = loader == "neoforge" ? 17 : 8;
 
         try
         {
             var path = Path.Combine(
-                MinecraftDirectory, "versions", minecraftVersion, minecraftVersion + ".json");
+                MinecraftDirectory, "versions", versionId, versionId + ".json");
             if (!File.Exists(path)) return fallback;
 
             using var document = JsonDocument.Parse(File.ReadAllBytes(path));

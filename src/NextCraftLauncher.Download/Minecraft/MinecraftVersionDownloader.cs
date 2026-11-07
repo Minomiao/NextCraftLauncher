@@ -37,6 +37,12 @@ public sealed class MinecraftVersionDownloadOptions
     public string AssetObjectBaseUrl { get; init; } = "https://resources.download.minecraft.net/";
 
     public DownloadClient? Client { get; init; }
+
+    /// <summary>
+    /// 版本目录以及 json / jar 使用的名称；为空时沿用 <see cref="MinecraftVersionEntry.Id"/>。
+    /// 安装加载器时用它把原版文件直接下到最终版本目录，避免真实目录里多出一个普通版本。
+    /// </summary>
+    public string? TargetVersionId { get; init; }
 }
 
 public sealed record MinecraftVersionDownloadProgress(
@@ -120,7 +126,9 @@ public static class MinecraftVersionDownloader
         options ??= new MinecraftVersionDownloadOptions();
         var client = options.Client ?? DownloadClient.Shared;
 
-        var versionId = entry.Id;
+        var versionId = string.IsNullOrWhiteSpace(options.TargetVersionId)
+            ? entry.Id
+            : options.TargetVersionId!;
         var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionId);
         Directory.CreateDirectory(versionDirectory);
 

@@ -2173,7 +2173,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
                 // 并发下载时进度可能因文件完成顺序出现瞬时回落，进度条只允许前进。
                 if (report.Percent is double currentPercent && currentPercent > task.Percent)
-                    task.Percent = currentPercent;
+                    task.Percent = Math.Min(currentPercent, 99);
 
                 if (stage == MinecraftDownloadStage.Files && report.Percent is double filePercent)
                     task.Steps[1].Detail = $"{filePercent:0}%";
@@ -2196,7 +2196,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 },
                 task.Token);
 
-            task.Percent = 100;
+            // 收尾（改名、重扫版本列表）也算任务时间，进度先停在 99，真正完成才打满。
+            task.Percent = 99;
 
             var finalId = VersionNaming.RenameInstalledVersion(
                 MinecraftDirectory, result.VersionId, desiredName);
@@ -2211,6 +2212,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             UpdateRemoteInstalledStatus();
             Status = $"版本 {finalId} 下载完成";
             LauncherLog.Info($"版本 {finalId} 下载完成");
+            task.Percent = 100;
             FinishTask(task, DownloadTaskState.Completed, $"版本 {finalId} 下载完成");
         }
         catch (OperationCanceledException)
@@ -2270,8 +2272,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         creepTimer.Tick += (_, _) =>
         {
             if (!installerRunning) return;
-            if (task.Percent < 95)
-                task.Percent = Math.Min(95, task.Percent + 0.4);
+            if (task.Percent < 97)
+                task.Percent = Math.Min(97, task.Percent + 0.6);
         };
         creepTimer.Start();
 
@@ -2307,7 +2309,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     if (report.Percent is double percent)
                     {
                         var mapped = percent * vanillaPhase / 100.0;
-                        if (mapped > task.Percent) task.Percent = mapped;
+                        if (mapped > task.Percent) task.Percent = Math.Min(mapped, 99);
                     }
 
                     if (report.BytesDownloaded > 0)
@@ -2380,7 +2382,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 {
                     installerRunning = false;
                     var mapped = vanillaPhase + percent * (100 - vanillaPhase) / 100.0;
-                    if (mapped > task.Percent) task.Percent = mapped;
+                    if (mapped > task.Percent) task.Percent = Math.Min(mapped, 99);
                 }
                 else
                 {
@@ -2425,7 +2427,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 },
                 task.Token);
 
-            task.Percent = 100;
+            task.Percent = 99;
 
             // 只重扫版本：安装加载器不会改变系统里的 Java。
             await RefreshCoreAsync(refreshJava: false);
@@ -2436,6 +2438,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             Status = $"{displayName} {loaderVersion} 安装完成";
             LauncherLog.Info($"{displayName} {loaderVersion} 安装完成 → {result.VersionId}");
+            task.Percent = 100;
             FinishTask(task, DownloadTaskState.Completed, $"{displayName} {loaderVersion} 安装完成");
         }
         catch (OperationCanceledException)

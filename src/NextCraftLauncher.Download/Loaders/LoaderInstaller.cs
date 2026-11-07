@@ -253,7 +253,7 @@ public static class LoaderInstaller
                 : 0;
 
             options.Progress?.Report(new LoaderInstallProgress(
-                $"正在下载 {displayName} 安装器…", fraction * 40, MinecraftDownloadStage.Preparing)
+                $"正在下载 {displayName} 安装器…", fraction * 30, MinecraftDownloadStage.Preparing)
             {
                 BytesDownloaded = report.BytesReceived,
             });
@@ -273,7 +273,7 @@ public static class LoaderInstaller
         // 安装器（Java 进程）会自己去官方 maven 下载它需要的库，在 DNS 被污染的网络下会卡住甚至失败。
         // 先用启动器自己的下载核心把这些库补齐，安装器校验通过后就不再访问网络。
         options.Progress?.Report(new LoaderInstallProgress(
-            $"正在补齐 {displayName} 安装器依赖…", 40, MinecraftDownloadStage.Preparing));
+            $"正在补齐 {displayName} 安装器依赖…", 30, MinecraftDownloadStage.Preparing));
 
         await PrepareInstallerLibrariesAsync(
             client, minecraftDirectory, installerPath, options.Mirror, displayName,
@@ -393,7 +393,7 @@ public static class LoaderInstaller
                     var done = Volatile.Read(ref completed);
                     progress?.Report(new LoaderInstallProgress(
                         $"正在准备 {displayName} 安装器依赖 {Math.Min(done + 1, total)}/{total}…",
-                        40 + done / (double)total * 50,
+                        30 + done / (double)total * 25,
                         MinecraftDownloadStage.Preparing)
                     {
                         BytesDownloaded = Interlocked.Read(ref transferredBytes),
@@ -428,7 +428,7 @@ public static class LoaderInstaller
                 var finished = Interlocked.Increment(ref completed);
                 progress?.Report(new LoaderInstallProgress(
                     $"正在准备 {displayName} 安装器依赖 {finished}/{total}…",
-                    40 + finished / (double)total * 50,
+                    30 + finished / (double)total * 25,
                     MinecraftDownloadStage.Preparing)
                 {
                     BytesDownloaded = Interlocked.Read(ref transferredBytes),

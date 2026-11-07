@@ -514,19 +514,35 @@ public static class LoaderInstaller
 
     private static IReadOnlyList<InstallerLibrary> ReadInstallerLibraries(string installerPath)
     {
+        var libraries = new List<InstallerLibrary>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         try
         {
             using var archive = ZipFile.OpenRead(installerPath);
-            var entry = archive.GetEntry("install_profile.json");
-            if (entry is null) return Array.Empty<InstallerLibrary>();
 
-            using var stream = entry.Open();
-            var profile = JsonSerializer.Deserialize<InstallerProfile>(stream, JsonOptions);
+            // install_profile.json 是安装器自己需要的工具库；version.json 是装完后要运行的库。
+            // 两者都要提前拉：安装器会自己下载 version.json 里的库，而它的下载器在这类网络下很慢。
+            foreach (var entryName in new[] { "install_profile.json", "version.json" })
+            {
+                var entry = archive.GetEntry(entryName);
+                if (entry is null) continue;
 
-            return profile?.Libraries?
-                .Where(library => library.Clientreq != false)
-                .ToList()
-                ?? (IReadOnlyList<InstallerLibrary>)Array.Empty<InstallerLibrary>();
+                InstallerProfile? profile;
+                using (var stream = entry.Open())
+                {
+                    profile = JsonSerializer.Deserialize<InstallerProfile>(stream, JsonOptions);
+                }
+
+                foreach (var library in profile?.Libraries ?? new List<InstallerLibrary>())
+                {
+                    if (library.Clientreq == false) continue;
+                    if (!seen.Add(library.Name ?? string.Empty)) continue;
+                    libraries.Add(library);
+                }
+            }
+
+            return libraries;
         }
         catch (Exception exception)
         {

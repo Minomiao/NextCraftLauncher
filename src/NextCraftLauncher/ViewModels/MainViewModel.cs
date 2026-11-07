@@ -2272,8 +2272,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         creepTimer.Tick += (_, _) =>
         {
             if (!installerRunning) return;
-            if (task.Percent < 97)
-                task.Percent = Math.Min(97, task.Percent + 0.6);
+            if (task.Percent >= 97) return;
+
+            // 安装器不提供百分比，用「逐步逼近 97%」推进：
+            // 刚开始明显往前走，越接近上限越慢，不会像固定步长那样一分钟只动几个点。
+            task.Percent = Math.Min(97, task.Percent + Math.Max(0.4, (97 - task.Percent) * 0.06));
         };
         creepTimer.Start();
 

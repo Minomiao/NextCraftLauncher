@@ -121,21 +121,58 @@ public static class LoaderInstaller
 
         var completed = 0;
         var total = Math.Max(libraries.Count, 1);
+        var knownBytes = libraries.Sum(library => Math.Max(0, library.Size));
+        var transferredBytes = 0L;
         var gate = new SemaphoreSlim(16);
+
+        // 有大小信息时按字节推进（可看出速度和进度），否则退回按文件数推进。
+        void ReportFabricProgress()
+        {
+            var done = Volatile.Read(ref completed);
+            var bytes = Interlocked.Read(ref transferredBytes);
+            var percent = knownBytes > 0
+                ? Math.Min(99, bytes / (double)knownBytes * 100)
+                : Math.Min(99, done / (double)total * 100);
+
+            options.Progress?.Report(new LoaderInstallProgress(
+                $"正在下载 Fabric 库文件 {Math.Min(done + 1, total)}/{libraries.Count}…",
+                percent,
+                MinecraftDownloadStage.Files)
+            {
+                BytesDownloaded = bytes,
+            });
+        }
 
         var tasks = libraries.Select(async library =>
         {
             await gate.WaitAsync(cancellationToken);
             try
             {
-                await DownloadLibraryAsync(
-                    client, minecraftDirectory, library, options.Mirror, cancellationToken);
+                var lastBytes = 0L;
+                var lastReportTicks = 0L;
+                var fileProgress = new ForwardProgress<DownloadProgress>(report =>
+                {
+                    var delta = report.BytesReceived - lastBytes;
+                    if (delta <= 0) return;
+                    lastBytes = report.BytesReceived;
+                    Interlocked.Add(ref transferredBytes, delta);
 
-                var done = Interlocked.Increment(ref completed);
-                options.Progress?.Report(new LoaderInstallProgress(
-                    $"正在下载 Fabric 库文件 {done}/{libraries.Count}…",
-                    Math.Min(99, (double)done / total * 100),
-                    MinecraftDownloadStage.Files));
+                    // 并发后回调很密集，限制刷新频率。
+                    var now = Environment.TickCount64;
+                    if (now - lastReportTicks < 100) return;
+                    lastReportTicks = now;
+                    ReportFabricProgress();
+                });
+
+                await DownloadLibraryAsync(
+                    client, minecraftDirectory, library, options.Mirror, fileProgress, cancellationToken);
+
+                // 文件已存在而跳过、或尾部回调被节流时，补齐剩余字节，保证进度不会倒退或卡住。
+                var remaining = Math.Max(0, library.Size - lastBytes);
+                if (remaining > 0) Interlocked.Add(ref transferredBytes, remaining);
+
+                Interlocked.Increment(ref completed);
+                ReportFabricProgress();
             }
             finally
             {
@@ -186,9 +223,24 @@ public static class LoaderInstaller
         options.Progress?.Report(new LoaderInstallProgress(
             $"正在下载 Fabric API {apiVersion}…", 99, MinecraftDownloadStage.Finalizing));
 
+        var lastReportTicks = 0L;
+        var apiProgress = new ForwardProgress<DownloadProgress>(report =>
+        {
+            var now = Environment.TickCount64;
+            if (now - lastReportTicks < 100) return;
+            lastReportTicks = now;
+
+            options.Progress?.Report(new LoaderInstallProgress(
+                $"正在下载 Fabric API {apiVersion}…", 99, MinecraftDownloadStage.Finalizing)
+            {
+                BytesDownloaded = report.BytesReceived,
+            });
+        });
+
         await client.DownloadFileAsync(
             DownloadUrlResolver.Build(url, options.Mirror),
             destination,
+            progress: apiProgress,
             cancellationToken: cancellationToken);
 
         LauncherLog.Info($"Fabric API {apiVersion} → {destination}");
@@ -199,6 +251,7 @@ public static class LoaderInstaller
         string minecraftDirectory,
         FabricLibrary library,
         DownloadMirror mirror,
+        IProgress<DownloadProgress>? progress,
         CancellationToken cancellationToken)
     {
         var relativePath = DeriveMavenPath(library.Name);
@@ -217,6 +270,7 @@ public static class LoaderInstaller
             destination,
             string.IsNullOrWhiteSpace(library.Sha1) ? null : library.Sha1,
             library.Size > 0 ? library.Size : null,
+            progress,
             cancellationToken: cancellationToken);
     }
 

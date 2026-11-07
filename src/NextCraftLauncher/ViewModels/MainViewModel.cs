@@ -2360,6 +2360,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
 
             var lastInstallTicks = 0L;
+            var lastInstallBytes = 0L;
             var installProgress = new Progress<LoaderInstallProgress>(report =>
             {
                 // 下载回调很密集，限制界面刷新频率；阶段切换与开始/结束阶段一定刷新。
@@ -2376,7 +2377,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
                 // 安装器依赖与安装器 jar 的下载量累计上报，用于显示实时速度。
                 if (report.BytesDownloaded is long bytes)
+                {
+                    // 每个阶段重新从 0 开始计数，先重置测速，否则速度会一瞬显示 0。
+                    if (bytes < lastInstallBytes) task.SpeedMeter.Reset();
+                    lastInstallBytes = bytes;
                     task.SpeedMeter.Feed(bytes);
+                }
 
                 if (report.Percent is double percent)
                 {

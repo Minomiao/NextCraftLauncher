@@ -88,6 +88,7 @@ public static class ModCatalog
         if (!ignoreCache &&
             ModSearchCache.TryGet(platform, rawQuery, gameVersion, loader, page, out var cached))
         {
+            LauncherLog.Info($"Mod 搜索命中缓存：「{rawQuery}」第 {page} 页");
             return cached;
         }
 

@@ -681,10 +681,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (value == DownloadSection.Mods && !_modPageInitialized)
         {
-            // 第一次进 Mod 页时按当前版本设置筛选并直接列出热门结果（PCL2 也是这样）。
+            // 第一次进 Mod 页时按当前版本设置筛选并直接列出结果（优先用缓存）。
             _modPageInitialized = true;
             UpdateModFiltersFromSelection();
-            _ = SearchModsAsync();
+            _ = ShowModsAsync();
         }
 
         if (value == DownloadSection.Java)
@@ -727,7 +727,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     // 当前结果列表对应的搜索条件，翻页时沿用这一组，避免筛选未生效时错位。
     private (ModPlatform? Platform, string Query, string? GameVersion, string? Loader)? _modActiveQuery;
 
-    public ObservableCollection<ModProjectItemViewModel> ModProjects { get; } = new();
+    public RangeObservableCollection<ModProjectItemViewModel> ModProjects { get; } = new();
 
     public ObservableCollection<ModVersionItemViewModel> ModVersions { get; } = new();
 
@@ -832,7 +832,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private Task SearchModsAsync() => FetchModPageAsync(1, newSearch: true);
+    private Task SearchModsAsync() => FetchModPageAsync(1, newSearch: true, ignoreCache: true);
+
+    /// <summary>进入 Mod 页时先用缓存展示，避免每次都等一次网络。</summary>
+    private Task ShowModsAsync() => FetchModPageAsync(1, newSearch: true, ignoreCache: false);
 
     [RelayCommand]
     private Task GoPreviousModPageAsync() => FetchModPageAsync(Math.Max(1, ModPage - 1), newSearch: false);
@@ -841,10 +844,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private Task GoNextModPageAsync() => FetchModPageAsync(Math.Min(ModTotalPages, ModPage + 1), newSearch: false);
 
     /// <summary>
-    /// 取搜索结果的一页。<paramref name="newSearch"/> 为 true 时按当前筛选重新搜索
-    /// （并绕过缓存），否则沿用上一组条件翻页。
+    /// 取搜索结果的一页。<paramref name="newSearch"/> 为 true 时按当前筛选重新搜索，
+    /// 否则翻页；<paramref name="ignoreCache"/> 为 true 时跳过本地缓存。
     /// </summary>
-    private async Task FetchModPageAsync(int page, bool newSearch)
+    private async Task FetchModPageAsync(int page, bool newSearch, bool ignoreCache = false)
     {
         _modSearchCts?.Cancel();
         var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
@@ -880,7 +883,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     request.GameVersion,
                     request.Loader,
                     page,
-                    newSearch,
+                    ignoreCache,
                     cts.Token),
                 cts.Token);
 
@@ -889,9 +892,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ModPage = result.Page;
             ModTotalPages = result.TotalPages;
 
-            ModProjects.Clear();
-            foreach (var project in result.Projects)
-                ModProjects.Add(new ModProjectItemViewModel(project, SelectModProject));
+            ModProjects.ReplaceAll(
+                result.Projects.Select(project => new ModProjectItemViewModel(project, SelectModProject)));
 
             ModStatus = ModProjects.Count == 0 ? "没有找到 Mod" : string.Empty;
 

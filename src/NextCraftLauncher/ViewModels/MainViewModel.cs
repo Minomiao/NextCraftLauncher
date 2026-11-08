@@ -679,8 +679,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsDownloadJavaSelected));
         OnPropertyChanged(nameof(IsDownloadRunningSelected));
 
-        if (value == DownloadSection.Mods)
+        if (value == DownloadSection.Mods && !_modPageInitialized)
+        {
+            // 第一次进 Mod 页时按当前版本设置筛选并直接列出热门结果（PCL2 也是这样）。
+            _modPageInitialized = true;
             UpdateModFiltersFromSelection();
+            _ = SearchModsAsync();
+        }
 
         if (value == DownloadSection.Java)
             _ = EnsureJavaRuntimesLoadedAsync();
@@ -717,6 +722,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private CancellationTokenSource? _modSearchCts;
     private CancellationTokenSource? _modDetailCts;
+    // 只在第一次进入 Mod 页时套用当前版本的筛选并自动搜索，之后保留用户的搜索状态。
+    private bool _modPageInitialized;
 
     public ObservableCollection<ModProjectItemViewModel> ModProjects { get; } = new();
 
@@ -765,8 +772,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void UpdateModFiltersFromSelection()
     {
         var versions = Versions
-            .Select(version => version.Summary.ClientVersion ?? version.Summary.Id)
+            .Select(version => version.Summary.ClientVersion)
             .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -775,8 +783,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         foreach (var value in versions)
             ModGameVersions.Add(value);
 
-        var selected = SelectedVersion?.Summary;
-        var target = selected?.ClientVersion ?? selected?.Id;
+        var target = SelectedVersion?.Summary.ClientVersion;
         var index = 0;
         if (!string.IsNullOrWhiteSpace(target))
         {
@@ -789,7 +796,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         SelectedModGameVersionIndex = index;
-        SelectedModLoaderIndex = selected?.Loader switch
+        SelectedModLoaderIndex = SelectedVersion?.Summary.Loader switch
         {
             "Forge" => 1,
             "Fabric" => 2,
@@ -831,6 +838,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ModStatus = ModProjects.Count == 0
                 ? "没有找到 Mod"
                 : $"共 {page.Total} 个结果，显示前 {ModProjects.Count} 个";
+            LauncherLog.Info(
+                $"Mod 搜索：\"{ModSearchText.Trim()}\"（{SelectedModGameVersionFilter ?? "全部"} / " +
+                $"{SelectedModLoaderFilter ?? "全部"}）→ {page.Total} 个结果");
         }
         catch (OperationCanceledException)
         {
@@ -838,6 +848,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch (Exception exception)
         {
             ModStatus = "搜索失败：" + exception.Message;
+            LauncherLog.Warn($"Mod 搜索失败：{exception.Message}");
         }
         finally
         {
@@ -1016,8 +1027,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (SelectedVersion is not { } selected) return null;
 
-        var gameVersion = selected.Summary.ClientVersion ?? selected.Summary.Id;
-        if (version.GameVersions.Count > 0 &&
+        var gameVersion = selected.Summary.ClientVersion;
+        if (!string.IsNullOrWhiteSpace(gameVersion) && version.GameVersions.Count > 0 &&
             !version.GameVersions.Any(value => string.Equals(value, gameVersion, StringComparison.OrdinalIgnoreCase)))
         {
             return null;

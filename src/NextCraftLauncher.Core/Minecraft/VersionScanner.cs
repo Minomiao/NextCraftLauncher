@@ -41,14 +41,15 @@ public static class VersionScanner
             try
             {
                 var info = VersionInfo.Load(jsonPath);
+                var loader = DetectLoader(id, info.MainClass, info.InheritsFrom);
                 result.Add(new VersionSummary(
                     id,
                     info.Type ?? "custom",
                     info.InheritsFrom,
-                    DetectLoader(id, info.MainClass, info.InheritsFrom),
+                    loader,
                     FindJavaMajor(minecraftDirectory, info, 0),
                     jsonPath,
-                    info.ClientVersion));
+                    ResolveVanillaVersion(directory, id, loader, info)));
             }
             catch (Exception)
             {
@@ -63,6 +64,63 @@ public static class VersionScanner
         });
 
         return result;
+    }
+
+    /// <summary>
+    /// 版本对应的原版版本号（Mod 兼容性判断用）。安装加载器时会写入 <c>clientVersion</c>；
+    /// PCL2 导入的版本读它缓存的 <c>VersionVanillaName</c>；更早的版本从
+    /// 「原版版本号-加载器 加载器版本」这样的目录名里截取。
+    /// 都拿不到时返回 <c>null</c>，调用方不能拿它当筛选条件。
+    /// </summary>
+    private static string? ResolveVanillaVersion(
+        string versionDirectory,
+        string id,
+        string? loader,
+        VersionInfo info)
+    {
+        if (!string.IsNullOrWhiteSpace(info.ClientVersion)) return info.ClientVersion.Trim();
+
+        // 原版版本：版本号就是它自己。
+        if (loader is null) return id;
+
+        if (!string.IsNullOrWhiteSpace(info.InheritsFrom) &&
+            !string.Equals(info.InheritsFrom, id, StringComparison.OrdinalIgnoreCase))
+        {
+            return info.InheritsFrom.Trim();
+        }
+
+        var cached = IniFile.Read(Path.Combine(versionDirectory, "PCL", "Setup.ini"))
+            .GetString("VersionVanillaName");
+        if (!string.IsNullOrWhiteSpace(cached) &&
+            !string.Equals(cached.Trim(), "Unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            return cached.Trim();
+        }
+
+        return ExtractVanillaVersionFromId(id);
+    }
+
+    private static string? ExtractVanillaVersionFromId(string id)
+    {
+        string[] markers = { "-neoforge", "-fabric", "-quilt", "-liteloader", "-forge", "-optifine" };
+        var lower = id.ToLowerInvariant();
+
+        var cut = -1;
+        foreach (var marker in markers)
+        {
+            var index = lower.IndexOf(marker, StringComparison.Ordinal);
+            if (index <= 0) continue;
+            cut = cut < 0 ? index : Math.Min(cut, index);
+        }
+
+        if (cut <= 0) return null;
+
+        var version = id[..cut].TrimEnd('-', ' ', '_');
+
+        // 只接受形如 1.21.1 / 26.3 / 26.3-snapshot-2 的版本号，避免把自定义名字当成版本。
+        return version.Length > 0 && char.IsDigit(version[0]) && version.Contains('.')
+            ? version
+            : null;
     }
 
     private static int FindJavaMajor(string minecraftDirectory, VersionInfo info, int depth)

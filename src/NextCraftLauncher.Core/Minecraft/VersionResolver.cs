@@ -129,7 +129,8 @@ public static class VersionResolver
                 minecraftDirectory,
                 versionId,
                 merged.Type,
-                !string.IsNullOrEmpty(merged.InheritsFrom),
+                // 可安装 Mod 的版本：带父版本的旧式加载器，或名称/主类能识别为加载器的合并版本。
+                VersionScanner.DetectLoader(versionId, merged.MainClass, merged.InheritsFrom) is not null,
                 defaultIsolation),
             Libraries = libraries,
             NativeLibraries = nativeLibraries,

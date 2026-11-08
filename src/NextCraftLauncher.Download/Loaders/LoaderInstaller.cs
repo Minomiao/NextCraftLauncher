@@ -913,6 +913,7 @@ public static class LoaderInstaller
                 case "id":
                 case "inheritsFrom":
                 case "jar":
+                case "type":
                 case "libraries":
                 case "arguments":
                 case "minecraftArguments":

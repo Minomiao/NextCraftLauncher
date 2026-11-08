@@ -86,7 +86,7 @@ public static class VersionScanner
         return 8;
     }
 
-    private static string? DetectLoader(string id, string? mainClass, string? inheritsFrom)
+    internal static string? DetectLoader(string id, string? mainClass, string? inheritsFrom)
     {
         // 加载器版本不再带 inheritsFrom（安装时已合并成自包含的 JSON），
         // 所以先按名称识别，再退回主类。

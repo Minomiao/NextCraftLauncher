@@ -177,6 +177,7 @@ public static class VersionResolver
             merged.Id = info.Id ?? merged.Id;
             merged.Type = info.Type ?? merged.Type;
             merged.InheritsFrom = info.InheritsFrom ?? merged.InheritsFrom;
+            merged.ClientVersion = info.ClientVersion ?? merged.ClientVersion;
             merged.MainClass = info.MainClass ?? merged.MainClass;
             merged.Assets = info.Assets ?? merged.Assets;
             merged.AssetIndex = info.AssetIndex ?? merged.AssetIndex;

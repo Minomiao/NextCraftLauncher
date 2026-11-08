@@ -15,6 +15,8 @@ public sealed class VersionInfo
     [JsonPropertyName("id")] public string? Id { get; set; }
     [JsonPropertyName("type")] public string? Type { get; set; }
     [JsonPropertyName("inheritsFrom")] public string? InheritsFrom { get; set; }
+    /// <summary>对应的原版版本号（安装加载器时写入，用于判断 Mod 兼容性）。</summary>
+    [JsonPropertyName("clientVersion")] public string? ClientVersion { get; set; }
     [JsonPropertyName("mainClass")] public string? MainClass { get; set; }
     [JsonPropertyName("assets")] public string? Assets { get; set; }
     [JsonPropertyName("assetIndex")] public AssetIndexInfo? AssetIndex { get; set; }

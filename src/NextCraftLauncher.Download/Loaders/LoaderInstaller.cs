@@ -211,7 +211,7 @@ public static class LoaderInstaller
         options.Progress?.Report(new LoaderInstallProgress(
             "正在写入 Fabric 版本配置…", 99, MinecraftDownloadStage.Finalizing));
 
-        var mergedBytes = BuildMergedVersionJson(vanillaBytes, profileBytes, versionId);
+        var mergedBytes = BuildMergedVersionJson(vanillaBytes, profileBytes, versionId, minecraftVersion);
         await File.WriteAllBytesAsync(versionJsonPath, mergedBytes, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(options.FabricApiVersion))
@@ -429,7 +429,7 @@ public static class LoaderInstaller
                 "正在写入版本配置…", 99, MinecraftDownloadStage.Finalizing));
 
             // 合并成一份自包含的版本文件，去掉 inheritsFrom，这样不再依赖一个单独的原版版本。
-            var mergedBytes = BuildMergedVersionJson(vanillaBytes, loaderBytes, versionId);
+            var mergedBytes = BuildMergedVersionJson(vanillaBytes, loaderBytes, versionId, minecraftVersion);
             Directory.CreateDirectory(versionDirectory);
             await File.WriteAllBytesAsync(versionJsonPath, mergedBytes, cancellationToken);
 
@@ -857,7 +857,11 @@ public static class LoaderInstaller
     /// 库与参数按继承链会得到的顺序拼接，最后去掉 <c>inheritsFrom</c>。
     /// 这样 <c>versions</c> 下只需要一个目录，不会因为父版本而多出一个普通版本。
     /// </summary>
-    private static byte[] BuildMergedVersionJson(byte[] vanillaBytes, byte[] loaderBytes, string id)
+    private static byte[] BuildMergedVersionJson(
+        byte[] vanillaBytes,
+        byte[] loaderBytes,
+        string id,
+        string clientVersion)
     {
         var vanilla = JsonNode.Parse(vanillaBytes) as JsonObject
                       ?? throw new InvalidDataException("原版版本 JSON 格式不正确。");
@@ -931,6 +935,8 @@ public static class LoaderInstaller
         vanilla.Remove("inheritsFrom");
         vanilla.Remove("jar");
         vanilla["id"] = id;
+        // 与 PCL2 一致：记下对应的原版版本，之后判断 Mod 兼容性时用。
+        vanilla["clientVersion"] = clientVersion;
 
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))

@@ -8,7 +8,8 @@ public sealed record VersionSummary(
     string? InheritsFrom,
     string? Loader,
     int RequiredJava,
-    string JsonPath)
+    string JsonPath,
+    string? ClientVersion)
 {
     public string TypeLabel => Type switch
     {
@@ -46,7 +47,8 @@ public static class VersionScanner
                     info.InheritsFrom,
                     DetectLoader(id, info.MainClass, info.InheritsFrom),
                     FindJavaMajor(minecraftDirectory, info, 0),
-                    jsonPath));
+                    jsonPath,
+                    info.ClientVersion));
             }
             catch (Exception)
             {

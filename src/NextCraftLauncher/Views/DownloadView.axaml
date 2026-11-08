@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:NextCraftLauncher.ViewModels"
              xmlns:java="using:NextCraftLauncher.Core.Java"
+             xmlns:controls="using:NextCraftLauncher.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="1080" d:DesignHeight="620"
@@ -327,7 +328,7 @@
                     <Grid IsVisible="{Binding IsDownloadModsSelected}">
 
                         <!-- 搜索结果 -->
-                        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10"
+                        <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10"
                               IsVisible="{Binding !IsModDetailOpen}">
 
                             <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
@@ -380,22 +381,37 @@
                                     <DataTemplate x:DataType="vm:ModProjectItemViewModel">
                                         <Button Classes="versionRow"
                                                 Command="{Binding SelectCommand}">
-                                            <StackPanel Spacing="2">
-                                                <TextBlock Text="{Binding Name}"
-                                                           FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Subtitle}"
-                                                           FontSize="11"
-                                                           Opacity="0.6" />
-                                                <TextBlock Text="{Binding Description}"
-                                                           FontSize="11"
-                                                           Opacity="0.5"
-                                                           TextTrimming="CharacterEllipsis" />
-                                            </StackPanel>
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                                <controls:RemoteImage Width="44"
+                                                                      Height="44"
+                                                                      VerticalAlignment="Top"
+                                                                      SourceUrl="{Binding IconUrl}"
+                                                                      CacheKey="{Binding IconKey}" />
+                                                <StackPanel Grid.Column="1" Spacing="2">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Subtitle}"
+                                                               FontSize="11"
+                                                               Opacity="0.6" />
+                                                    <TextBlock Text="{Binding Description}"
+                                                               FontSize="11"
+                                                               Opacity="0.5"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </Grid>
                                         </Button>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
+
+                            <Button Grid.Row="3"
+                                    Classes="toolbar soft"
+                                    Content="加载更多"
+                                    IsVisible="{Binding HasMoreMods}"
+                                    IsEnabled="{Binding !IsModsLoading}"
+                                    HorizontalAlignment="Center"
+                                    Command="{Binding LoadMoreModsCommand}" />
                         </Grid>
 
                         <!-- 项目详情：版本列表 -->

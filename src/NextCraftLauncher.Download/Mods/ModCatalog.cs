@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
 using NextCraftLauncher.Core.Logging;
@@ -11,7 +12,12 @@ namespace NextCraftLauncher.Download.Mods;
 /// </summary>
 public static class ModCatalog
 {
-    public const int PageSize = 20;
+    public const int PageSize = 40;
+
+    /// <summary>相同搜索在 60 秒内直接复用结果（与 PCL2 的 ReloadTimeout 一致）。</summary>
+    private static readonly TimeSpan SearchReuseWindow = TimeSpan.FromSeconds(60);
+
+    private static readonly TimeSpan VersionReuseWindow = TimeSpan.FromSeconds(60);
 
     private const string ModrinthApi = "https://api.modrinth.com/v2";
     private const string CurseForgeApi = "https://api.curseforge.com/v1";
@@ -21,21 +27,21 @@ public static class ModCatalog
 
     private static readonly HttpClient Http = CreateClient();
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
+    private static readonly ConcurrentDictionary<string, CacheEntry<ModSearchPage>> SearchCache = new();
+    private static readonly ConcurrentDictionary<string, CacheEntry<IReadOnlyList<ModVersion>>> VersionCache = new();
+    private static readonly ConcurrentDictionary<string, CacheEntry<IReadOnlyList<ModProject>>> ProjectCache = new();
 
     private static HttpClient CreateClient()
     {
         var client = new HttpClient(new SocketsHttpHandler
         {
-            ConnectTimeout = TimeSpan.FromSeconds(15),
-            MaxConnectionsPerServer = 8,
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            MaxConnectionsPerServer = 16,
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
         })
         {
-            Timeout = TimeSpan.FromSeconds(30),
+            // 单次尝试的超时由 GetJsonAsync 逐个请求控制。
+            Timeout = Timeout.InfiniteTimeSpan,
         };
 
         client.DefaultRequestHeaders.UserAgent.ParseAdd(
@@ -45,38 +51,90 @@ public static class ModCatalog
 
     // ------------------------------------------------------------ 搜索
 
+    /// <summary>
+    /// 搜索 Mod。两个平台各自维护分页偏移，返回合并去重后的结果。
+    /// 相同的搜索（含偏移）在 60 秒内直接复用，不再请求。
+    /// </summary>
     public static async Task<ModSearchPage> SearchAsync(
         ModPlatform? platform,
         string query,
         string? gameVersion,
         string? loader,
-        int offset,
+        int modrinthOffset,
+        int curseForgeOffset,
         CancellationToken cancellationToken = default)
     {
         if (platform == ModPlatform.CurseForge && string.IsNullOrWhiteSpace(CurseForgeApiKey))
             throw new InvalidOperationException("需要 CurseForge API Key（可设置环境变量 NCL_CURSEFORGE_API_KEY）");
 
-        var tasks = new List<Task<ModSearchPage>>();
+        var includeModrinth = platform is null or ModPlatform.Modrinth;
+        var includeCurseForge = platform is null or ModPlatform.CurseForge;
+        if (includeCurseForge && string.IsNullOrWhiteSpace(CurseForgeApiKey))
+            includeCurseForge = false; // 没有 Key 时只提供 Modrinth 结果（与 PCL2 一致）
 
-        if (platform is null or ModPlatform.Modrinth)
-            tasks.Add(SearchModrinthAsync(query, gameVersion, loader, offset, cancellationToken));
+        var rawQuery = query?.Trim() ?? string.Empty;
+        var searchQuery = rawQuery;
+        if (ModAliases.ContainsChinese(rawQuery))
+        {
+            // 接口不支持中文全文检索，先查自己的别名表换成英文关键词；
+            // 没有收录时保留原词，至少不会比不翻译更差。
+            var translated = ModAliases.Resolve(rawQuery);
+            if (!string.IsNullOrWhiteSpace(translated))
+            {
+                searchQuery = translated;
+                LauncherLog.Info($"中文搜索：「{rawQuery}」→「{translated}」");
+            }
+        }
 
-        if (platform is null or ModPlatform.CurseForge && !string.IsNullOrWhiteSpace(CurseForgeApiKey))
-            tasks.Add(SearchCurseForgeAsync(query, gameVersion, loader, offset, cancellationToken));
+        var cacheKey = $"{platform}|{rawQuery}|{gameVersion}|{loader}|{modrinthOffset}|{curseForgeOffset}";
+        if (TryGetCached(SearchCache, cacheKey, SearchReuseWindow, out var cached)) return cached;
 
-        if (tasks.Count == 0)
-            return new ModSearchPage(Array.Empty<ModProject>(), offset, 0, PageSize);
+        var modrinthTask = includeModrinth
+            ? SearchModrinthAsync(searchQuery, gameVersion, loader, modrinthOffset, cancellationToken)
+            : Task.FromResult(SourcePage.Empty);
+        var curseForgeTask = includeCurseForge
+            ? SearchCurseForgeAsync(searchQuery, gameVersion, loader, curseForgeOffset, cancellationToken)
+            : Task.FromResult(SourcePage.Empty);
 
-        var pages = await Task.WhenAll(tasks);
+        var results = await Task.WhenAll(modrinthTask, curseForgeTask);
+        var modrinthPage = results[0];
+        var curseForgePage = results[1];
 
-        return new ModSearchPage(
-            pages.SelectMany(page => page.Projects).ToList(),
-            offset,
-            pages.Sum(page => page.Total),
-            PageSize);
+        var page = new ModSearchPage(
+            MergeProjects(curseForgePage.Projects, modrinthPage.Projects),
+            modrinthOffset + modrinthPage.Projects.Count,
+            includeModrinth ? modrinthPage.Total : 0,
+            curseForgeOffset + curseForgePage.Projects.Count,
+            includeCurseForge ? curseForgePage.Total : 0,
+            HasMore(modrinthPage, modrinthOffset) || HasMore(curseForgePage, curseForgeOffset));
+
+        StoreCached(SearchCache, cacheKey, page);
+        return page;
+
+        static bool HasMore(SourcePage source, int offset)
+            => source.Projects.Count > 0 && source.Total > offset + source.Projects.Count;
     }
 
-    private static async Task<ModSearchPage> SearchModrinthAsync(
+    /// <summary>合并两个平台的结果：CurseForge 在前，按平台 ID 与 slug 去重。</summary>
+    private static List<ModProject> MergeProjects(
+        IReadOnlyList<ModProject> curseForge,
+        IReadOnlyList<ModProject> modrinth)
+    {
+        var result = new List<ModProject>(curseForge.Count + modrinth.Count);
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var slugs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var project in curseForge.Concat(modrinth))
+        {
+            if (!ids.Add(project.Platform + ":" + project.Id)) continue;
+            if (!string.IsNullOrWhiteSpace(project.Slug) && !slugs.Add(project.Slug)) continue;
+            result.Add(project);
+        }
+
+        return result;
+    }
+
+    private static async Task<SourcePage> SearchModrinthAsync(
         string query,
         string? gameVersion,
         string? loader,
@@ -127,10 +185,10 @@ public static class ModCatalog
             }
         }
 
-        return new ModSearchPage(projects, offset, (int)Long(root, "total_hits"), PageSize);
+        return new SourcePage(projects, (int)Long(root, "total_hits"));
     }
 
-    private static async Task<ModSearchPage> SearchCurseForgeAsync(
+    private static async Task<SourcePage> SearchCurseForgeAsync(
         string query,
         string? gameVersion,
         string? loader,
@@ -172,7 +230,7 @@ public static class ModCatalog
             ? (int)Long(pagination, "totalCount")
             : projects.Count;
 
-        return new ModSearchPage(projects, offset, total, PageSize);
+        return new SourcePage(projects, total);
     }
 
     // ------------------------------------------------------------ 版本列表
@@ -183,9 +241,15 @@ public static class ModCatalog
         string? loader,
         CancellationToken cancellationToken = default)
     {
-        return project.Platform == ModPlatform.Modrinth
+        var cacheKey = $"{project.Platform}:{project.Id}|{gameVersion}|{loader}";
+        if (TryGetCached(VersionCache, cacheKey, VersionReuseWindow, out var cached)) return cached;
+
+        var versions = project.Platform == ModPlatform.Modrinth
             ? await GetModrinthVersionsAsync(project, gameVersion, loader, cancellationToken)
             : await GetCurseForgeVersionsAsync(project, gameVersion, loader, cancellationToken);
+
+        StoreCached(VersionCache, cacheKey, versions);
+        return versions;
     }
 
     private static async Task<IReadOnlyList<ModVersion>> GetModrinthVersionsAsync(
@@ -348,6 +412,10 @@ public static class ModCatalog
     {
         if (ids.Count == 0) return Array.Empty<ModProject>();
 
+        var cacheKey = platform + "|" + string.Join(",", ids.OrderBy(id => id, StringComparer.Ordinal));
+        if (TryGetCached(ProjectCache, cacheKey, VersionReuseWindow, out var cached)) return cached;
+
+        IReadOnlyList<ModProject> result;
         try
         {
             if (platform == ModPlatform.Modrinth)
@@ -357,7 +425,7 @@ public static class ModCatalog
                 using var document = await GetJsonAsync(url, cancellationToken);
                 if (document.RootElement.ValueKind != JsonValueKind.Array) return Array.Empty<ModProject>();
 
-                return document.RootElement.EnumerateArray()
+                result = document.RootElement.EnumerateArray()
                     .Select(entry => new ModProject(
                         String(entry, "id") ?? string.Empty,
                         ModPlatform.Modrinth,
@@ -370,38 +438,47 @@ public static class ModCatalog
                     .Where(project => project.Id.Length > 0)
                     .ToList();
             }
-
-            var curseUrl = $"{CurseForgeApi}/mods?" +
-                           string.Join("&", ids.Select(id => "modId=" + Uri.EscapeDataString(id)));
-            using var curseDocument = await GetJsonAsync(curseUrl, cancellationToken, CurseForgeApiKey);
-            if (!curseDocument.RootElement.TryGetProperty("data", out var data) ||
-                data.ValueKind != JsonValueKind.Array)
+            else
             {
-                return Array.Empty<ModProject>();
-            }
+                var curseUrl = $"{CurseForgeApi}/mods?" +
+                               string.Join("&", ids.Select(id => "modId=" + Uri.EscapeDataString(id)));
+                using var curseDocument = await GetJsonAsync(curseUrl, cancellationToken, CurseForgeApiKey);
+                if (!curseDocument.RootElement.TryGetProperty("data", out var data) ||
+                    data.ValueKind != JsonValueKind.Array)
+                {
+                    return Array.Empty<ModProject>();
+                }
 
-            return data.EnumerateArray()
-                .Select(entry => new ModProject(
-                    String(entry, "id") ?? string.Empty,
-                    ModPlatform.CurseForge,
-                    String(entry, "slug") ?? string.Empty,
-                    String(entry, "name") ?? string.Empty,
-                    String(entry, "summary"),
-                    Long(entry, "downloadCount"),
-                    Date(entry, "dateModified"),
-                    null))
-                .Where(project => project.Id.Length > 0)
-                .ToList();
+                result = data.EnumerateArray()
+                    .Select(entry => new ModProject(
+                        String(entry, "id") ?? string.Empty,
+                        ModPlatform.CurseForge,
+                        String(entry, "slug") ?? string.Empty,
+                        String(entry, "name") ?? string.Empty,
+                        String(entry, "summary"),
+                        Long(entry, "downloadCount"),
+                        Date(entry, "dateModified"),
+                        null))
+                    .Where(project => project.Id.Length > 0)
+                    .ToList();
+            }
         }
         catch (Exception exception)
         {
             LauncherLog.Warn($"查询前置 Mod 失败：{exception.Message}");
             return Array.Empty<ModProject>();
         }
+
+        if (result.Count > 0) StoreCached(ProjectCache, cacheKey, result);
+        return result;
     }
 
     // ------------------------------------------------------------ 工具
 
+    /// <summary>
+    /// 与 PCL2 的 <c>DlModRequest</c> 一致：官方源与镜像交替重试，每次尝试单独设超时，
+    /// 一个源卡住不会拖住整个搜索。
+    /// </summary>
     private static async Task<JsonDocument> GetJsonAsync(
         string url,
         CancellationToken cancellationToken,
@@ -409,34 +486,73 @@ public static class ModCatalog
     {
         Exception? lastError = null;
 
-        foreach (var candidate in ModDownloadUrlResolver.BuildApiCandidates(url))
+        foreach (var (candidate, timeoutSeconds) in ModDownloadUrlResolver.BuildApiAttempts(url))
         {
+            using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            attempt.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, candidate);
                 if (!string.IsNullOrWhiteSpace(apiKey))
                     request.Headers.TryAddWithoutValidation("x-api-key", apiKey);
 
-                using var response = await Http.SendAsync(request, cancellationToken);
+                using var response = await Http.SendAsync(request, attempt.Token);
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return JsonDocument.Parse("{}");
 
                 response.EnsureSuccessStatusCode();
 
-                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                return await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+                await using var stream = await response.Content.ReadAsStreamAsync(attempt.Token);
+                return await JsonDocument.ParseAsync(stream, cancellationToken: attempt.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
             catch (Exception exception)
             {
+                // 单次尝试超时或失败，换下一个地址继续。
                 lastError = exception;
             }
         }
 
         throw new IOException($"请求 {url} 失败：{lastError?.Message}", lastError);
+    }
+
+    private static bool TryGetCached<T>(
+        ConcurrentDictionary<string, CacheEntry<T>> cache,
+        string key,
+        TimeSpan window,
+        out T value)
+    {
+        value = default!;
+        if (!cache.TryGetValue(key, out var entry)) return false;
+
+        if (DateTimeOffset.UtcNow - entry.StoredAt > window)
+        {
+            cache.TryRemove(key, out _);
+            return false;
+        }
+
+        value = entry.Value;
+        return true;
+    }
+
+    private static void StoreCached<T>(
+        ConcurrentDictionary<string, CacheEntry<T>> cache,
+        string key,
+        T value)
+    {
+        if (cache.Count > 256) cache.Clear();
+        cache[key] = new CacheEntry<T>(DateTimeOffset.UtcNow, value);
+    }
+
+    private readonly record struct CacheEntry<T>(DateTimeOffset StoredAt, T Value);
+
+    private readonly record struct SourcePage(IReadOnlyList<ModProject> Projects, int Total)
+    {
+        public static SourcePage Empty => new(Array.Empty<ModProject>(), 0);
     }
 
     /// <summary>我们的加载器名称 → Modrinth 的 loader 标签。</summary>
@@ -538,16 +654,28 @@ public static class ModDownloadUrlResolver
             : new[] { mirror, url };
     }
 
-    /// <summary>API 请求：官方优先，失败后再试镜像。</summary>
-    public static IReadOnlyList<string> BuildApiCandidates(string url)
+    /// <summary>
+    /// API 请求的尝试顺序与单次超时（秒），与 PCL2 的 <c>DlModRequest</c> 一致：
+    /// 官方源 → 镜像 → 官方源 → 镜像。
+    /// </summary>
+    public static IReadOnlyList<(string Url, int TimeoutSeconds)> BuildApiAttempts(string url)
     {
         var mirror = ToMirror(url);
-        return string.Equals(mirror, url, StringComparison.OrdinalIgnoreCase)
-            ? new[] { url }
-            : new[] { url, mirror };
+        if (string.Equals(mirror, url, StringComparison.OrdinalIgnoreCase))
+            return new[] { (url, 30) };
+
+        // Modrinth 的官方接口本身就慢，首次给它多一点的余量（PCL2 也是 20s）。
+        var firstTimeout = url.Contains("api.modrinth.com", StringComparison.OrdinalIgnoreCase) ? 20 : 10;
+        return new[]
+        {
+            (url, firstTimeout),
+            (mirror, 10),
+            (url, 30),
+            (mirror, 30),
+        };
     }
 
-    private static string ToMirror(string url)
+    public static string ToMirror(string url)
         => url
             .Replace("https://api.modrinth.com", Mirror + "/modrinth", StringComparison.OrdinalIgnoreCase)
             .Replace("https://cdn.modrinth.com", Mirror, StringComparison.OrdinalIgnoreCase)

@@ -1,0 +1,103 @@
+# 中文名 → 英文搜索关键词
+#
+# 本项目自己的常用 Mod 名称别名表，用于把中文搜索词换成英文关键词。
+# 格式：中文别名（可用逗号分隔多个）=英文关键词；以 # 开头的行为注释。
+# 同一行里的多个中文名共用一个英文关键词；同分时取靠前的条目。
+
+# ---- 性能 / 优化 / 前置 ----
+钠,钠锭=sodium
+钠扩展,钠的扩展=sodium extra
+锂=lithium
+磷=phosphor
+铁氧体=ferrite core
+内存泄漏修复,内存泄漏=memory leak fix
+实体剔除,实体渲染优化=entity culling
+优化=optimization
+性能=performance
+
+# ---- 视觉 / 渲染 ----
+光影=iris shaders
+高清修复=optifine
+铷=rubidium
+嵌入=embeddium
+铟=indium
+连接材质=continuity
+缩放=zoomify
+小地图=xaero minimap
+旅行地图=journeymap
+更好的战斗=better combat
+更好的第三人称=better third person
+苹果皮=appleskin
+附魔描述=enchantment descriptions
+属性修复=attributefix
+
+# ---- 界面 / 工具 ----
+物品管理器,配方查看,合成表=jei
+物品整理,一键整理=inventory sorter
+任务系统=ftb quests
+指南,说明书=patchouli
+快速熔炉,熔炉性能=fast furnace
+快速工作台,合成性能=fast workbench
+
+# ---- 存储 ----
+存储抽屉,抽屉=storage drawers
+精致存储=refined storage
+简单存储,简易存储=simple storage network
+铁箱子,更多箱子=iron chests
+末影存储=ender storage
+精致背包=sophisticated backpacks
+旅行者背包=travelers backpack
+
+# ---- 科技 ----
+机械动力=create
+工业时代2,工业时代=industrial craft
+建筑,建筑工艺=buildcraft
+林业=forestry
+铁路=railcraft
+红石力量=redpower
+应用能源2,应用能源=applied energistics
+通用机械=mekanism
+沉浸工程=immersive engineering
+沉浸石油=immersive petroleum
+热力膨胀=thermal expansion
+热力基础=thermal foundation
+末影接口=ender io
+工业先锋=industrial foregoing
+核电工艺=nuclearcraft
+极限反应堆=extreme reactors
+环境科技=environmental tech
+模块化动力=modular routers
+
+# ---- 魔法 / 冒险 ----
+匠魂=tinkers construct
+植物魔法=botania
+神秘时代=thaumcraft
+神秘农业=mystical agriculture
+星辉魔法=astral sorcery
+魔法艺术=ars nouveau
+血魔法=blood magic
+自然灵气=natures aura
+等价交换=projecte
+无尽贪婪=avaritia
+龙之研究=draconic evolution
+暮色森林=twilight forest
+虚无世界=divine rpg
+星系=galacticraft
+以太,天境=aether
+深渊国度=abyssalcraft
+农夫乐事=farmers delight
+潘马斯农场=pams harvestcraft
+
+# ---- 世界 / 群系 ----
+超多生物群系,更多生物群系=biomes o plenty
+更好的下界=better nether
+更好的末地=better end
+地形生成=terralith
+季节=serene seasons
+区块预生成=chunky
+区块加载器=chunk loader
+传送石碑,路径点=waystones
+
+# ---- 其他常用 ----
+布料配置=cloth config
+饰品栏=curios

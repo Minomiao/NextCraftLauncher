@@ -42,6 +42,8 @@ public sealed record ModVersion(
 
 public sealed record ModSearchPage(
     IReadOnlyList<ModProject> Projects,
-    int Offset,
-    int Total,
-    int PageSize);
+    int ModrinthOffset,
+    int ModrinthTotal,
+    int CurseForgeOffset,
+    int CurseForgeTotal,
+    bool HasMore);

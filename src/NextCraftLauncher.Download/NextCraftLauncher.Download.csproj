@@ -11,4 +11,9 @@
     <ProjectReference Include="..\NextCraftLauncher.Core\NextCraftLauncher.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 本项目自己维护的常用 Mod 中文别名表，用于把中文搜索词换成英文关键词。 -->
+    <EmbeddedResource Include="Mods\Data\ModAliases.txt" />
+  </ItemGroup>
+
 </Project>

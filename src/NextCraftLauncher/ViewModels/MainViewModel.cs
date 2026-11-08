@@ -724,6 +724,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _modDetailCts;
     // 只在第一次进入 Mod 页时套用当前版本的筛选并自动搜索，之后保留用户的搜索状态。
     private bool _modPageInitialized;
+    // 两个平台各自的分页偏移。
+    private int _modModrinthOffset;
+    private int _modCurseForgeOffset;
+    // 当前结果列表对应的搜索条件：“加载更多”继续用这一组，避免筛选未生效时错位。
+    private (ModPlatform? Platform, string Query, string? GameVersion, string? Loader)? _modActiveQuery;
 
     public ObservableCollection<ModProjectItemViewModel> ModProjects { get; } = new();
 
@@ -741,6 +746,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _selectedModGameVersionIndex;
     [ObservableProperty] private int _selectedModLoaderIndex;
     [ObservableProperty] private bool _isModsLoading;
+    [ObservableProperty] private bool _hasMoreMods;
     [ObservableProperty] private string _modStatus = "输入关键字搜索 Mod";
     [ObservableProperty] private bool _isModDetailOpen;
     [ObservableProperty] private ModProjectItemViewModel? _selectedModProject;
@@ -807,38 +813,84 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private async Task SearchModsAsync()
+    private Task SearchModsAsync() => FetchModResultsAsync(append: false);
+
+    [RelayCommand]
+    private Task LoadMoreModsAsync() => FetchModResultsAsync(append: true);
+
+    /// <summary>
+    /// 取一页搜索结果；<paramref name="append"/> 为 true 时接着本次搜索继续往后取。
+    /// 两个平台各自维护偏移，结果先合并去重再追加。
+    /// </summary>
+    private async Task FetchModResultsAsync(bool append)
     {
         _modSearchCts?.Cancel();
         var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _modSearchCts = cts;
 
+        if (append && _modActiveQuery is null) return;
+
         IsModsLoading = true;
-        ModStatus = "正在搜索…";
-        ModProjects.Clear();
-        IsModDetailOpen = false;
+
+        if (append)
+        {
+            ModStatus = "正在加载更多…";
+        }
+        else
+        {
+            ModStatus = "正在搜索…";
+            ModProjects.Clear();
+            IsModDetailOpen = false;
+            _modModrinthOffset = 0;
+            _modCurseForgeOffset = 0;
+            HasMoreMods = false;
+            _modActiveQuery = (
+                SelectedModPlatform,
+                ModSearchText.Trim(),
+                SelectedModGameVersionFilter,
+                SelectedModLoaderFilter);
+        }
+
+        var request = _modActiveQuery!.Value;
 
         try
         {
             var page = await Task.Run(
                 () => ModCatalog.SearchAsync(
-                    SelectedModPlatform,
-                    ModSearchText.Trim(),
-                    SelectedModGameVersionFilter,
-                    SelectedModLoaderFilter,
-                    0,
+                    request.Platform,
+                    request.Query,
+                    request.GameVersion,
+                    request.Loader,
+                    _modModrinthOffset,
+                    _modCurseForgeOffset,
                     cts.Token),
                 cts.Token);
 
             if (cts.IsCancellationRequested) return;
 
-            foreach (var project in page.Projects)
-                ModProjects.Add(new ModProjectItemViewModel(project, SelectModProject));
+            _modModrinthOffset = page.ModrinthOffset;
+            _modCurseForgeOffset = page.CurseForgeOffset;
 
-            ModStatus = ModProjects.Count == 0 ? "没有找到 Mod" : string.Empty;
+            var known = new HashSet<string>(
+                ModProjects.Select(item => item.Project.Platform + ":" + item.Project.Id),
+                StringComparer.OrdinalIgnoreCase);
+
+            var added = 0;
+            foreach (var project in page.Projects)
+            {
+                if (!known.Add(project.Platform + ":" + project.Id)) continue;
+                ModProjects.Add(new ModProjectItemViewModel(project, SelectModProject));
+                added++;
+            }
+
+            // 加载更多时如果没有新增内容，就别再让按钮可点，避免反复请求同一页。
+            HasMoreMods = page.HasMore && !(append && added == 0);
+            ModStatus = added == 0 && !append ? "没有找到 Mod" : string.Empty;
+
             LauncherLog.Info(
-                $"Mod 搜索：\"{ModSearchText.Trim()}\"（{SelectedModGameVersionFilter ?? "全部"} / " +
-                $"{SelectedModLoaderFilter ?? "全部"}）→ {page.Total} 个结果");
+                $"Mod 搜索：\"{request.Query}\"（{request.GameVersion ?? "全部"} / " +
+                $"{request.Loader ?? "全部"}）→ 新增 {added} 个，共 {ModProjects.Count} 个" +
+                (append ? "（加载更多）" : string.Empty));
         }
         catch (OperationCanceledException)
         {

@@ -19,6 +19,12 @@ public sealed class ModProjectItemViewModel
 
     public string Description => Project.Description ?? string.Empty;
 
+    /// <summary>封面图地址（可能为空）。</summary>
+    public string? IconUrl => Project.IconUrl;
+
+    /// <summary>图标缓存键，形如 <c>modrinth/P7dR8mSH</c>。</summary>
+    public string IconKey => ModIconCache.MakeKey(Project.Platform, Project.Id);
+
     public string Subtitle => $"{Project.PlatformName} · 下载 {DownloadsText}";
 
     public string DownloadsText => Project.Downloads >= 10000

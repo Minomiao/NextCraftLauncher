@@ -1,6 +1,8 @@
 using System;
+using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -11,6 +13,8 @@ namespace NextCraftLauncher.Views;
 
 public partial class DownloadView : UserControl
 {
+    private MainViewModel? _viewModel;
+
     public DownloadView()
     {
         InitializeComponent();
@@ -20,8 +24,27 @@ public partial class DownloadView : UserControl
     {
         base.OnDataContextChanged(e);
 
+        if (_viewModel is not null) _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
         if (DataContext is MainViewModel viewModel)
+        {
             viewModel.ModSaveFilePicker = PickModSavePathAsync;
+            viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            _viewModel = viewModel;
+        }
+        else
+        {
+            _viewModel = null;
+        }
+    }
+
+    /// <summary>翻页后把列表滚回顶部，否则会停在新一页的末尾。</summary>
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MainViewModel.ModPage)) return;
+
+        var scroll = ModResultsScroll;
+        if (scroll is not null) scroll.Offset = new Vector(scroll.Offset.X, 0);
     }
 
     private void OnModSearchKeyDown(object? sender, KeyEventArgs e)

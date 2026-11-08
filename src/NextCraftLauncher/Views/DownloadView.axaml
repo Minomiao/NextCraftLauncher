@@ -339,7 +339,7 @@
                     <Grid IsVisible="{Binding IsDownloadModsSelected}">
 
                         <!-- 搜索结果 -->
-                        <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10"
+                        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10"
                               IsVisible="{Binding !IsModDetailOpen}">
 
                             <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
@@ -383,72 +383,61 @@
                                        Text="{Binding ModStatus}"
                                        Classes="meta" />
 
-                            <ListBox Grid.Row="2"
-                                     Classes="versionList"
-                                     ItemsSource="{Binding ModProjects}"
-                                     Background="Transparent"
-                                     Padding="0,0,14,0">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:ModProjectItemViewModel">
-                                        <Button Classes="versionRow"
-                                                Command="{Binding SelectCommand}">
-                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                                                <controls:RemoteImage Width="44"
-                                                                      Height="44"
-                                                                      VerticalAlignment="Top"
-                                                                      SourceUrl="{Binding IconUrl}"
-                                                                      CacheKey="{Binding IconKey}" />
-                                                <StackPanel Grid.Column="1" Spacing="2">
-                                                    <TextBlock Text="{Binding Name}"
-                                                               FontWeight="SemiBold"
-                                                               TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Text="{Binding Subtitle}"
-                                                               FontSize="11"
-                                                               Opacity="0.6" />
-                                                    <TextBlock Text="{Binding Description}"
-                                                               FontSize="11"
-                                                               Opacity="0.5"
-                                                               TextTrimming="CharacterEllipsis" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </Button>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                            <ScrollViewer Grid.Row="2"
+                                          x:Name="ModResultsScroll"
+                                          VerticalScrollBarVisibility="Auto">
+                                <StackPanel Spacing="6" Margin="0,0,10,0">
+                                    <ItemsControl ItemsSource="{Binding ModProjects}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ModProjectItemViewModel">
+                                                <Button Classes="versionRow"
+                                                        Command="{Binding SelectCommand}">
+                                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                                        <controls:RemoteImage Width="44"
+                                                                              Height="44"
+                                                                              VerticalAlignment="Top"
+                                                                              SourceUrl="{Binding IconUrl}"
+                                                                              CacheKey="{Binding IconKey}" />
+                                                        <StackPanel Grid.Column="1" Spacing="2">
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       FontWeight="SemiBold"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Subtitle}"
+                                                                       FontSize="11"
+                                                                       Opacity="0.6" />
+                                                            <TextBlock Text="{Binding Description}"
+                                                                       FontSize="11"
+                                                                       Opacity="0.5"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
 
-                            <StackPanel Grid.Row="3"
-                                        Orientation="Horizontal"
-                                        Spacing="4"
-                                        HorizontalAlignment="Center"
-                                        IsVisible="{Binding ShowModPager}">
-                                <Button Classes="pager"
-                                        Command="{Binding GoPreviousModPageCommand}"
-                                        IsEnabled="{Binding CanGoPreviousModPage}"
-                                        ToolTip.Tip="上一页">
-                                    <Path Data="M 15,4 L 7,12 L 15,20 Z"
-                                          Width="8"
-                                          Height="13"
-                                          Stretch="Uniform"
-                                          Fill="{Binding $parent[Button].Foreground}" />
-                                </Button>
+                                    <!-- 翻页：首/末页不显示对应按钮，不留置灰箭头 -->
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="12"
+                                                HorizontalAlignment="Center"
+                                                Margin="0,8,0,4"
+                                                IsVisible="{Binding ShowModPager}">
+                                        <Button Classes="pager"
+                                                Content="上一页"
+                                                Command="{Binding GoPreviousModPageCommand}"
+                                                IsVisible="{Binding CanGoPreviousModPage}" />
 
-                                <TextBlock Text="{Binding ModPageText}"
-                                           Classes="meta"
-                                           MinWidth="64"
-                                           TextAlignment="Center"
-                                           VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding ModPageText}"
+                                                   Classes="meta"
+                                                   VerticalAlignment="Center" />
 
-                                <Button Classes="pager"
-                                        Command="{Binding GoNextModPageCommand}"
-                                        IsEnabled="{Binding CanGoNextModPage}"
-                                        ToolTip.Tip="下一页">
-                                    <Path Data="M 9,4 L 17,12 L 9,20 Z"
-                                          Width="8"
-                                          Height="13"
-                                          Stretch="Uniform"
-                                          Fill="{Binding $parent[Button].Foreground}" />
-                                </Button>
-                            </StackPanel>
+                                        <Button Classes="pager"
+                                                Content="下一页"
+                                                Command="{Binding GoNextModPageCommand}"
+                                                IsVisible="{Binding CanGoNextModPage}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
                         </Grid>
 
                         <!-- 项目详情：版本列表 -->

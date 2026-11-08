@@ -405,13 +405,41 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <Button Grid.Row="3"
-                                    Classes="toolbar soft"
-                                    Content="加载更多"
-                                    IsVisible="{Binding HasMoreMods}"
-                                    IsEnabled="{Binding !IsModsLoading}"
-                                    HorizontalAlignment="Center"
-                                    Command="{Binding LoadMoreModsCommand}" />
+                            <Grid Grid.Row="3"
+                                  ColumnDefinitions="Auto,*,Auto"
+                                  ColumnSpacing="8"
+                                  IsVisible="{Binding ShowModPager}">
+                                <Button Classes="toolbar soft"
+                                        Padding="10,0"
+                                        Command="{Binding GoPreviousModPageCommand}"
+                                        IsEnabled="{Binding CanGoPreviousModPage}"
+                                        ToolTip.Tip="上一页">
+                                    <Path Data="M 15,4 L 7,12 L 15,20 Z"
+                                          Width="8"
+                                          Height="13"
+                                          Stretch="Uniform"
+                                          Fill="{Binding $parent[Button].Foreground}" />
+                                </Button>
+
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding ModPageText}"
+                                           Classes="meta"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+
+                                <Button Grid.Column="2"
+                                        Classes="toolbar soft"
+                                        Padding="10,0"
+                                        Command="{Binding GoNextModPageCommand}"
+                                        IsEnabled="{Binding CanGoNextModPage}"
+                                        ToolTip.Tip="下一页">
+                                    <Path Data="M 9,4 L 17,12 L 9,20 Z"
+                                          Width="8"
+                                          Height="13"
+                                          Stretch="Uniform"
+                                          Fill="{Binding $parent[Button].Foreground}" />
+                                </Button>
+                            </Grid>
                         </Grid>
 
                         <!-- 项目详情：版本列表 -->

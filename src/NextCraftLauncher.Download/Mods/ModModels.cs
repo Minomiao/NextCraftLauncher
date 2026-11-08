@@ -42,8 +42,10 @@ public sealed record ModVersion(
 
 public sealed record ModSearchPage(
     IReadOnlyList<ModProject> Projects,
-    int ModrinthOffset,
-    int ModrinthTotal,
-    int CurseForgeOffset,
-    int CurseForgeTotal,
-    bool HasMore);
+    int Page,
+    int PageSize,
+    int Total)
+{
+    /// <summary>总页数，按接口返回的结果总数与每页条数计算。</summary>
+    public int TotalPages => PageSize <= 0 ? 1 : Math.Max(1, (Total + PageSize - 1) / PageSize);
+}

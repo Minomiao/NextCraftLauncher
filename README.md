@@ -22,6 +22,7 @@
 - `NCL\log\`：运行日志，按天分文件，保留 7 天
 - `NCL\cache\`：可重建的缓存，包括版本清单、加载器版本列表、Forge 安装器等
   - `NCL\cache\mods\icons\<平台>\<工程 ID>-<链接哈希>.<扩展名>`：Mod 图标
+  - `NCL\cache\mods\search\<平台>\<版本>_<加载器>_<关键词>-p<页码>.json`：Mod 搜索结果（6 小时内复用）
   - `NCL\cache\mods\aliases.json`：中文名查询结果
 
 ## 参考

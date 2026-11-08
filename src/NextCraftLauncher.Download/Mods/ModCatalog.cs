@@ -12,10 +12,7 @@ namespace NextCraftLauncher.Download.Mods;
 /// </summary>
 public static class ModCatalog
 {
-    public const int PageSize = 40;
-
-    /// <summary>相同搜索在 60 秒内直接复用结果（与 PCL2 的 ReloadTimeout 一致）。</summary>
-    private static readonly TimeSpan SearchReuseWindow = TimeSpan.FromSeconds(60);
+    public const int PageSize = 30;
 
     private static readonly TimeSpan VersionReuseWindow = TimeSpan.FromSeconds(60);
 
@@ -27,7 +24,6 @@ public static class ModCatalog
 
     private static readonly HttpClient Http = CreateClient();
 
-    private static readonly ConcurrentDictionary<string, CacheEntry<ModSearchPage>> SearchCache = new();
     private static readonly ConcurrentDictionary<string, CacheEntry<IReadOnlyList<ModVersion>>> VersionCache = new();
     private static readonly ConcurrentDictionary<string, CacheEntry<IReadOnlyList<ModProject>>> ProjectCache = new();
 
@@ -52,18 +48,20 @@ public static class ModCatalog
     // ------------------------------------------------------------ 搜索
 
     /// <summary>
-    /// 搜索 Mod。两个平台各自维护分页偏移，返回合并去重后的结果。
-    /// 相同的搜索（含偏移）在 60 秒内直接复用，不再请求。
+    /// 搜索 Mod 的第 <paramref name="page"/> 页（从 1 开始）。每页 30 条，
+    /// 两个平台各自取一半再合并去重；结果会缓存到 <c>NCL/cache/mods/search</c>。
     /// </summary>
     public static async Task<ModSearchPage> SearchAsync(
         ModPlatform? platform,
         string query,
         string? gameVersion,
         string? loader,
-        int modrinthOffset,
-        int curseForgeOffset,
+        int page,
+        bool ignoreCache = false,
         CancellationToken cancellationToken = default)
     {
+        page = Math.Max(1, page);
+
         if (platform == ModPlatform.CurseForge && string.IsNullOrWhiteSpace(CurseForgeApiKey))
             throw new InvalidOperationException("需要 CurseForge API Key（可设置环境变量 NCL_CURSEFORGE_API_KEY）");
 
@@ -87,33 +85,42 @@ public static class ModCatalog
             }
         }
 
-        var cacheKey = $"{platform}|{rawQuery}|{gameVersion}|{loader}|{modrinthOffset}|{curseForgeOffset}";
-        if (TryGetCached(SearchCache, cacheKey, SearchReuseWindow, out var cached)) return cached;
+        if (!ignoreCache &&
+            ModSearchCache.TryGet(platform, rawQuery, gameVersion, loader, page, out var cached))
+        {
+            return cached;
+        }
+
+        var platformCount = (includeModrinth ? 1 : 0) + (includeCurseForge ? 1 : 0);
+        if (platformCount == 0)
+            return new ModSearchPage(Array.Empty<ModProject>(), page, PageSize, 0);
+
+        // 两个平台都开启时各取一半，合起来刚好一页。
+        var limit = Math.Max(1, PageSize / platformCount);
+        var offset = (page - 1) * limit;
 
         var modrinthTask = includeModrinth
-            ? SearchModrinthAsync(searchQuery, gameVersion, loader, modrinthOffset, cancellationToken)
+            ? SearchModrinthAsync(searchQuery, gameVersion, loader, offset, limit, cancellationToken)
             : Task.FromResult(SourcePage.Empty);
         var curseForgeTask = includeCurseForge
-            ? SearchCurseForgeAsync(searchQuery, gameVersion, loader, curseForgeOffset, cancellationToken)
+            ? SearchCurseForgeAsync(searchQuery, gameVersion, loader, offset, limit, cancellationToken)
             : Task.FromResult(SourcePage.Empty);
 
         var results = await Task.WhenAll(modrinthTask, curseForgeTask);
         var modrinthPage = results[0];
         var curseForgePage = results[1];
 
-        var page = new ModSearchPage(
+        var total = (includeModrinth ? modrinthPage.Total : 0) +
+                    (includeCurseForge ? curseForgePage.Total : 0);
+
+        var result = new ModSearchPage(
             MergeProjects(curseForgePage.Projects, modrinthPage.Projects),
-            modrinthOffset + modrinthPage.Projects.Count,
-            includeModrinth ? modrinthPage.Total : 0,
-            curseForgeOffset + curseForgePage.Projects.Count,
-            includeCurseForge ? curseForgePage.Total : 0,
-            HasMore(modrinthPage, modrinthOffset) || HasMore(curseForgePage, curseForgeOffset));
+            page,
+            PageSize,
+            total);
 
-        StoreCached(SearchCache, cacheKey, page);
-        return page;
-
-        static bool HasMore(SourcePage source, int offset)
-            => source.Projects.Count > 0 && source.Total > offset + source.Projects.Count;
+        ModSearchCache.Store(platform, rawQuery, gameVersion, loader, result);
+        return result;
     }
 
     /// <summary>合并两个平台的结果：CurseForge 在前，按平台 ID 与 slug 去重。</summary>
@@ -140,6 +147,7 @@ public static class ModCatalog
         string? gameVersion,
         string? loader,
         int offset,
+        int limit,
         CancellationToken cancellationToken)
     {
         var facets = new List<string> { "[\"project_type:mod\"]" };
@@ -154,7 +162,7 @@ public static class ModCatalog
         if (!string.IsNullOrWhiteSpace(gameVersion))
             facets.Add($"[\"versions:'{gameVersion}'\"]");
 
-        var url = $"{ModrinthApi}/search?limit={PageSize}&index=relevance" +
+        var url = $"{ModrinthApi}/search?limit={limit}&index=relevance" +
                   $"&facets={Uri.EscapeDataString("[" + string.Join(",", facets) + "]")}";
 
         if (!string.IsNullOrWhiteSpace(query))
@@ -194,10 +202,11 @@ public static class ModCatalog
         string? gameVersion,
         string? loader,
         int offset,
+        int limit,
         CancellationToken cancellationToken)
     {
         var url = $"{CurseForgeApi}/mods/search?gameId=432&classId=6&sortField=2&sortOrder=desc" +
-                  $"&pageSize={PageSize}&index={offset}";
+                  $"&pageSize={limit}&index={offset}";
 
         var loaderType = CurseForgeLoaderType(loader);
         if (loaderType is not null) url += $"&modLoaderType={loaderType}";

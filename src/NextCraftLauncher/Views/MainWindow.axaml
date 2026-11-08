@@ -88,6 +88,10 @@
                             Classes.selected="{Binding IsDownloadPageSelected}"
                             Content="下载"
                             Command="{Binding ShowDownloadPageCommand}" />
+                    <Button Classes="nav"
+                            Classes.selected="{Binding IsSettingsPageSelected}"
+                            Content="设置"
+                            Command="{Binding ShowSettingsPageCommand}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="2"
@@ -116,6 +120,7 @@
         <Grid Grid.Row="1" Margin="16,10,16,16">
             <views:LaunchView IsVisible="{Binding IsLaunchPageSelected}" />
             <views:DownloadView IsVisible="{Binding IsDownloadPageSelected}" />
+            <views:SettingsView IsVisible="{Binding IsSettingsPageSelected}" />
         </Grid>
         </Grid>
 

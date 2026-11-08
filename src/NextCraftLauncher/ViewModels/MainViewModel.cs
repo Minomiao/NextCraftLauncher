@@ -392,6 +392,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _selectedNeoForgeMirrorIndex;
     [ObservableProperty] private LaunchSection _currentLaunchSection = LaunchSection.Start;
     [ObservableProperty] private DownloadSection _currentDownloadSection = DownloadSection.Versions;
+    [ObservableProperty] private SettingsSection _currentSettingsSection = SettingsSection.Launch;
     [ObservableProperty] private bool _isVersionDeleteDialogOpen;
     [ObservableProperty] private string _versionDeleteDialogMessage = string.Empty;
 
@@ -519,17 +520,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public bool IsDownloadPageSelected => CurrentPage == AppPage.Download;
 
+    public bool IsSettingsPageSelected => CurrentPage == AppPage.Settings;
+
     public bool IsStartSectionSelected => CurrentLaunchSection == LaunchSection.Start;
 
     public bool IsVersionsSectionSelected => CurrentLaunchSection == LaunchSection.Versions;
 
-    public bool IsSettingsSectionSelected => CurrentLaunchSection == LaunchSection.Settings;
+    public bool IsSettingsLaunchSelected => CurrentSettingsSection == SettingsSection.Launch;
+
+    public bool IsSettingsDownloadSelected => CurrentSettingsSection == SettingsSection.Download;
 
     public bool IsDownloadVersionsSelected => CurrentDownloadSection == DownloadSection.Versions;
 
     public bool IsDownloadJavaSelected => CurrentDownloadSection == DownloadSection.Java;
-
-    public bool IsDownloadSettingsSelected => CurrentDownloadSection == DownloadSection.Settings;
 
     public bool IsDownloadRunningSelected => CurrentDownloadSection == DownloadSection.Running;
 
@@ -659,14 +662,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(IsStartSectionSelected));
         OnPropertyChanged(nameof(IsVersionsSectionSelected));
-        OnPropertyChanged(nameof(IsSettingsSectionSelected));
+    }
+
+    partial void OnCurrentSettingsSectionChanged(SettingsSection value)
+    {
+        OnPropertyChanged(nameof(IsSettingsLaunchSelected));
+        OnPropertyChanged(nameof(IsSettingsDownloadSelected));
     }
 
     partial void OnCurrentDownloadSectionChanged(DownloadSection value)
     {
         OnPropertyChanged(nameof(IsDownloadVersionsSelected));
         OnPropertyChanged(nameof(IsDownloadJavaSelected));
-        OnPropertyChanged(nameof(IsDownloadSettingsSelected));
         OnPropertyChanged(nameof(IsDownloadRunningSelected));
 
         if (value == DownloadSection.Java)
@@ -807,6 +814,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(IsLaunchPageSelected));
         OnPropertyChanged(nameof(IsDownloadPageSelected));
+        OnPropertyChanged(nameof(IsSettingsPageSelected));
 
         if (value == AppPage.Download)
         {
@@ -874,16 +882,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ShowVersionsSection() => CurrentLaunchSection = LaunchSection.Versions;
 
     [RelayCommand]
-    private void ShowSettingsSection() => CurrentLaunchSection = LaunchSection.Settings;
-
-    [RelayCommand]
     private void ShowDownloadVersions() => CurrentDownloadSection = DownloadSection.Versions;
 
     [RelayCommand]
     private void ShowDownloadJava() => CurrentDownloadSection = DownloadSection.Java;
-
-    [RelayCommand]
-    private void ShowDownloadSettings() => CurrentDownloadSection = DownloadSection.Settings;
 
     [RelayCommand]
     private void ShowDownloadRunning() => EnterTaskSection();
@@ -906,6 +908,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowDownloadPage() => CurrentPage = AppPage.Download;
+
+    [RelayCommand]
+    private void ShowSettingsPage() => CurrentPage = AppPage.Settings;
+
+    [RelayCommand]
+    private void ShowSettingsLaunch() => CurrentSettingsSection = SettingsSection.Launch;
+
+    [RelayCommand]
+    private void ShowSettingsDownload() => CurrentSettingsSection = SettingsSection.Download;
 
     [RelayCommand]
     private void RequestVersionDelete()

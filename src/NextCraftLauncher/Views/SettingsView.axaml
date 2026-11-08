@@ -1,0 +1,197 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NextCraftLauncher.ViewModels"
+             xmlns:java="using:NextCraftLauncher.Core.Java"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="620"
+             x:Class="NextCraftLauncher.Views.SettingsView"
+             x:DataType="vm:MainViewModel">
+
+    <Grid ColumnDefinitions="176,1,*" ColumnSpacing="16">
+
+        <!-- 左侧边栏 -->
+        <StackPanel Spacing="2" VerticalAlignment="Top" Margin="0,2,0,0">
+            <Button Classes="side"
+                    Classes.selected="{Binding IsSettingsLaunchSelected}"
+                    Content="启动设置"
+                    Command="{Binding ShowSettingsLaunchCommand}" />
+            <Button Classes="side"
+                    Classes.selected="{Binding IsSettingsDownloadSelected}"
+                    Content="下载设置"
+                    Command="{Binding ShowSettingsDownloadCommand}" />
+        </StackPanel>
+
+        <Border Grid.Column="1" Classes="vline" />
+
+        <Grid Grid.Column="2">
+
+            <!-- 启动设置 -->
+            <ScrollViewer IsVisible="{Binding IsSettingsLaunchSelected}"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16" MaxWidth="640" HorizontalAlignment="Left">
+                    <TextBlock Text="启动设置" Classes="section" />
+
+                    <Grid ColumnDefinitions="120,*"
+                          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                          ColumnSpacing="12"
+                          RowSpacing="12">
+
+                        <TextBlock Text="默认版本隔离" Classes="fieldLabel" />
+                        <ComboBox Grid.Column="1"
+                                  Classes="toolbar"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding IsolationOptions}"
+                                  SelectedIndex="{Binding SelectedIsolationIndex}" />
+
+                        <TextBlock Grid.Row="1" Text="启动器可见性" Classes="fieldLabel" />
+                        <ComboBox Grid.Row="1"
+                                  Grid.Column="1"
+                                  Classes="toolbar"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding LauncherVisibilityOptions}"
+                                  SelectedIndex="{Binding SelectedLauncherVisibilityIndex}" />
+
+                        <TextBlock Grid.Row="2" Text="进程优先级" Classes="fieldLabel" />
+                        <ComboBox Grid.Row="2"
+                                  Grid.Column="1"
+                                  Classes="toolbar"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding ProcessPriorityOptions}"
+                                  SelectedIndex="{Binding SelectedProcessPriorityIndex}" />
+
+                        <TextBlock Grid.Row="3" Text="窗口大小" Classes="fieldLabel" />
+                        <ComboBox Grid.Row="3"
+                                  Grid.Column="1"
+                                  Classes="toolbar"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding WindowSizeOptions}"
+                                  SelectedIndex="{Binding SelectedWindowSizeIndex}" />
+
+                        <TextBlock Grid.Row="4"
+                                   Text="自定义尺寸"
+                                   Classes="fieldLabel"
+                                   IsVisible="{Binding IsCustomWindowSize}" />
+                        <StackPanel Grid.Row="4"
+                                    Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    IsVisible="{Binding IsCustomWindowSize}">
+                            <NumericUpDown Value="{Binding CustomWindowWidth}"
+                                           Minimum="320"
+                                           Maximum="7680"
+                                           Increment="10"
+                                           FormatString="0"
+                                           Width="140" />
+                            <TextBlock Text="×" VerticalAlignment="Center" Opacity="0.6" />
+                            <NumericUpDown Value="{Binding CustomWindowHeight}"
+                                           Minimum="240"
+                                           Maximum="4320"
+                                           Increment="10"
+                                           FormatString="0"
+                                           Width="140" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Row="5" Text="内存 (MB)" Classes="fieldLabel" />
+                        <ComboBox Grid.Row="5"
+                                  Grid.Column="1"
+                                  Classes="toolbar"
+                                  ItemsSource="{Binding MemoryOptions}"
+                                  SelectedItem="{Binding MemoryMb}"
+                                  HorizontalAlignment="Stretch" />
+
+                        <TextBlock Grid.Row="6" Text="Java" Classes="fieldLabel" />
+                        <Grid Grid.Row="6" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <ComboBox Classes="toolbar"
+                                      ItemsSource="{Binding JavaRuntimes}"
+                                      SelectedItem="{Binding SelectedJava}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="java:JavaRuntime">
+                                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <Button Grid.Column="1" Classes="toolbar soft" Content="浏览" Click="OnBrowseJavaClick" />
+                        </Grid>
+
+                        <TextBlock Grid.Row="7" Text="运行目录" Classes="fieldLabel" />
+                        <TextBlock Grid.Row="7"
+                                   Grid.Column="1"
+                                   Text="{Binding EffectiveGameDirectory}"
+                                   FontSize="11"
+                                   Opacity="0.6"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"
+                                   ToolTip.Tip="{Binding EffectiveGameDirectory}" />
+                    </Grid>
+
+                    <Border Classes="hline" />
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="当前版本隔离" Classes="fieldLabel" />
+                        <CheckBox Content="启用（覆盖默认设置）" IsChecked="{Binding IsVersionIsolated}" />
+                        <TextBlock Text="{Binding IsolationDescription}"
+                                   Classes="meta"
+                                   FontSize="11" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 下载设置：各类列表的获取源（当前只影响显示） -->
+            <ScrollViewer IsVisible="{Binding IsSettingsDownloadSelected}"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="18" MaxWidth="620" HorizontalAlignment="Left">
+                    <TextBlock Text="下载设置" Classes="section" />
+                    <TextBlock Classes="meta"
+                               Text="游戏版本源同时用于版本清单、游戏文件与 Java 的下载；Forge / Fabric / NeoForge 源仅用于各自版本列表的获取。" />
+
+                    <Grid ColumnDefinitions="110,*"
+                          RowDefinitions="Auto,Auto,Auto,Auto"
+                          ColumnSpacing="12"
+                          RowSpacing="12">
+                        <TextBlock Text="游戏版本" Classes="fieldLabel" />
+                        <ComboBox Grid.Column="1"
+                                  Classes="toolbar"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding DownloadMirrors}"
+                                  SelectedIndex="{Binding SelectedGameMirrorIndex}" />
+
+                        <TextBlock Grid.Row="1" Text="Forge" Classes="fieldLabel" />
+                        <ComboBox Grid.Row="1" Grid.Column="1"
+                                  Classes="toolbar"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding LoaderMirrorOptions}"
+                                  SelectedIndex="{Binding SelectedForgeMirrorIndex}" />
+
+                        <TextBlock Grid.Row="2" Text="Fabric" Classes="fieldLabel" />
+                        <ComboBox Grid.Row="2" Grid.Column="1"
+                                  Classes="toolbar"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding LoaderMirrorOptions}"
+                                  SelectedIndex="{Binding SelectedFabricMirrorIndex}" />
+
+                        <TextBlock Grid.Row="3" Text="NeoForge" Classes="fieldLabel" />
+                        <ComboBox Grid.Row="3" Grid.Column="1"
+                                  Classes="toolbar"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding LoaderMirrorOptions}"
+                                  SelectedIndex="{Binding SelectedNeoForgeMirrorIndex}" />
+                    </Grid>
+
+                    <TextBlock Classes="meta"
+                               Text="游戏版本：自动 / Mojang 官方 / Mojang CDN / BMCLAPI。加载器：自动（官网立即请求、BMCLAPI 延迟对冲） / 官方（仅加载器官网） / BMCLAPI（优先镜像）。" />
+
+                    <Border Classes="hline" />
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="版本隔离" Classes="fieldLabel" />
+                        <CheckBox Content="下载后开启版本隔离（使用版本目录作为游戏目录）"
+                                  IsChecked="{Binding DownloadVersionIsolated}" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+
+</UserControl>

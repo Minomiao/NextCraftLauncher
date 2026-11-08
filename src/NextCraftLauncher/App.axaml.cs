@@ -84,8 +84,8 @@ public partial class App : Application
             return;
         }
 
-        // 下载页的首次布局与模板解析约 0.3–0.4 s。趁启动画面还在、窗口还完全透明时先跑一遍，
-        // 用户第一次点开下载页时就只剩几毫秒。启动画面是静态的，这一小段不会被察觉。
+        // 下载页、设置页的首次布局与模板解析需要几百毫秒。趁启动画面还在、窗口还完全透明时先跑一遍，
+        // 用户第一次点开这两个页面时就只剩几毫秒。启动画面是静态的，这一小段不会被察觉。
         var warmWatch = System.Diagnostics.Stopwatch.StartNew();
         window.Opacity = 0;
         window.Show();
@@ -95,12 +95,12 @@ public partial class App : Application
 
         try
         {
-            await WarmUpDownloadPageAsync(viewModel);
+            await WarmUpPagesAsync(viewModel);
         }
         catch (Exception exception)
         {
-            // 预热失败不影响启动，只是第一次打开下载页会稍慢。
-            LauncherLog.Warn($"预热下载页失败：{exception.Message}");
+            // 预热失败不影响启动，只是第一次打开这些页面会稍慢。
+            LauncherLog.Warn($"预热页面失败：{exception.Message}");
         }
         finally
         {
@@ -115,12 +115,15 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 预热下载页：切过去让它完成一次完整布局，再切回启动页。
+    /// 预热各页面：切过去让它完成一次完整布局，再切回启动页。
     /// 全程通过 Dispatcher 让出，不在调用线程上同步等待。
     /// </summary>
-    private static async Task WarmUpDownloadPageAsync(MainViewModel viewModel)
+    private static async Task WarmUpPagesAsync(MainViewModel viewModel)
     {
         viewModel.ShowDownloadPageCommand.Execute(null);
+        await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+
+        viewModel.ShowSettingsPageCommand.Execute(null);
         await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
 
         viewModel.ShowLaunchPageCommand.Execute(null);

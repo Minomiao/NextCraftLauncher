@@ -4,5 +4,4 @@ public enum LaunchSection
 {
     Start,
     Versions,
-    Settings,
 }

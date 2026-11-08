@@ -20,10 +20,6 @@
                     Classes.selected="{Binding IsVersionsSectionSelected}"
                     Content="版本"
                     Command="{Binding ShowVersionsSectionCommand}" />
-            <Button Classes="side"
-                    Classes.selected="{Binding IsSettingsSectionSelected}"
-                    Content="启动设置"
-                    Command="{Binding ShowSettingsSectionCommand}" />
         </StackPanel>
 
         <Border Grid.Column="1" Classes="vline" />
@@ -191,118 +187,6 @@
                     </Grid>
                 </Grid>
             </Grid>
-
-            <!-- 启动设置 -->
-            <ScrollViewer IsVisible="{Binding IsSettingsSectionSelected}"
-                          VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="16" MaxWidth="640" HorizontalAlignment="Left">
-                    <TextBlock Text="启动设置" Classes="section" />
-
-                    <Grid ColumnDefinitions="120,*"
-                          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
-                          ColumnSpacing="12"
-                          RowSpacing="12">
-
-                        <TextBlock Text="默认版本隔离" Classes="fieldLabel" />
-                        <ComboBox Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding IsolationOptions}"
-                                  SelectedIndex="{Binding SelectedIsolationIndex}" />
-
-                        <TextBlock Grid.Row="1" Text="启动器可见性" Classes="fieldLabel" />
-                        <ComboBox Grid.Row="1"
-                                  Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding LauncherVisibilityOptions}"
-                                  SelectedIndex="{Binding SelectedLauncherVisibilityIndex}" />
-
-                        <TextBlock Grid.Row="2" Text="进程优先级" Classes="fieldLabel" />
-                        <ComboBox Grid.Row="2"
-                                  Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding ProcessPriorityOptions}"
-                                  SelectedIndex="{Binding SelectedProcessPriorityIndex}" />
-
-                        <TextBlock Grid.Row="3" Text="窗口大小" Classes="fieldLabel" />
-                        <ComboBox Grid.Row="3"
-                                  Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding WindowSizeOptions}"
-                                  SelectedIndex="{Binding SelectedWindowSizeIndex}" />
-
-                        <TextBlock Grid.Row="4"
-                                   Text="自定义尺寸"
-                                   Classes="fieldLabel"
-                                   IsVisible="{Binding IsCustomWindowSize}" />
-                        <StackPanel Grid.Row="4"
-                                    Grid.Column="1"
-                                    Orientation="Horizontal"
-                                    Spacing="8"
-                                    IsVisible="{Binding IsCustomWindowSize}">
-                            <NumericUpDown Value="{Binding CustomWindowWidth}"
-                                           Minimum="320"
-                                           Maximum="7680"
-                                           Increment="10"
-                                           FormatString="0"
-                                           Width="140" />
-                            <TextBlock Text="×" VerticalAlignment="Center" Opacity="0.6" />
-                            <NumericUpDown Value="{Binding CustomWindowHeight}"
-                                           Minimum="240"
-                                           Maximum="4320"
-                                           Increment="10"
-                                           FormatString="0"
-                                           Width="140" />
-                        </StackPanel>
-
-                        <TextBlock Grid.Row="5" Text="内存 (MB)" Classes="fieldLabel" />
-                        <ComboBox Grid.Row="5"
-                                  Grid.Column="1"
-                                  Classes="toolbar"
-                                  ItemsSource="{Binding MemoryOptions}"
-                                  SelectedItem="{Binding MemoryMb}"
-                                  HorizontalAlignment="Stretch" />
-
-                        <TextBlock Grid.Row="6" Text="Java" Classes="fieldLabel" />
-                        <Grid Grid.Row="6" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                            <ComboBox Classes="toolbar"
-                                      ItemsSource="{Binding JavaRuntimes}"
-                                      SelectedItem="{Binding SelectedJava}"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="java:JavaRuntime">
-                                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            <Button Grid.Column="1" Classes="toolbar soft" Content="浏览" Click="OnBrowseJavaClick" />
-                        </Grid>
-
-                        <TextBlock Grid.Row="7" Text="运行目录" Classes="fieldLabel" />
-                        <TextBlock Grid.Row="7"
-                                   Grid.Column="1"
-                                   Text="{Binding EffectiveGameDirectory}"
-                                   FontSize="11"
-                                   Opacity="0.6"
-                                   TextTrimming="CharacterEllipsis"
-                                   VerticalAlignment="Center"
-                                   ToolTip.Tip="{Binding EffectiveGameDirectory}" />
-                    </Grid>
-
-                    <Border Classes="hline" />
-
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="当前版本隔离" Classes="fieldLabel" />
-                        <CheckBox Content="启用（覆盖默认设置）" IsChecked="{Binding IsVersionIsolated}" />
-                        <TextBlock Text="{Binding IsolationDescription}"
-                                   Classes="meta"
-                                   FontSize="11" />
-                    </StackPanel>
-                </StackPanel>
-            </ScrollViewer>
         </Grid>
     </Grid>
 

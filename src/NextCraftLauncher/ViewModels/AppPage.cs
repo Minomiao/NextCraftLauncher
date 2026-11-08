@@ -4,4 +4,5 @@ public enum AppPage
 {
     Launch,
     Download,
+    Settings,
 }

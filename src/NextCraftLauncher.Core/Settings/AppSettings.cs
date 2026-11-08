@@ -16,6 +16,13 @@ public sealed class AppSettings
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public DownloadMirror GameMirror { get; set; } = DownloadMirror.Automatic;
 
+    /// <summary>
+    /// CurseForge API Key。为空时 Mod 搜索只用 Modrinth（与 PCL2 开源版一致）。
+    /// 可通过环境变量 NCL_CURSEFORGE_API_KEY 提供。
+    /// </summary>
+    public string? CurseForgeApiKey { get; set; } =
+        Environment.GetEnvironmentVariable("NCL_CURSEFORGE_API_KEY");
+
     /// <summary>Forge 版本列表的获取源（仅影响显示，默认自动）。</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public DownloadMirror ForgeMirror { get; set; } = DownloadMirror.Automatic;

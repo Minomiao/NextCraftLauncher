@@ -20,6 +20,7 @@ using NextCraftLauncher.Download;
 using NextCraftLauncher.Download.Java;
 using NextCraftLauncher.Download.Loaders;
 using NextCraftLauncher.Download.Minecraft;
+using NextCraftLauncher.Download.Mods;
 
 namespace NextCraftLauncher.ViewModels;
 
@@ -49,6 +50,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         _settings = AppSettings.Load();
         _minecraftDirectory = _settings.MinecraftDirectory;
+        ModCatalog.CurseForgeApiKey = _settings.CurseForgeApiKey;
         _playerName = _settings.PlayerName;
         _memoryMb = MemoryOptions.Contains(_settings.MemoryMb) ? _settings.MemoryMb : 4096;
         _selectedGameMirrorIndex = (int)_settings.GameMirror;
@@ -530,6 +532,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public bool IsDownloadVersionsSelected => CurrentDownloadSection == DownloadSection.Versions;
 
+    public bool IsDownloadModsSelected => CurrentDownloadSection == DownloadSection.Mods;
+
     public bool IsDownloadJavaSelected => CurrentDownloadSection == DownloadSection.Java;
 
     public bool IsDownloadRunningSelected => CurrentDownloadSection == DownloadSection.Running;
@@ -671,8 +675,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     partial void OnCurrentDownloadSectionChanged(DownloadSection value)
     {
         OnPropertyChanged(nameof(IsDownloadVersionsSelected));
+        OnPropertyChanged(nameof(IsDownloadModsSelected));
         OnPropertyChanged(nameof(IsDownloadJavaSelected));
         OnPropertyChanged(nameof(IsDownloadRunningSelected));
+
+        if (value == DownloadSection.Mods)
+            UpdateModFiltersFromSelection();
 
         if (value == DownloadSection.Java)
             _ = EnsureJavaRuntimesLoadedAsync();
@@ -703,6 +711,343 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanDownloadSelectedVersion));
         OnPropertyChanged(nameof(CanManageSelectedVersion));
         OnPropertyChanged(nameof(CanDownloadSelected));
+    }
+
+    // ---- Mod 下载 ----
+
+    private CancellationTokenSource? _modSearchCts;
+    private CancellationTokenSource? _modDetailCts;
+
+    public ObservableCollection<ModProjectItemViewModel> ModProjects { get; } = new();
+
+    public ObservableCollection<ModVersionItemViewModel> ModVersions { get; } = new();
+
+    /// <summary>搜索时可选的原版版本；在打开 Mod 页时用本地版本填充。</summary>
+    public ObservableCollection<string> ModGameVersions { get; } = new();
+
+    public IReadOnlyList<string> ModSources { get; } = new[] { "全部", "CurseForge", "Modrinth" };
+
+    public IReadOnlyList<string> ModLoaderOptions { get; } = new[] { "全部", "Forge", "Fabric", "NeoForge", "Quilt" };
+
+    [ObservableProperty] private string _modSearchText = string.Empty;
+    [ObservableProperty] private int _selectedModSourceIndex;
+    [ObservableProperty] private int _selectedModGameVersionIndex;
+    [ObservableProperty] private int _selectedModLoaderIndex;
+    [ObservableProperty] private bool _isModsLoading;
+    [ObservableProperty] private string _modStatus = "输入关键字搜索 Mod";
+    [ObservableProperty] private bool _isModDetailOpen;
+    [ObservableProperty] private ModProjectItemViewModel? _selectedModProject;
+    [ObservableProperty] private string _modDetailTitle = string.Empty;
+    [ObservableProperty] private string _modDetailDescription = string.Empty;
+    [ObservableProperty] private string _modDetailStatus = string.Empty;
+
+    /// <summary>由视图提供：当前版本不兼容时让用户选择保存位置（参数：默认文件名、默认目录）。</summary>
+    public Func<string, string, Task<string?>>? ModSaveFilePicker { get; set; }
+
+    private ModPlatform? SelectedModPlatform => SelectedModSourceIndex switch
+    {
+        1 => ModPlatform.CurseForge,
+        2 => ModPlatform.Modrinth,
+        _ => null,
+    };
+
+    private string? SelectedModGameVersionFilter =>
+        SelectedModGameVersionIndex > 0 && SelectedModGameVersionIndex < ModGameVersions.Count
+            ? ModGameVersions[SelectedModGameVersionIndex]
+            : null;
+
+    private string? SelectedModLoaderFilter =>
+        SelectedModLoaderIndex > 0 && SelectedModLoaderIndex < ModLoaderOptions.Count
+            ? ModLoaderOptions[SelectedModLoaderIndex]
+            : null;
+
+    /// <summary>用本地版本填充搜索筛选，并默认跟随当前选中的版本（与 PCL2 一致）。</summary>
+    private void UpdateModFiltersFromSelection()
+    {
+        var versions = Versions
+            .Select(version => version.Summary.ClientVersion ?? version.Summary.Id)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        ModGameVersions.Clear();
+        ModGameVersions.Add("全部");
+        foreach (var value in versions)
+            ModGameVersions.Add(value);
+
+        var selected = SelectedVersion?.Summary;
+        var target = selected?.ClientVersion ?? selected?.Id;
+        var index = 0;
+        if (!string.IsNullOrWhiteSpace(target))
+        {
+            for (var i = 1; i < ModGameVersions.Count; i++)
+            {
+                if (!string.Equals(ModGameVersions[i], target, StringComparison.OrdinalIgnoreCase)) continue;
+                index = i;
+                break;
+            }
+        }
+
+        SelectedModGameVersionIndex = index;
+        SelectedModLoaderIndex = selected?.Loader switch
+        {
+            "Forge" => 1,
+            "Fabric" => 2,
+            "NeoForge" => 3,
+            "Quilt" => 4,
+            _ => 0,
+        };
+    }
+
+    [RelayCommand]
+    private async Task SearchModsAsync()
+    {
+        _modSearchCts?.Cancel();
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _modSearchCts = cts;
+
+        IsModsLoading = true;
+        ModStatus = "正在搜索…";
+        ModProjects.Clear();
+        IsModDetailOpen = false;
+
+        try
+        {
+            var page = await Task.Run(
+                () => ModCatalog.SearchAsync(
+                    SelectedModPlatform,
+                    ModSearchText.Trim(),
+                    SelectedModGameVersionFilter,
+                    SelectedModLoaderFilter,
+                    0,
+                    cts.Token),
+                cts.Token);
+
+            if (cts.IsCancellationRequested) return;
+
+            foreach (var project in page.Projects)
+                ModProjects.Add(new ModProjectItemViewModel(project, SelectModProject));
+
+            ModStatus = ModProjects.Count == 0
+                ? "没有找到 Mod"
+                : $"共 {page.Total} 个结果，显示前 {ModProjects.Count} 个";
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            ModStatus = "搜索失败：" + exception.Message;
+        }
+        finally
+        {
+            if (ReferenceEquals(_modSearchCts, cts)) IsModsLoading = false;
+        }
+    }
+
+    private void SelectModProject(ModProjectItemViewModel item)
+    {
+        SelectedModProject = item;
+        IsModDetailOpen = true;
+        ModDetailTitle = item.Name;
+        ModDetailDescription = item.Description;
+        ModVersions.Clear();
+        _ = LoadModVersionsAsync(item);
+    }
+
+    [RelayCommand]
+    private void CloseModDetail()
+    {
+        _modDetailCts?.Cancel();
+        IsModDetailOpen = false;
+        SelectedModProject = null;
+    }
+
+    private async Task LoadModVersionsAsync(ModProjectItemViewModel item)
+    {
+        _modDetailCts?.Cancel();
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _modDetailCts = cts;
+
+        ModDetailStatus = "正在获取版本列表…";
+
+        try
+        {
+            var versions = await Task.Run(
+                () => ModCatalog.GetVersionsAsync(item.Project, null, null, cts.Token),
+                cts.Token);
+
+            if (cts.IsCancellationRequested) return;
+
+            var ordered = versions
+                .OrderByDescending(version => version.Published ?? DateTimeOffset.MinValue)
+                .ToList();
+
+            var items = new List<ModVersionItemViewModel>(ordered.Count);
+            foreach (var version in ordered)
+            {
+                var vm = new ModVersionItemViewModel(version, item => _ = DownloadModVersionAsync(item));
+                if (version.Dependencies.Count > 0)
+                    vm.DependencyText = $"{version.Dependencies.Count} 项前置";
+                ModVersions.Add(vm);
+                items.Add(vm);
+            }
+
+            ModDetailStatus = items.Count == 0
+                ? "该 Mod 没有可用文件"
+                : $"共 {items.Count} 个文件";
+
+            _ = FillDependencyTextAsync(item.Project.Platform, items, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            ModDetailStatus = "获取版本失败：" + exception.Message;
+        }
+    }
+
+    /// <summary>把前置 Mod 的 ID 换成名字，仅用于展示（PCL2 也不会自动下载单个 Mod 的前置）。</summary>
+    private static async Task FillDependencyTextAsync(
+        ModPlatform platform,
+        IReadOnlyList<ModVersionItemViewModel> items,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var ids = items.SelectMany(item => item.Version.Dependencies).Distinct(StringComparer.Ordinal).ToList();
+            if (ids.Count == 0) return;
+
+            var projects = await ModCatalog.GetProjectsAsync(platform, ids, cancellationToken);
+            var names = projects.ToDictionary(project => project.Id, project => project.Name, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var item in items)
+            {
+                if (item.Version.Dependencies.Count == 0) continue;
+
+                item.DependencyText = "前置：" + string.Join("、", item.Version.Dependencies
+                    .Select(id => names.TryGetValue(id, out var name) ? name : id));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            LauncherLog.Warn($"获取前置 Mod 名称失败：{exception.Message}");
+        }
+    }
+
+    private async Task DownloadModVersionAsync(ModVersionItemViewModel item)
+    {
+        var version = item.Version;
+        var target = ResolveModTargetPath(version);
+
+        if (target is null)
+        {
+            // 当前没有兼容的版本：让用户自己选位置（等价于 PCL2 的「另存为」）。
+            if (ModSaveFilePicker is null)
+            {
+                ModDetailStatus = "当前版本不兼容，请先选择一个兼容的游戏版本";
+                return;
+            }
+
+            var defaultDirectory = Path.Combine(MinecraftDirectory, "mods");
+            target = await ModSaveFilePicker(version.FileName, defaultDirectory);
+            if (string.IsNullOrWhiteSpace(target)) return;
+        }
+
+        var task = TryCreateTask($"Mod · {item.Title}", DownloadTaskKind.Generic, $"mod:{version.Platform}:{version.Id}");
+        if (task is null) return;
+
+        task.StatusText = "正在下载…";
+        Status = $"正在下载 Mod：{item.Title}";
+        LauncherLog.Info($"下载 Mod {item.Title} → {target}");
+
+        try
+        {
+            var progress = new Progress<DownloadProgress>(report =>
+            {
+                if (report.Percent is double percent && percent > task.Percent)
+                    task.Percent = Math.Min(percent, 99);
+
+                if (report.BytesReceived > 0)
+                    task.SpeedMeter.Feed(report.BytesReceived);
+
+                task.StatusText = $"{report.BytesReceived / 1048576.0:0.0} MB";
+                NotifyDownloadStats();
+            });
+
+            await Task.Run(
+                () => DownloadClient.Shared.DownloadFileAsync(
+                    version.DownloadUrls,
+                    target,
+                    version.Sha1,
+                    version.Size > 0 ? version.Size : null,
+                    progress,
+                    task.Token),
+                task.Token);
+
+            task.Percent = 100;
+            var fileName = Path.GetFileName(target);
+            FinishTask(task, DownloadTaskState.Completed, $"已下载到 {Path.GetDirectoryName(target)}");
+            ModDetailStatus = $"已下载：{fileName}";
+            Status = $"Mod 已下载：{fileName}";
+        }
+        catch (OperationCanceledException)
+        {
+            FinishTask(task, DownloadTaskState.Canceled, "下载已取消");
+        }
+        catch (Exception exception)
+        {
+            LauncherLog.Error($"下载 Mod 失败：{version.FileName}", exception);
+            ShowDownloadError("下载 Mod", exception);
+            FinishTask(task, DownloadTaskState.Failed, "下载失败");
+        }
+    }
+
+    /// <summary>
+    /// 计算下载目标：当前选中版本兼容时直接放进它的 mods 目录（已隔离则放版本目录），
+    /// 否则返回 null，由调用方让用户选择位置。兼容性判断与 PCL2 一致：
+    /// 游戏版本匹配，且 Mod 支持当前加载器。
+    /// </summary>
+    private string? ResolveModTargetPath(ModVersion version)
+    {
+        if (SelectedVersion is not { } selected) return null;
+
+        var gameVersion = selected.Summary.ClientVersion ?? selected.Summary.Id;
+        if (version.GameVersions.Count > 0 &&
+            !version.GameVersions.Any(value => string.Equals(value, gameVersion, StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        var loaderTags = ModCatalog.LoaderTags(selected.Summary.Loader);
+        if (version.Loaders.Count > 0 &&
+            !version.Loaders.Any(loader => loaderTags.Contains(loader, StringComparer.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        var gameDirectory = IsVersionIsolated && _resolved is not null
+            ? _resolved.VersionDirectory
+            : MinecraftDirectory;
+
+        var modsDirectory = Path.Combine(gameDirectory, "mods");
+        Directory.CreateDirectory(modsDirectory);
+
+        return Path.Combine(modsDirectory, SanitizeModFileName(version.FileName));
+    }
+
+    private static string SanitizeModFileName(string fileName)
+    {
+        var name = fileName;
+        foreach (var invalid in Path.GetInvalidFileNameChars())
+            name = name.Replace(invalid, '-');
+
+        // PCL2 的做法：~ 会导致 Mixin 加载失败。
+        return name.Replace('~', '-');
     }
 
     // ---- 下载任务卡片 ----
@@ -881,6 +1226,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowDownloadVersions() => CurrentDownloadSection = DownloadSection.Versions;
+
+    [RelayCommand]
+    private void ShowDownloadMods() => CurrentDownloadSection = DownloadSection.Mods;
 
     [RelayCommand]
     private void ShowDownloadJava() => CurrentDownloadSection = DownloadSection.Java;

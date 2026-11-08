@@ -56,6 +56,10 @@
                             Content="游戏版本"
                             Command="{Binding ShowDownloadVersionsCommand}" />
                     <Button Classes="side"
+                            Classes.selected="{Binding IsDownloadModsSelected}"
+                            Content="Mod 下载"
+                            Command="{Binding ShowDownloadModsCommand}" />
+                    <Button Classes="side"
                             Classes.selected="{Binding IsDownloadJavaSelected}"
                             Content="Java 运行时"
                             Command="{Binding ShowDownloadJavaCommand}" />
@@ -314,6 +318,136 @@
                                         Padding="18,0"
                                         ToolTip.Tip="选中加载器时会与原版一起下载；同一版本只能选择一种加载器" />
                             </Grid>
+                        </Grid>
+                    </Grid>
+
+                    <!-- Mod 下载 -->
+                    <Grid RowDefinitions="Auto,*" RowSpacing="10"
+                          IsVisible="{Binding IsDownloadModsSelected}">
+
+                        <!-- 搜索结果 -->
+                        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10"
+                              IsVisible="{Binding !IsModDetailOpen}">
+
+                            <Grid ColumnDefinitions="*,110,110,96,Auto" ColumnSpacing="8">
+                                <TextBox Classes="toolbar"
+                                         Text="{Binding ModSearchText}"
+                                         PlaceholderText="搜索 Mod…"
+                                         KeyDown="OnModSearchKeyDown" />
+                                <ComboBox Grid.Column="1"
+                                          Classes="toolbar"
+                                          ItemsSource="{Binding ModSources}"
+                                          SelectedIndex="{Binding SelectedModSourceIndex}"
+                                          HorizontalAlignment="Stretch" />
+                                <ComboBox Grid.Column="2"
+                                          Classes="toolbar"
+                                          ItemsSource="{Binding ModGameVersions}"
+                                          SelectedIndex="{Binding SelectedModGameVersionIndex}"
+                                          HorizontalAlignment="Stretch" />
+                                <ComboBox Grid.Column="3"
+                                          Classes="toolbar"
+                                          ItemsSource="{Binding ModLoaderOptions}"
+                                          SelectedIndex="{Binding SelectedModLoaderIndex}"
+                                          HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="4"
+                                        Classes="toolbar soft"
+                                        Content="搜索"
+                                        Command="{Binding SearchModsCommand}"
+                                        IsEnabled="{Binding !IsModsLoading}" />
+                            </Grid>
+
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding ModStatus}"
+                                       Classes="meta" />
+
+                            <ListBox Grid.Row="2"
+                                     ItemsSource="{Binding ModProjects}"
+                                     Background="Transparent"
+                                     Padding="0,0,14,0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ModProjectItemViewModel">
+                                        <Button Background="Transparent"
+                                                BorderThickness="0"
+                                                Padding="6,4"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Left"
+                                                Command="{Binding SelectCommand}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Subtitle}"
+                                                           FontSize="11"
+                                                           Opacity="0.6" />
+                                                <TextBlock Text="{Binding Description}"
+                                                           FontSize="11"
+                                                           Opacity="0.5"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+
+                        <!-- 项目详情：版本列表 -->
+                        <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10"
+                              IsVisible="{Binding IsModDetailOpen}">
+
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                <Button Classes="soft"
+                                        Content="← 返回"
+                                        Height="30"
+                                        Padding="12,0"
+                                        Command="{Binding CloseModDetailCommand}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding ModDetailTitle}"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Grid>
+
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding ModDetailDescription}"
+                                       Classes="meta"
+                                       MaxHeight="54"
+                                       TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis" />
+
+                            <TextBlock Grid.Row="2"
+                                       Text="{Binding ModDetailStatus}"
+                                       Classes="meta" />
+
+                            <ListBox Grid.Row="3"
+                                     ItemsSource="{Binding ModVersions}"
+                                     Background="Transparent"
+                                     Padding="0,0,14,0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ModVersionItemViewModel">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Subtitle}"
+                                                           FontSize="11"
+                                                           Opacity="0.6"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding DependencyText}"
+                                                           FontSize="11"
+                                                           Opacity="0.5"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1"
+                                                    Classes="soft"
+                                                    Content="下载"
+                                                    Height="28"
+                                                    Padding="14,0"
+                                                    Command="{Binding DownloadCommand}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </Grid>
                     </Grid>
 

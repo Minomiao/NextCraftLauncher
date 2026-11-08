@@ -835,9 +835,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             foreach (var project in page.Projects)
                 ModProjects.Add(new ModProjectItemViewModel(project, SelectModProject));
 
-            ModStatus = ModProjects.Count == 0
-                ? "没有找到 Mod"
-                : $"共 {page.Total} 个结果，显示前 {ModProjects.Count} 个";
+            ModStatus = ModProjects.Count == 0 ? "没有找到 Mod" : string.Empty;
             LauncherLog.Info(
                 $"Mod 搜索：\"{ModSearchText.Trim()}\"（{SelectedModGameVersionFilter ?? "全部"} / " +
                 $"{SelectedModLoaderFilter ?? "全部"}）→ {page.Total} 个结果");

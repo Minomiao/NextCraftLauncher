@@ -53,15 +53,15 @@
                 <StackPanel Spacing="2" VerticalAlignment="Top" Margin="0,2,0,0">
                     <Button Classes="side"
                             Classes.selected="{Binding IsDownloadVersionsSelected}"
-                            Content="游戏版本"
+                            Content="游戏"
                             Command="{Binding ShowDownloadVersionsCommand}" />
                     <Button Classes="side"
                             Classes.selected="{Binding IsDownloadModsSelected}"
-                            Content="Mod 下载"
+                            Content="Mod"
                             Command="{Binding ShowDownloadModsCommand}" />
                     <Button Classes="side"
                             Classes.selected="{Binding IsDownloadJavaSelected}"
-                            Content="Java 运行时"
+                            Content="Java"
                             Command="{Binding ShowDownloadJavaCommand}" />
                 </StackPanel>
 
@@ -95,10 +95,12 @@
 
             <Border Grid.Column="1" Classes="vline" />
 
-            <Grid Grid.Column="2" RowDefinitions="Auto,*" RowSpacing="14">
+            <Grid Grid.Column="2" RowDefinitions="Auto,*">
 
-                <!-- 游戏目录 -->
+                <!-- 游戏目录：只在游戏版本页显示 -->
                 <TextBlock Text="{Binding MinecraftDirectory}"
+                           Margin="0,0,0,14"
+                           IsVisible="{Binding IsDownloadVersionsSelected}"
                            FontSize="11"
                            Opacity="0.5"
                            VerticalAlignment="Center"
@@ -322,38 +324,47 @@
                     </Grid>
 
                     <!-- Mod 下载 -->
-                    <Grid RowDefinitions="Auto,*" RowSpacing="10"
-                          IsVisible="{Binding IsDownloadModsSelected}">
+                    <Grid IsVisible="{Binding IsDownloadModsSelected}">
 
                         <!-- 搜索结果 -->
                         <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10"
                               IsVisible="{Binding !IsModDetailOpen}">
 
-                            <Grid ColumnDefinitions="*,110,110,96,Auto" ColumnSpacing="8">
-                                <TextBox Classes="toolbar"
-                                         Text="{Binding ModSearchText}"
-                                         PlaceholderText="搜索 Mod…"
-                                         KeyDown="OnModSearchKeyDown" />
-                                <ComboBox Grid.Column="1"
-                                          Classes="toolbar"
-                                          ItemsSource="{Binding ModSources}"
-                                          SelectedIndex="{Binding SelectedModSourceIndex}"
-                                          HorizontalAlignment="Stretch" />
-                                <ComboBox Grid.Column="2"
-                                          Classes="toolbar"
-                                          ItemsSource="{Binding ModGameVersions}"
-                                          SelectedIndex="{Binding SelectedModGameVersionIndex}"
-                                          HorizontalAlignment="Stretch" />
-                                <ComboBox Grid.Column="3"
-                                          Classes="toolbar"
-                                          ItemsSource="{Binding ModLoaderOptions}"
-                                          SelectedIndex="{Binding SelectedModLoaderIndex}"
-                                          HorizontalAlignment="Stretch" />
-                                <Button Grid.Column="4"
-                                        Classes="toolbar soft"
-                                        Content="搜索"
-                                        Command="{Binding SearchModsCommand}"
-                                        IsEnabled="{Binding !IsModsLoading}" />
+                            <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <TextBox Classes="toolbar"
+                                             Text="{Binding ModSearchText}"
+                                             PlaceholderText="搜索 Mod…"
+                                             KeyDown="OnModSearchKeyDown" />
+                                    <Button Grid.Column="1"
+                                            Classes="toolbar soft"
+                                            Content="搜索"
+                                            Command="{Binding SearchModsCommand}"
+                                            IsEnabled="{Binding !IsModsLoading}" />
+                                </Grid>
+
+                                <Grid Grid.Row="1"
+                                      ColumnDefinitions="Auto,*,Auto,*,Auto,*"
+                                      ColumnSpacing="8">
+                                    <TextBlock Text="来源" Classes="fieldLabel" />
+                                    <ComboBox Grid.Column="1"
+                                              Classes="toolbar"
+                                              ItemsSource="{Binding ModSources}"
+                                              SelectedIndex="{Binding SelectedModSourceIndex}"
+                                              HorizontalAlignment="Stretch" />
+                                    <TextBlock Grid.Column="2" Text="版本" Classes="fieldLabel" />
+                                    <ComboBox Grid.Column="3"
+                                              Classes="toolbar"
+                                              ItemsSource="{Binding ModGameVersions}"
+                                              SelectedIndex="{Binding SelectedModGameVersionIndex}"
+                                              HorizontalAlignment="Stretch" />
+                                    <TextBlock Grid.Column="4" Text="加载器" Classes="fieldLabel" />
+                                    <ComboBox Grid.Column="5"
+                                              Classes="toolbar"
+                                              ItemsSource="{Binding ModLoaderOptions}"
+                                              SelectedIndex="{Binding SelectedModLoaderIndex}"
+                                              HorizontalAlignment="Stretch" />
+                                </Grid>
                             </Grid>
 
                             <TextBlock Grid.Row="1"
@@ -361,16 +372,13 @@
                                        Classes="meta" />
 
                             <ListBox Grid.Row="2"
+                                     Classes="versionList"
                                      ItemsSource="{Binding ModProjects}"
                                      Background="Transparent"
                                      Padding="0,0,14,0">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:ModProjectItemViewModel">
-                                        <Button Background="Transparent"
-                                                BorderThickness="0"
-                                                Padding="6,4"
-                                                HorizontalAlignment="Stretch"
-                                                HorizontalContentAlignment="Left"
+                                        <Button Classes="versionRow"
                                                 Command="{Binding SelectCommand}">
                                             <StackPanel Spacing="2">
                                                 <TextBlock Text="{Binding Name}"
@@ -420,6 +428,7 @@
                                        Classes="meta" />
 
                             <ListBox Grid.Row="3"
+                                     Classes="versionList"
                                      ItemsSource="{Binding ModVersions}"
                                      Background="Transparent"
                                      Padding="0,0,14,0">

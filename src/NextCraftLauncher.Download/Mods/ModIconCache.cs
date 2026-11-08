@@ -12,11 +12,11 @@ namespace NextCraftLauncher.Download.Mods;
 /// NCL/cache/mods/icons/curseforge/238222-9a8b7c6d.webp
 /// </code>
 /// 同一工程换了图标链接会生成新文件，旧文件在下次下载成功时清掉。
-/// 缓存 7 天（与 PCL2 的 MyImage 一致），过期后在后台重新拉取。
+/// 缓存 14 天后在后台重新拉取。
 /// </summary>
 public static class ModIconCache
 {
-    public static readonly TimeSpan Freshness = TimeSpan.FromDays(7);
+    public static readonly TimeSpan Freshness = TimeSpan.FromDays(14);
 
     private const long MaxSize = 4 * 1024 * 1024;
     private const int MaxConcurrentDownloads = 4;

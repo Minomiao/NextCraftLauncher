@@ -7,8 +7,8 @@ namespace NextCraftLauncher.Download.Mods;
 
 /// <summary>
 /// Mod 资源搜索与版本查询（Modrinth / CurseForge）。
-/// 与 PCL2 一致：两个平台分别查询后合并；CurseForge 需要 API Key，
-/// Modrinth 不需要。请求失败时自动改走 MCIMirror。
+/// 两个平台分别查询后合并；CurseForge 需要 API Key，Modrinth 不需要。
+/// 官方源与镜像赛跑，取先成功的一方，并记住较快的源。
 /// </summary>
 public static class ModCatalog
 {
@@ -484,38 +484,80 @@ public static class ModCatalog
         return result;
     }
 
-    // ------------------------------------------------------------ 工具
+    // ------------------------------------------------------------ 请求
+
+    /// <summary>首个源的等待时间。</summary>
+    private static readonly TimeSpan FirstAttemptTimeout = TimeSpan.FromSeconds(12);
+
+    private static readonly TimeSpan SecondAttemptTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>首个源迟迟不回应时，等这么久就让另一个源一起抢。</summary>
+    private static readonly TimeSpan HedgeDelay = TimeSpan.FromSeconds(2.5);
+
+    /// <summary>上次成功的源；下次优先尝试它，避免每次都先等一次慢源。</summary>
+    private static volatile bool _preferMirror;
 
     /// <summary>
-    /// 与 PCL2 的 <c>DlModRequest</c> 一致：官方源与镜像交替重试，每次尝试单独设超时，
-    /// 一个源卡住不会拖住整个搜索。
+    /// 官方源与镜像赛跑：先问上次成功的那个，2.5 秒内没回应就同时问另一个，
+    /// 谁先成功用谁；成功的源会被记住。比固定顺序重试少一次超时等待。
     /// </summary>
     private static async Task<JsonDocument> GetJsonAsync(
         string url,
         CancellationToken cancellationToken,
         string? apiKey = null)
     {
-        Exception? lastError = null;
-
-        foreach (var (candidate, timeoutSeconds) in ModDownloadUrlResolver.BuildApiAttempts(url))
+        var mirror = ModDownloadUrlResolver.ToMirror(url);
+        if (string.Equals(mirror, url, StringComparison.OrdinalIgnoreCase))
         {
-            using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            attempt.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+            var (direct, _) = await FetchJsonAsync(url, SecondAttemptTimeout, apiKey, cancellationToken);
+            return direct;
+        }
+
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        var preferred = _preferMirror ? mirror : url;
+        var fallback = _preferMirror ? url : mirror;
+
+        var first = FetchJsonAsync(preferred, FirstAttemptTimeout, apiKey, linked.Token);
+        var firstOrDelay = await Task.WhenAny(first, Task.Delay(HedgeDelay, cancellationToken));
+
+        if (firstOrDelay == first)
+        {
+            try
+            {
+                var (document, _) = await first;
+                RememberSource(preferred);
+                linked.Cancel();
+                return document;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // 首选源失败，立即换另一个。
+            }
+        }
+
+        // 首选源还没回来或已经失败：另一个源也开跑，两个一起等。
+        var pending = new List<Task<(JsonDocument Document, string Url)>>();
+        if (!first.IsCompleted) pending.Add(first);
+        pending.Add(FetchJsonAsync(fallback, SecondAttemptTimeout, apiKey, linked.Token));
+
+        Exception? lastError = null;
+        while (pending.Count > 0)
+        {
+            var finished = await Task.WhenAny(pending);
+            pending.Remove(finished);
 
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, candidate);
-                if (!string.IsNullOrWhiteSpace(apiKey))
-                    request.Headers.TryAddWithoutValidation("x-api-key", apiKey);
-
-                using var response = await Http.SendAsync(request, attempt.Token);
-                if (response.StatusCode == HttpStatusCode.NotFound)
-                    return JsonDocument.Parse("{}");
-
-                response.EnsureSuccessStatusCode();
-
-                await using var stream = await response.Content.ReadAsStreamAsync(attempt.Token);
-                return await JsonDocument.ParseAsync(stream, cancellationToken: attempt.Token);
+                var (document, source) = await finished;
+                RememberSource(source);
+                linked.Cancel();
+                ObserveFaults(pending);
+                return document;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -523,12 +565,50 @@ public static class ModCatalog
             }
             catch (Exception exception)
             {
-                // 单次尝试超时或失败，换下一个地址继续。
                 lastError = exception;
             }
         }
 
         throw new IOException($"请求 {url} 失败：{lastError?.Message}", lastError);
+    }
+
+    private static async Task<(JsonDocument Document, string Url)> FetchJsonAsync(
+        string url,
+        TimeSpan timeout,
+        string? apiKey,
+        CancellationToken cancellationToken)
+    {
+        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        attempt.CancelAfter(timeout);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (!string.IsNullOrWhiteSpace(apiKey))
+            request.Headers.TryAddWithoutValidation("x-api-key", apiKey);
+
+        using var response = await Http.SendAsync(request, attempt.Token);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return (JsonDocument.Parse("{}"), url);
+
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(attempt.Token);
+        return (await JsonDocument.ParseAsync(stream, cancellationToken: attempt.Token), url);
+    }
+
+    private static void RememberSource(string url)
+        => _preferMirror = ModDownloadUrlResolver.IsMirror(url);
+
+    /// <summary>取消落败的请求后观察它的异常，避免未观察任务异常。</summary>
+    private static void ObserveFaults(IEnumerable<Task> tasks)
+    {
+        foreach (var task in tasks)
+        {
+            _ = task.ContinueWith(
+                static finished => _ = finished.Exception,
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
     }
 
     private static bool TryGetCached<T>(
@@ -652,10 +732,10 @@ public static class ModCatalog
     }
 }
 
-/// <summary>Mod 下载地址与 API 的镜像处理（与 PCL2 的 DlSourceModGet 一致）。</summary>
+/// <summary>Mod 下载地址与 API 的镜像处理。</summary>
 public static class ModDownloadUrlResolver
 {
-    private const string Mirror = "https://mod.mcimirror.top";
+    public const string MirrorRoot = "https://mod.mcimirror.top";
 
     public static IReadOnlyList<string> Build(string url)
     {
@@ -665,33 +745,15 @@ public static class ModDownloadUrlResolver
             : new[] { mirror, url };
     }
 
-    /// <summary>
-    /// API 请求的尝试顺序与单次超时（秒），与 PCL2 的 <c>DlModRequest</c> 一致：
-    /// 官方源 → 镜像 → 官方源 → 镜像。
-    /// </summary>
-    public static IReadOnlyList<(string Url, int TimeoutSeconds)> BuildApiAttempts(string url)
-    {
-        var mirror = ToMirror(url);
-        if (string.Equals(mirror, url, StringComparison.OrdinalIgnoreCase))
-            return new[] { (url, 30) };
-
-        // Modrinth 的官方接口本身就慢，首次给它多一点的余量（PCL2 也是 20s）。
-        var firstTimeout = url.Contains("api.modrinth.com", StringComparison.OrdinalIgnoreCase) ? 20 : 10;
-        return new[]
-        {
-            (url, firstTimeout),
-            (mirror, 10),
-            (url, 30),
-            (mirror, 30),
-        };
-    }
+    public static bool IsMirror(string url)
+        => url.StartsWith(MirrorRoot, StringComparison.OrdinalIgnoreCase);
 
     public static string ToMirror(string url)
         => url
-            .Replace("https://api.modrinth.com", Mirror + "/modrinth", StringComparison.OrdinalIgnoreCase)
-            .Replace("https://cdn.modrinth.com", Mirror, StringComparison.OrdinalIgnoreCase)
-            .Replace("https://api.curseforge.com", Mirror + "/curseforge", StringComparison.OrdinalIgnoreCase)
-            .Replace("https://edge.forgecdn.net", Mirror, StringComparison.OrdinalIgnoreCase)
-            .Replace("https://mediafilez.forgecdn.net", Mirror, StringComparison.OrdinalIgnoreCase)
-            .Replace("https://media.forgecdn.net", Mirror, StringComparison.OrdinalIgnoreCase);
+            .Replace("https://api.modrinth.com", MirrorRoot + "/modrinth", StringComparison.OrdinalIgnoreCase)
+            .Replace("https://cdn.modrinth.com", MirrorRoot, StringComparison.OrdinalIgnoreCase)
+            .Replace("https://api.curseforge.com", MirrorRoot + "/curseforge", StringComparison.OrdinalIgnoreCase)
+            .Replace("https://edge.forgecdn.net", MirrorRoot, StringComparison.OrdinalIgnoreCase)
+            .Replace("https://mediafilez.forgecdn.net", MirrorRoot, StringComparison.OrdinalIgnoreCase)
+            .Replace("https://media.forgecdn.net", MirrorRoot, StringComparison.OrdinalIgnoreCase);
 }

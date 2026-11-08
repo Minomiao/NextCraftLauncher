@@ -7,6 +7,7 @@ namespace NextCraftLauncher.Core.Minecraft;
 public enum VersionIsolationSource
 {
     None,
+    NclVersionConfig,
     PclVersionConfig,
     HmclVersionConfig,
     FolderLayout,
@@ -17,6 +18,7 @@ public sealed record VersionIsolation(bool IsIsolated, VersionIsolationSource So
 {
     public string Description => Source switch
     {
+        VersionIsolationSource.NclVersionConfig => IsIsolated ? "开启（版本设置）" : "关闭（版本设置）",
         VersionIsolationSource.PclVersionConfig => IsIsolated ? "开启（版本设置）" : "关闭（版本设置）",
         VersionIsolationSource.HmclVersionConfig => IsIsolated ? "开启（HMCL 版本设置）" : "关闭（HMCL 版本设置）",
         VersionIsolationSource.FolderLayout => "开启（版本目录内已有 Mod / 存档）",
@@ -26,19 +28,28 @@ public sealed record VersionIsolation(bool IsIsolated, VersionIsolationSource So
 }
 
 /// <summary>
-/// 判断某个版本是否隔离，行为与 PCL2 的 <c>McInstance.PathIndie</c> 一致：
+/// 判断某个版本是否隔离。
+/// <para/>
+/// 判定顺序：
 /// <list type="number">
-/// <item>版本目录的 <c>PCL/Setup.ini</c> 已有 <c>VersionArgumentIndieV2</c> 时直接采用；</item>
-/// <item>否则迁移老的 <c>VersionArgumentIndie</c>（1 开 / 2 关）；</item>
-/// <item>否则兼容 HMCL 的 <c>hmclversion.cfg</c>；</item>
-/// <item>否则版本目录里已有 mods 文件或 saves 存档时开启；</item>
+/// <item>版本目录的 <c>NCL/Setup.ini</c>（本启动器自己的配置）；</item>
+/// <item>版本目录的 <c>PCL/Setup.ini</c> 的 <c>VersionArgumentIndieV2</c>（兼容 PCL2）；</item>
+/// <item>迁移 PCL2 的老键 <c>VersionArgumentIndie</c>（1 开 / 2 关）；</item>
+/// <item>兼容 HMCL 的 <c>hmclversion.cfg</c>；</item>
+/// <item>版本目录里已有 mods 文件或 saves 存档时开启；</item>
 /// <item>否则按下载设置里的全局策略（结合是否可装 Mod、是否正式版）计算。</item>
 /// </list>
-/// 与 PCL2 一样，判定结果会写回该版本的 <c>PCL/Setup.ini</c>，之后这个版本就固定使用该值；
-/// 想让它重新跟随全局策略，删掉这一项即可（PCL2 的「初始化版本独立设置」也是这么做的）。
+/// <para/>
+/// 判定结果会**同时**写入 <c>NCL/Setup.ini</c> 与 <c>PCL/Setup.ini</c>：
+/// 前者是我们自己的状态，后者保证与 PCL2 的行为一致。
+/// 两边都有值但不一致时，以修改时间较新的文件为准，再把另一个写成相同值。
 /// </summary>
 public static class VersionIsolationDetector
 {
+    private const string IsolationKey = "VersionArgumentIndieV2";
+
+    private const string LegacyIsolationKey = "VersionArgumentIndie";
+
     public static VersionIsolation Detect(
         string minecraftDirectory,
         string versionId,
@@ -47,14 +58,28 @@ public static class VersionIsolationDetector
         DefaultIsolationMode defaultMode = DefaultIsolationMode.All)
     {
         var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionId);
-        var versionIni = IniFile.Read(Path.Combine(versionDirectory, "PCL", "Setup.ini"));
+        var nclPath = Path.Combine(versionDirectory, "NCL", "Setup.ini");
+        var pclPath = Path.Combine(versionDirectory, "PCL", "Setup.ini");
 
-        // 1. 版本级设置（PCL2 写入的 PCL/Setup.ini）
-        if (versionIni.GetBool("VersionArgumentIndieV2") is bool versionV2)
-            return new VersionIsolation(versionV2, VersionIsolationSource.PclVersionConfig);
+        var nclIni = IniFile.Read(nclPath);
+        var pclIni = IniFile.Read(pclPath);
 
-        // 2. 老版本的版本级设置：-1 未决定，0 使用全局，1 手动开启，2 手动关闭。
-        if (versionIni.GetInt("VersionArgumentIndie") is int legacy && legacy > 0)
+        // 1. 自己的版本级设置；与 PCL 并存时按修改时间取新的一份。
+        bool? own = nclIni.GetBool(IsolationKey);
+        bool? fromPcl = pclIni.GetBool(IsolationKey);
+
+        if (own is not null || fromPcl is not null)
+        {
+            var (isolated, fromOwn) = Resolve(own, fromPcl, nclPath, pclPath);
+            Persist(versionDirectory, isolated);
+
+            return new VersionIsolation(
+                isolated,
+                fromOwn ? VersionIsolationSource.NclVersionConfig : VersionIsolationSource.PclVersionConfig);
+        }
+
+        // 2. PCL2 的老键：-1 未决定，0 使用全局，1 手动开启，2 手动关闭。
+        if (pclIni.GetInt(LegacyIsolationKey) is int legacy && legacy > 0)
         {
             var migrated = legacy == 1;
             Persist(versionDirectory, migrated);
@@ -80,7 +105,7 @@ public static class VersionIsolationDetector
                         !string.Equals(effectiveType, "old_beta", StringComparison.OrdinalIgnoreCase) &&
                         !string.Equals(effectiveType, "old_alpha", StringComparison.OrdinalIgnoreCase);
 
-        var isolated = defaultMode switch
+        var result = defaultMode switch
         {
             DefaultIsolationMode.Off => false,
             DefaultIsolationMode.Moddable => modable,
@@ -89,21 +114,42 @@ public static class VersionIsolationDetector
             _ => true,
         };
 
-        Persist(versionDirectory, isolated);
-        return new VersionIsolation(isolated, VersionIsolationSource.LauncherDefault);
+        Persist(versionDirectory, result);
+        return new VersionIsolation(result, VersionIsolationSource.LauncherDefault);
     }
 
-    /// <summary>
-    /// 与 PCL2 一致：判定结果写回版本级配置，之后这个版本不再跟随全局策略。
-    /// </summary>
+    /// <summary>两边都有值且不一致时，用较新的文件；只一边有值就用它。</summary>
+    private static (bool Isolated, bool FromOwn) Resolve(bool? own, bool? fromPcl, string ownPath, string pclPath)
+    {
+        if (own is null) return (fromPcl!.Value, false);
+        if (fromPcl is null) return (own.Value, true);
+        if (own.Value == fromPcl.Value) return (own.Value, true);
+
+        try
+        {
+            return File.GetLastWriteTimeUtc(pclPath) > File.GetLastWriteTimeUtc(ownPath)
+                ? (fromPcl.Value, false)
+                : (own.Value, true);
+        }
+        catch (IOException)
+        {
+            return (own.Value, true);
+        }
+    }
+
+    /// <summary>把判定结果同时写进 NCL 与 PCL 两个配置；值已一致时不重复写盘。</summary>
     private static void Persist(string versionDirectory, bool isolated)
     {
         if (!Directory.Exists(versionDirectory)) return;
 
-        IniFile.SetValue(
-            Path.Combine(versionDirectory, "PCL", "Setup.ini"),
-            "VersionArgumentIndieV2",
-            isolated ? "True" : "False");
+        Write(Path.Combine(versionDirectory, "NCL", "Setup.ini"), isolated);
+        Write(Path.Combine(versionDirectory, "PCL", "Setup.ini"), isolated);
+    }
+
+    private static void Write(string path, bool isolated)
+    {
+        if (IniFile.Read(path).GetBool(IsolationKey) == isolated) return;
+        IniFile.SetValue(path, IsolationKey, isolated ? "True" : "False");
     }
 
     private static bool? ReadHmclIsolation(string path)
@@ -153,9 +199,7 @@ public static class VersionIsolationDetector
         }
     }
 
-    /// <summary>
-    /// 与 PCL2 一致：mods 目录下存在文件，或 saves 目录下存在子目录。
-    /// </summary>
+    /// <summary>mods 目录下存在文件，或 saves 目录下存在子目录。</summary>
     private static bool HasIsolationMarkers(string versionDirectory)
     {
         try

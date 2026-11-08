@@ -89,8 +89,10 @@ public static class VersionScanner
             return info.InheritsFrom.Trim();
         }
 
-        var cached = IniFile.Read(Path.Combine(versionDirectory, "PCL", "Setup.ini"))
-            .GetString("VersionVanillaName");
+        var cached = IniFile.Read(Path.Combine(versionDirectory, "NCL", "Setup.ini"))
+                         .GetString("VersionVanillaName")
+                     ?? IniFile.Read(Path.Combine(versionDirectory, "PCL", "Setup.ini"))
+                         .GetString("VersionVanillaName");
         if (!string.IsNullOrWhiteSpace(cached) &&
             !string.Equals(cached.Trim(), "Unknown", StringComparison.OrdinalIgnoreCase))
         {

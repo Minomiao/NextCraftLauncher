@@ -88,8 +88,7 @@ public sealed record MinecraftVersionDownloadResult(
     string VersionId,
     string VersionDirectory,
     int TotalFiles,
-    long TotalBytes,
-    bool Isolated);
+    long TotalBytes);
 
 /// <summary>
 /// 下载一个完整的 Mojang 游戏版本：版本 JSON、客户端 jar、依赖库、natives、
@@ -113,7 +112,6 @@ public static class MinecraftVersionDownloader
     public static async Task<MinecraftVersionDownloadResult> DownloadAsync(
         string minecraftDirectory,
         MinecraftVersionEntry entry,
-        bool isolate,
         IProgress<MinecraftVersionDownloadProgress>? progress = null,
         MinecraftVersionDownloadOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -514,18 +512,13 @@ public static class MinecraftVersionDownloader
 
         ReportProgress("版本 JSON", force: true);
 
-        // 6. 版本隔离设置（PCL2 兼容格式）
-        IniFile.SetValue(
-            Path.Combine(versionDirectory, "PCL", "Setup.ini"),
-            "VersionArgumentIndieV2",
-            isolate ? "True" : "False");
-
+        // 隔离方式不在下载时写盘：统一由启动设置里的「版本隔离」决定，
+        // 已有的版本级配置（PCL2 / HMCL）仍然优先。
         return new MinecraftVersionDownloadResult(
             versionId,
             versionDirectory,
             totalFiles,
-            totalBytes,
-            isolate);
+            totalBytes);
     }
 
     private static string? DeriveMavenPath(string? name)

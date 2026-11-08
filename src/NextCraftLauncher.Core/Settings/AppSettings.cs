@@ -12,9 +12,6 @@ public sealed class AppSettings
     public string PlayerName { get; set; } = "Player";
     public int MemoryMb { get; set; } = 4096;
 
-    /// <summary>下载原版时是否开启版本隔离。</summary>
-    public bool DownloadVersionIsolated { get; set; } = true;
-
     /// <summary>游戏版本列表 / 清单的获取源，同时用于游戏文件与 Java 下载（默认自动）。</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public DownloadMirror GameMirror { get; set; } = DownloadMirror.Automatic;

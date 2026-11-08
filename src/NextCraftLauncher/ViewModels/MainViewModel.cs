@@ -55,7 +55,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _selectedForgeMirrorIndex = LoaderMirrorIndexFrom(_settings.ForgeMirror);
         _selectedFabricMirrorIndex = LoaderMirrorIndexFrom(_settings.FabricMirror);
         _selectedNeoForgeMirrorIndex = LoaderMirrorIndexFrom(_settings.NeoForgeMirror);
-        _downloadVersionIsolated = _settings.DownloadVersionIsolated;
         _selectedIsolationIndex = (int)_settings.DefaultIsolation;
         _selectedLauncherVisibilityIndex = (int)_settings.LauncherVisibility;
         _selectedProcessPriorityIndex = (int)_settings.GameProcessPriority;
@@ -373,7 +372,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isRemoteVersionsLoading;
     [ObservableProperty] private RemoteVersionItemViewModel? _selectedRemoteVersion;
     [ObservableProperty] private bool _isRemoteVersionDetailOpen;
-    [ObservableProperty] private bool _downloadVersionIsolated = true;
 
     // ---- 启动设置（与 PCL2 的「启动选项」对应） ----
     [ObservableProperty] private int _selectedIsolationIndex;
@@ -1002,6 +1000,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnIsVersionIsolatedChanged(bool value) => OnPropertyChanged(nameof(EffectiveGameDirectory));
 
+    partial void OnSelectedIsolationIndexChanged(int value)
+    {
+        var mode = value is >= 0 and <= 4 ? (DefaultIsolationMode)value : DefaultIsolationMode.All;
+        if (_settings.DefaultIsolation == mode) return;
+
+        _settings.DefaultIsolation = mode;
+        _settings.Save();
+
+        // 重新解析当前版本，让隔离方式立即按新默认值生效。
+        if (SelectedVersion is not null)
+            _ = LoadDetailsAsync(SelectedVersion);
+    }
+
     partial void OnMinecraftDirectoryChanged(string value)
     {
         _settings.MinecraftDirectory = value;
@@ -1085,12 +1096,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _settings.Save();
     }
 
-    partial void OnDownloadVersionIsolatedChanged(bool value)
-    {
-        _settings.DownloadVersionIsolated = value;
-        _settings.Save();
-    }
-
     partial void OnSelectedGameMirrorIndexChanged(int value)
     {
         if (value is < 0 or > 3) return;
@@ -1133,19 +1138,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         apply(mirror);
         _settings.Save();
         _loaderMirrorDirty = true;
-    }
-
-    partial void OnSelectedIsolationIndexChanged(int value)
-    {
-        var mode = value is >= 0 and <= 4 ? (DefaultIsolationMode)value : DefaultIsolationMode.All;
-        if (_settings.DefaultIsolation == mode) return;
-
-        _settings.DefaultIsolation = mode;
-        _settings.Save();
-
-        // 重新解析当前版本，让隔离方式立即按新默认值生效。
-        if (SelectedVersion is not null)
-            _ = LoadDetailsAsync(SelectedVersion);
     }
 
     partial void OnSelectedLauncherVisibilityIndexChanged(int value)
@@ -1371,7 +1363,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (result.Isolated is bool isolated)
         {
-            IsVersionIsolated = isolated;
+            SelectedIsolationIndex = isolated ? (int)DefaultIsolationMode.All : (int)DefaultIsolationMode.Off;
             applied.Add(isolated ? "版本隔离开" : "版本隔离关");
         }
 
@@ -2217,7 +2209,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 () => MinecraftVersionDownloader.DownloadAsync(
                     MinecraftDirectory,
                     item.Entry,
-                    DownloadVersionIsolated,
                     progress,
                     new MinecraftVersionDownloadOptions
                     {
@@ -2367,7 +2358,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 () => MinecraftVersionDownloader.DownloadAsync(
                     MinecraftDirectory,
                     item.Entry,
-                    DownloadVersionIsolated,
                     vanillaProgress,
                     new MinecraftVersionDownloadOptions
                     {
@@ -2479,7 +2469,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     new LoaderInstallOptions
                     {
                         FabricApiVersion = _selectedFabricApiVersion,
-                        IsolateVersion = DownloadVersionIsolated,
+                        IsolateVersion = VersionIsolationDetector.Detect(
+                            MinecraftDirectory,
+                            desiredName,
+                            item.Entry.Type,
+                            modable: true,
+                            _settings.DefaultIsolation).IsIsolated,
                         Mirror = ResolveLoaderMirror(loader),
                         JavaPath = javaPath,
                         VersionName = desiredName,

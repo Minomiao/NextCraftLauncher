@@ -37,7 +37,7 @@
                           ColumnSpacing="12"
                           RowSpacing="12">
 
-                        <TextBlock Text="默认版本隔离" Classes="fieldLabel" />
+                        <TextBlock Text="版本隔离" Classes="fieldLabel" />
                         <ComboBox Grid.Column="1"
                                   Classes="toolbar"
                                   HorizontalAlignment="Stretch"
@@ -129,8 +129,7 @@
                     <Border Classes="hline" />
 
                     <StackPanel Spacing="6">
-                        <TextBlock Text="当前版本隔离" Classes="fieldLabel" />
-                        <CheckBox Content="启用（覆盖默认设置）" IsChecked="{Binding IsVersionIsolated}" />
+                        <TextBlock Text="当前版本的生效结果" Classes="fieldLabel" />
                         <TextBlock Text="{Binding IsolationDescription}"
                                    Classes="meta"
                                    FontSize="11" />
@@ -181,14 +180,6 @@
 
                     <TextBlock Classes="meta"
                                Text="游戏版本：自动 / Mojang 官方 / Mojang CDN / BMCLAPI。加载器：自动（官网立即请求、BMCLAPI 延迟对冲） / 官方（仅加载器官网） / BMCLAPI（优先镜像）。" />
-
-                    <Border Classes="hline" />
-
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="版本隔离" Classes="fieldLabel" />
-                        <CheckBox Content="下载后开启版本隔离（使用版本目录作为游戏目录）"
-                                  IsChecked="{Binding DownloadVersionIsolated}" />
-                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

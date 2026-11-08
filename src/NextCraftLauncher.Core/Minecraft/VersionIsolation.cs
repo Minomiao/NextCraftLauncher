@@ -29,7 +29,7 @@ public sealed record VersionIsolation(bool IsIsolated, VersionIsolationSource So
 
 /// <summary>
 /// 按优先级判断版本隔离：版本级 PCL2 / HMCL 配置 → 目录特征（mods 有文件 / saves 有子目录）
-/// → 启动器的「默认版本隔离」策略。隔离后游戏目录为 versions/&lt;id&gt;。
+/// → 启动器的「版本隔离」策略。隔离后游戏目录为 versions/&lt;id&gt;。
 /// </summary>
 public static class VersionIsolationDetector
 {

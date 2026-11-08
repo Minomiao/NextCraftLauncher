@@ -760,15 +760,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public bool ShowModPager => ModTotalPages > 1;
 
-    public bool CanGoPreviousModPage => !IsModsLoading && ModPage > 1;
+    public bool CanGoPreviousModPage => ModPage > 1;
 
-    public bool CanGoNextModPage => !IsModsLoading && ModPage < ModTotalPages;
+    public bool CanGoNextModPage => ModPage < ModTotalPages;
 
     partial void OnModPageChanged(int value) => RaiseModPagerState();
 
     partial void OnModTotalPagesChanged(int value) => RaiseModPagerState();
-
-    partial void OnIsModsLoadingChanged(bool value) => RaiseModPagerState();
 
     private void RaiseModPagerState()
     {

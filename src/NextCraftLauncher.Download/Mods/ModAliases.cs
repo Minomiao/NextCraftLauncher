@@ -66,7 +66,7 @@ public static class ModAliases
         return bestScore >= 50 ? best : null;
     }
 
-    private static int Score(string alias, string query)
+    internal static int Score(string alias, string query)
     {
         if (string.Equals(alias, query, StringComparison.Ordinal)) return 100;
 
@@ -83,7 +83,7 @@ public static class ModAliases
     }
 
     /// <summary>统一小写并去掉所有空白，中文输入法常带全角空格。</summary>
-    private static string Normalize(string? value)
+    internal static string Normalize(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return string.Empty;
 

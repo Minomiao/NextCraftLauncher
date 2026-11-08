@@ -76,9 +76,10 @@ public static class ModCatalog
         var searchQuery = rawQuery;
         if (ModAliases.ContainsChinese(rawQuery))
         {
-            // 接口不支持中文全文检索，先查自己的别名表换成英文关键词；
-            // 没有收录时保留原词，至少不会比不翻译更差。
-            var translated = ModAliases.Resolve(rawQuery);
+            // 接口不支持中文全文检索：先查内置别名表，再查 MC百科，都没有就保留原词。
+            var translated = ModAliases.Resolve(rawQuery) ??
+                             await ModAliasOnline.ResolveAsync(rawQuery, cancellationToken);
+
             if (!string.IsNullOrWhiteSpace(translated))
             {
                 searchQuery = translated;

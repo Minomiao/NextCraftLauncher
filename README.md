@@ -22,6 +22,7 @@
 - `NCL\log\`：运行日志，按天分文件，保留 7 天
 - `NCL\cache\`：可重建的缓存，包括版本清单、加载器版本列表、Forge 安装器等
   - `NCL\cache\mods\icons\<平台>\<工程 ID>-<链接哈希>.<扩展名>`：Mod 图标
+  - `NCL\cache\mods\aliases.json`：中文名查询结果
 
 ## 参考
 
@@ -29,5 +30,7 @@
 交互与实现思路，包括资源下载页的分区方式、下载源之间切换与超时的策略，
 以及 Mod 搜索与图标的加载流程。
 
-本项目为独立实现，不包含 PCL 的代码或数据文件；中文搜索使用自己的别名表
-`src/NextCraftLauncher.Download/Mods/Data/ModAliases.txt`。
+本项目为独立实现，不包含 PCL 的代码或数据文件。中文搜索优先使用自己的别名表
+`src/NextCraftLauncher.Download/Mods/Data/ModAliases.txt`，未收录时查询
+[MC百科](https://www.mcmod.cn/) 的搜索结果取得英文名，结果缓存在
+`NCL\cache\mods\aliases.json`。MC百科内容以 BY-NC-SA 3.0 协议提供。

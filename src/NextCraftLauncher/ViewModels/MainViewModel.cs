@@ -111,6 +111,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _ = PrefetchRemoteVersionsAsync();
         _ = Task.Run(RunLoaderPrefetcherAsync);
 
+        // 与远程版本清单同时开始预取默认的 Mod 列表，打开下载页时直接有内容。
+        _ = PrefetchModsAsync();
+
         // Fabric API 的版本表很小（约 48 KB），启动时后台拉一次；之后各游戏版本的列表都在本地过滤。
         var fabricMirror = ResolveLoaderMirror("fabric");
         _ = Task.Run(() => LoaderVersionCatalog.PrimeFabricApiAsync(fabricMirror, _lifetime.Token));
@@ -143,6 +146,26 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch (Exception)
         {
             // 后台预取失败不影响正常使用，下次启动会继续。
+        }
+    }
+
+    /// <summary>启动时按当前选中的版本预取第一页 Mod（优先读缓存）。</summary>
+    private async Task PrefetchModsAsync()
+    {
+        if (_modPageInitialized) return;
+        _modPageInitialized = true;
+
+        try
+        {
+            UpdateModFiltersFromSelection();
+            await FetchModPageAsync(1, newSearch: true, ignoreCache: false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            LauncherLog.Warn($"预取 Mod 列表失败：{exception.Message}");
         }
     }
 
@@ -679,12 +702,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsDownloadJavaSelected));
         OnPropertyChanged(nameof(IsDownloadRunningSelected));
 
-        if (value == DownloadSection.Mods && !_modPageInitialized)
+        if (value == DownloadSection.Mods)
         {
-            // 第一次进 Mod 页时按当前版本设置筛选并直接列出结果（优先用缓存）。
-            _modPageInitialized = true;
-            UpdateModFiltersFromSelection();
-            _ = ShowModsAsync();
+            if (!_modPageInitialized)
+            {
+                // 没预取过（例如启动时预取被取消）：进页面时补一次。
+                _modPageInitialized = true;
+                UpdateModFiltersFromSelection();
+                _ = ShowModsAsync();
+            }
+            else if (ModProjects.Count == 0 && !IsModsLoading)
+            {
+                // 预取失败时列表为空，进页面再试一次（优先用缓存）。
+                _ = ShowModsAsync();
+            }
         }
 
         if (value == DownloadSection.Java)

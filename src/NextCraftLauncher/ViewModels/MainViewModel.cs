@@ -928,6 +928,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             ModStatus = ModProjects.Count == 0 ? "没有找到 Mod" : string.Empty;
 
+            // 后台静默把后续页面和每个工程的文件列表准备好（低优先级线程）。
+            if (newSearch)
+            {
+                ModPrefetcher.Start(
+                    request.Platform, request.Query, request.GameVersion, request.Loader, _lifetime.Token);
+            }
+
             LauncherLog.Info(
                 $"Mod 搜索：\"{request.Query}\"（{request.GameVersion ?? "全部"} / " +
                 $"{request.Loader ?? "全部"}）第 {result.Page}/{result.TotalPages} 页，" +

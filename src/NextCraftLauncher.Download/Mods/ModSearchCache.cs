@@ -138,8 +138,11 @@ public static class ModSearchCache
                 };
 
                 var temp = path + ".tmp";
-                File.WriteAllBytes(temp, JsonSerializer.SerializeToUtf8Bytes(file, JsonOptions));
+                var bytes = JsonSerializer.SerializeToUtf8Bytes(file, JsonOptions);
+                File.WriteAllBytes(temp, bytes);
                 File.Move(temp, path, overwrite: true);
+
+                ModCacheBudget.NotifyWrite(bytes.Length);
 
                 Trim(directory);
             }

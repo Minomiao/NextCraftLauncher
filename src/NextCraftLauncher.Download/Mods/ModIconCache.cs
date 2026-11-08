@@ -90,6 +90,7 @@ public static class ModIconCache
 
                     File.Move(tempPath, path, overwrite: true);
                     RemoveStale(cacheKey, path);
+                    ModCacheBudget.NotifyWrite(new FileInfo(path).Length);
                     return path;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

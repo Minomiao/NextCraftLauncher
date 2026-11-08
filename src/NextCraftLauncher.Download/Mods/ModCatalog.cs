@@ -24,7 +24,6 @@ public static class ModCatalog
 
     private static readonly HttpClient Http = CreateClient();
 
-    private static readonly ConcurrentDictionary<string, CacheEntry<IReadOnlyList<ModVersion>>> VersionCache = new();
     private static readonly ConcurrentDictionary<string, CacheEntry<IReadOnlyList<ModProject>>> ProjectCache = new();
 
     private static HttpClient CreateClient()
@@ -252,16 +251,37 @@ public static class ModCatalog
         string? loader,
         CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"{project.Platform}:{project.Id}|{gameVersion}|{loader}";
-        if (TryGetCached(VersionCache, cacheKey, VersionReuseWindow, out var cached)) return cached;
+        var unfiltered = string.IsNullOrWhiteSpace(gameVersion) && string.IsNullOrWhiteSpace(loader);
 
-        var versions = project.Platform == ModPlatform.Modrinth
-            ? await GetModrinthVersionsAsync(project, gameVersion, loader, cancellationToken)
-            : await GetCurseForgeVersionsAsync(project, gameVersion, loader, cancellationToken);
+        if (unfiltered && ModVersionCache.TryGet(project, out var cached)) return cached;
 
-        StoreCached(VersionCache, cacheKey, versions);
+        var versions = await FetchVersionsAsync(project, gameVersion, loader, cancellationToken);
+
+        // 只缓存不带筛选的完整列表，预取回来也是这一份。
+        if (unfiltered) ModVersionCache.Store(project, versions);
+
         return versions;
     }
+
+    /// <summary>给后台预取使用：缓存已有且未过期时直接返回。</summary>
+    public static async Task EnsureVersionsCachedAsync(
+        ModProject project,
+        CancellationToken cancellationToken = default)
+    {
+        if (ModVersionCache.IsFresh(project)) return;
+
+        var versions = await FetchVersionsAsync(project, null, null, cancellationToken);
+        ModVersionCache.Store(project, versions);
+    }
+
+    private static Task<IReadOnlyList<ModVersion>> FetchVersionsAsync(
+        ModProject project,
+        string? gameVersion,
+        string? loader,
+        CancellationToken cancellationToken)
+        => project.Platform == ModPlatform.Modrinth
+            ? GetModrinthVersionsAsync(project, gameVersion, loader, cancellationToken)
+            : GetCurseForgeVersionsAsync(project, gameVersion, loader, cancellationToken);
 
     private static async Task<IReadOnlyList<ModVersion>> GetModrinthVersionsAsync(
         ModProject project,

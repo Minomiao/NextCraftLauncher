@@ -13,11 +13,11 @@ namespace NextCraftLauncher.Download.Mods;
 /// NCL/cache/mods/search/modrinth/1.21.1_fabric_sodium-p1.json
 /// NCL/cache/mods/search/all/all_all_-p2.json
 /// </code>
-/// 6 小时内直接复用；“搜索”按钮会绕过缓存重新拉取并覆盖。
+/// 48 小时内直接复用；“搜索”按钮会绕过缓存重新拉取并覆盖。
 /// </summary>
 public static class ModSearchCache
 {
-    public static readonly TimeSpan Freshness = TimeSpan.FromHours(6);
+    public static readonly TimeSpan Freshness = TimeSpan.FromHours(48);
 
     private const int MaxFiles = 400;
     private const int TrimTo = 300;

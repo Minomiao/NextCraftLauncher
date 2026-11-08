@@ -41,6 +41,17 @@
         <Style Selector="ListBox.versionList ListBoxItem:selected /template/ Border#PART_Root">
             <Setter Property="Background" Value="Transparent" />
         </Style>
+
+        <!-- 翻页按钮：无边框、无底色，只保留图标 -->
+        <Style Selector="Button.pager">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="9,5" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
     </UserControl.Styles>
 
     <Grid>
@@ -405,12 +416,12 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <Grid Grid.Row="3"
-                                  ColumnDefinitions="Auto,*,Auto"
-                                  ColumnSpacing="8"
-                                  IsVisible="{Binding ShowModPager}">
-                                <Button Classes="toolbar soft"
-                                        Padding="10,0"
+                            <StackPanel Grid.Row="3"
+                                        Orientation="Horizontal"
+                                        Spacing="4"
+                                        HorizontalAlignment="Center"
+                                        IsVisible="{Binding ShowModPager}">
+                                <Button Classes="pager"
                                         Command="{Binding GoPreviousModPageCommand}"
                                         IsEnabled="{Binding CanGoPreviousModPage}"
                                         ToolTip.Tip="上一页">
@@ -421,15 +432,13 @@
                                           Fill="{Binding $parent[Button].Foreground}" />
                                 </Button>
 
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding ModPageText}"
+                                <TextBlock Text="{Binding ModPageText}"
                                            Classes="meta"
-                                           HorizontalAlignment="Center"
+                                           MinWidth="64"
+                                           TextAlignment="Center"
                                            VerticalAlignment="Center" />
 
-                                <Button Grid.Column="2"
-                                        Classes="toolbar soft"
-                                        Padding="10,0"
+                                <Button Classes="pager"
                                         Command="{Binding GoNextModPageCommand}"
                                         IsEnabled="{Binding CanGoNextModPage}"
                                         ToolTip.Tip="下一页">
@@ -439,7 +448,7 @@
                                           Stretch="Uniform"
                                           Fill="{Binding $parent[Button].Foreground}" />
                                 </Button>
-                            </Grid>
+                            </StackPanel>
                         </Grid>
 
                         <!-- 项目详情：版本列表 -->

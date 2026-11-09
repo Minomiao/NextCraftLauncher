@@ -77,6 +77,19 @@
     SkiaSharp / HarfBuzzSharp 自带的 .pdb 合计约 105 MB，单文件发布默认不会把它们打进 exe，
     却仍会先复制到发布目录再删除。发布时直接从清单移除，少数百 MB 的磁盘写入。
   -->
+  <!--
+    WebView2 附带的 XML 文档对运行没有用处，发布时直接从清单移除，
+    免得发布目录里除了 exe 还多出几个无关文件。
+  -->
+  <Target Name="SkipWebView2Docs"
+          BeforeTargets="_ComputeFilesToBundle;_ComputeResolvedFilesToPublishTypes">
+    <ItemGroup>
+      <_WebView2Docs Include="@(ResolvedFileToPublish)"
+                     Condition="'%(Extension)' == '.xml' and $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Web.WebView2'))" />
+      <ResolvedFileToPublish Remove="@(_WebView2Docs)" />
+    </ItemGroup>
+  </Target>
+
   <Target Name="SkipPublishSymbols"
           BeforeTargets="_ComputeFilesToBundle;_ComputeResolvedFilesToPublishTypes"
           Condition="'$(PublishSingleFile)' == 'true'">

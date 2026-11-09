@@ -36,6 +36,7 @@ public sealed class MicrosoftSignInWindow : Window
 
         Opened += async (_, _) => await InitializeAsync();
         SizeChanged += (_, _) => ApplyBounds();
+        ScalingChanged += (_, _) => ApplyBounds();
         Closed += (_, _) => Release();
     }
 
@@ -107,13 +108,23 @@ public sealed class MicrosoftSignInWindow : Window
         if (tokens is not null) Finish(tokens);
     }
 
-    /// <summary>窗口内容区尺寸变化时同步 WebView 的边界（单位为 DIP）。</summary>
+    /// <summary>
+    /// 同步 WebView 的尺寸。WebView2 的 <c>Bounds</c> 与子窗口都按物理像素计算，
+    /// 而 Avalonia 的尺寸是 DIP，所以乘上缩放比例，并把光栅化比例一并告诉 WebView2。
+    /// </summary>
     private void ApplyBounds()
     {
         if (_controller is null) return;
 
+        var scaling = RenderScaling is > 0 ? RenderScaling : 1;
         var size = ClientSize;
-        _controller.Bounds = new Rectangle(0, 0, Math.Max(1, (int)size.Width), Math.Max(1, (int)size.Height));
+
+        _controller.Bounds = new Rectangle(
+            0,
+            0,
+            Math.Max(1, (int)Math.Round(size.Width * scaling)),
+            Math.Max(1, (int)Math.Round(size.Height * scaling)));
+        _controller.RasterizationScale = scaling;
     }
 
     private void Finish(LiveTokens? tokens)

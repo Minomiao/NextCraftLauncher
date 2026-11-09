@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:NextCraftLauncher.ViewModels"
+             xmlns:controls="using:NextCraftLauncher.Controls"
              xmlns:java="using:NextCraftLauncher.Core.Java"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -72,22 +73,35 @@
             <Grid IsVisible="{Binding IsStartSectionSelected}">
 
                 <StackPanel Spacing="12"
-                            MaxWidth="520"
+                            MaxWidth="640"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                         <TextBlock Text="当前版本"
                                    FontSize="12"
                                    Opacity="0.55"
                                    HorizontalAlignment="Center" />
-                        <TextBlock Text="{Binding CurrentVersionName}"
-                                   FontSize="32"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding CurrentVersionSubtitle}"
-                                   FontSize="13"
-                                   Opacity="0.6"
-                                   HorizontalAlignment="Center" />
+
+                        <!-- 实验：主界面的大版本显示做成无容器的弧形轮播，一次一页 -->
+                        <controls:ArcCarousel ItemsSource="{Binding Versions}"
+                                              SelectedItem="{Binding SelectedVersion}"
+                                              Width="640"
+                                              Height="104">
+                            <controls:ArcCarousel.ItemTemplate>
+                                <DataTemplate x:DataType="vm:VersionItemViewModel">
+                                    <StackPanel Spacing="2" MaxWidth="440">
+                                        <TextBlock Text="{Binding Id}"
+                                                   FontSize="{Binding TitleFontSize}"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Subtitle}"
+                                                   FontSize="13"
+                                                   Opacity="0.6"
+                                                   HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </controls:ArcCarousel.ItemTemplate>
+                        </controls:ArcCarousel>
                         <TextBlock Text="{Binding CurrentJavaName}"
                                    FontSize="12"
                                    Opacity="0.5"

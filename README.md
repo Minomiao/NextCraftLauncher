@@ -19,8 +19,8 @@
 
 配置与日志保存在启动器所在目录的 `NCL` 文件夹中：
 
-- `NCL\settings.json`：游戏目录、内存、Java、下载源等设置
-- `NCL\account.json`：已登录的账号（正版刷新令牌，请勿分享）
+- `NCL\settings.json`：游戏目录、内存、Java、下载源、账号类型与离线游戏名等设置
+- `NCL\account.json`：已登录的正版账号（名称与刷新令牌，请勿分享）
 - `NCL\log\`：运行日志，按天分文件，保留 7 天
 - `NCL\cache\`：可重建的缓存，包括版本清单、加载器版本列表、Forge 安装器等
   - `NCL\cache\mods\icons\<平台>\<工程 ID>-<链接哈希>.<扩展名>`：Mod 图标

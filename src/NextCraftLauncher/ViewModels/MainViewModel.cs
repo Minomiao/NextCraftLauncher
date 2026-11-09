@@ -56,6 +56,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ModCatalog.CurseForgeApiKey = _settings.CurseForgeApiKey;
         _playerName = _settings.PlayerName;
         _account = AccountStore.Load();
+        _isMicrosoftAccount = string.Equals(_settings.AccountType, "microsoft", StringComparison.OrdinalIgnoreCase);
         ApplyAccount();
         _memoryMb = MemoryOptions.Contains(_settings.MemoryMb) ? _settings.MemoryMb : 4096;
         _selectedGameMirrorIndex = (int)_settings.GameMirror;
@@ -389,7 +390,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private JavaRuntime? _selectedJava;
     [ObservableProperty] private string _playerName = "Player";
     [ObservableProperty] private bool _isMicrosoftAccount;
-    [ObservableProperty] private string _accountDisplayName = "离线账号";
+    [ObservableProperty] private bool _hasMicrosoftAccount;
+    [ObservableProperty] private string _accountDisplayName = "未登录";
     [ObservableProperty] private string _accountSubtitle = "";
     [ObservableProperty] private bool _isLoginDialogOpen;
     [ObservableProperty] private bool _isLoggingIn;
@@ -604,6 +606,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public bool CanLaunch =>
         !IsBusy &&
         !IsLaunching &&
+        (!IsMicrosoftAccount || HasMicrosoftAccount) &&
         _resolved is { IsComplete: true } &&
         SelectedJava is not null &&
         SelectedJava.MajorVersion >= _resolved.RequiredJavaMajor;
@@ -3291,19 +3294,39 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void ApplyAccount()
     {
-        if (_account is { IsMicrosoft: true })
+        HasMicrosoftAccount = _account is { IsMicrosoft: true };
+
+        if (HasMicrosoftAccount)
         {
-            IsMicrosoftAccount = true;
-            AccountDisplayName = _account.Name ?? "正版账号";
+            AccountDisplayName = _account!.Name ?? "正版账号";
             AccountSubtitle = "Microsoft 账户";
         }
         else
         {
-            IsMicrosoftAccount = false;
-            AccountDisplayName = "离线账号";
-            AccountSubtitle = string.Empty;
+            AccountDisplayName = "未登录";
+            AccountSubtitle = "点击「登录」使用正版账号";
         }
+
+        OnPropertyChanged(nameof(IsOfflineAccount));
+        UpdateLaunchWarning();
     }
+
+    public bool IsOfflineAccount => !IsMicrosoftAccount;
+
+    partial void OnIsMicrosoftAccountChanged(bool value)
+    {
+        _settings.AccountType = value ? "microsoft" : "offline";
+        _settings.Save();
+
+        OnPropertyChanged(nameof(IsOfflineAccount));
+        UpdateLaunchWarning();
+    }
+
+    [RelayCommand]
+    private void UseOfflineAccount() => IsMicrosoftAccount = false;
+
+    [RelayCommand]
+    private void UseMicrosoftAccount() => IsMicrosoftAccount = true;
 
     [RelayCommand]
     private async Task LoginMicrosoftAsync()
@@ -3355,6 +3378,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
                 AccountStore.Save(_account);
                 ApplyAccount();
+                IsMicrosoftAccount = true;
 
                 IsLoginDialogOpen = false;
                 Status = $"已登录正版账号：{result.Profile.Name}";
@@ -3396,6 +3420,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _account = null;
         AccountStore.Clear();
         ApplyAccount();
+        IsMicrosoftAccount = false;
         Status = "已退出正版账号，使用离线账号启动";
     }
 
@@ -3436,6 +3461,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task LaunchAsync()
     {
+        if (IsMicrosoftAccount && !HasMicrosoftAccount)
+        {
+            Status = "请先登录正版账号，或切换到离线账号";
+            return;
+        }
+
         if (!CanLaunch || _resolved is null || SelectedJava is null) return;
 
         IsLaunching = true;
@@ -3625,6 +3656,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         else if (SelectedJava.MajorVersion < _resolved.RequiredJavaMajor)
         {
             LaunchWarning = $"当前 Java {SelectedJava.MajorVersion} 低于所需的 Java {_resolved.RequiredJavaMajor}。";
+        }
+        else if (IsMicrosoftAccount && !HasMicrosoftAccount)
+        {
+            LaunchWarning = "已选择正版账号，但尚未登录：请点击上方的「登录」，或切换到离线账号。";
         }
         else
         {

@@ -8,6 +8,21 @@
              x:Class="NextCraftLauncher.Views.LaunchView"
              x:DataType="vm:MainViewModel">
 
+    <UserControl.Styles>
+        <!-- 账号类型切换（离线 / 正版） -->
+        <Style Selector="Button.accountTab">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="20,6" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style Selector="Button.accountTab.selected">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </UserControl.Styles>
+
     <Grid ColumnDefinitions="176,1,*" ColumnSpacing="16">
 
         <!-- 左侧边栏 -->
@@ -27,8 +42,64 @@
         <Grid Grid.Column="2">
 
             <!-- 启动 -->
-            <Grid IsVisible="{Binding IsStartSectionSelected}">
-                <StackPanel Spacing="12"
+            <Grid IsVisible="{Binding IsStartSectionSelected}" RowDefinitions="Auto,*">
+
+                <!-- 顶部：账号 -->
+                <StackPanel Grid.Row="0" Spacing="10" HorizontalAlignment="Center" Margin="0,6,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                        <Button Classes="accountTab"
+                                Classes.selected="{Binding IsOfflineAccount}"
+                                Content="离线"
+                                Command="{Binding UseOfflineAccountCommand}" />
+                        <Button Classes="accountTab"
+                                Classes.selected="{Binding IsMicrosoftAccount}"
+                                Content="正版"
+                                Command="{Binding UseMicrosoftAccountCommand}" />
+                    </StackPanel>
+
+                    <!-- 离线：记住上次使用的游戏名 -->
+                    <TextBox Classes="toolbar"
+                             Width="200"
+                             HorizontalAlignment="Center"
+                             PlaceholderText="离线游戏名"
+                             Text="{Binding PlayerName}"
+                             IsVisible="{Binding IsOfflineAccount}" />
+
+                    <!-- 正版 -->
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                HorizontalAlignment="Center"
+                                IsVisible="{Binding IsMicrosoftAccount}">
+                        <StackPanel Spacing="1"
+                                    MinWidth="180"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="{Binding AccountDisplayName}"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding AccountSubtitle}"
+                                       FontSize="11"
+                                       Opacity="0.55"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+                        <Button Classes="toolbar soft"
+                                Content="登录"
+                                Command="{Binding LoginMicrosoftCommand}"
+                                IsVisible="{Binding !HasMicrosoftAccount}" />
+                        <Button Classes="toolbar soft"
+                                Content="切换账号"
+                                Command="{Binding LoginMicrosoftCommand}"
+                                IsVisible="{Binding HasMicrosoftAccount}" />
+                        <Button Classes="toolbar soft"
+                                Content="退出"
+                                Command="{Binding LogoutMicrosoftCommand}"
+                                IsVisible="{Binding HasMicrosoftAccount}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1"
+                            Spacing="12"
                             MaxWidth="520"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
@@ -51,52 +122,14 @@
                                    HorizontalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" />
 
-                        <!-- 账号 -->
-                        <StackPanel Orientation="Horizontal"
-                                    Spacing="8"
-                                    HorizontalAlignment="Center"
-                                    Margin="0,4,0,6">
-                            <TextBox Classes="toolbar"
-                                     Width="180"
-                                     Text="{Binding PlayerName}"
-                                     IsVisible="{Binding !IsMicrosoftAccount}" />
-
-                            <StackPanel Spacing="1"
-                                        MinWidth="180"
-                                        VerticalAlignment="Center"
-                                        IsVisible="{Binding IsMicrosoftAccount}">
-                                <TextBlock Text="{Binding AccountDisplayName}"
-                                           FontSize="14"
-                                           FontWeight="SemiBold"
-                                           HorizontalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding AccountSubtitle}"
-                                           FontSize="11"
-                                           Opacity="0.55"
-                                           HorizontalAlignment="Center" />
-                            </StackPanel>
-
-                            <Button Classes="toolbar soft"
-                                    Content="正版登录"
-                                    Command="{Binding LoginMicrosoftCommand}"
-                                    IsVisible="{Binding !IsMicrosoftAccount}" />
-                            <Button Classes="toolbar soft"
-                                    Content="切换账号"
-                                    Command="{Binding LoginMicrosoftCommand}"
-                                    IsVisible="{Binding IsMicrosoftAccount}" />
-                            <Button Classes="toolbar soft"
-                                    Content="退出"
-                                    Command="{Binding LogoutMicrosoftCommand}"
-                                    IsVisible="{Binding IsMicrosoftAccount}" />
-                        </StackPanel>
-
                         <Button Content="启动"
                                 Command="{Binding LaunchCommand}"
                                 IsEnabled="{Binding CanLaunch}"
                                 Classes="primary"
                                 Width="240"
                                 Height="48"
-                                HorizontalAlignment="Center" />
+                                HorizontalAlignment="Center"
+                                Margin="0,8,0,0" />
 
                         <TextBlock Text="{Binding LaunchWarning}"
                                    Foreground="#D13438"
@@ -104,10 +137,11 @@
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"
                                    IsVisible="{Binding HasLaunchWarning}" />
-                    </StackPanel>
+                </StackPanel>
 
                 <!-- 正版登录 -->
-                <Border IsVisible="{Binding IsLoginDialogOpen}"
+                <Border Grid.RowSpan="2"
+                        IsVisible="{Binding IsLoginDialogOpen}"
                         Background="#33000000">
                     <Border Width="420"
                             Padding="24"

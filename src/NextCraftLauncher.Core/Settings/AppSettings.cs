@@ -10,6 +10,9 @@ public sealed class AppSettings
     public List<string> HiddenVersions { get; set; } = new();
     public string? JavaPath { get; set; }
     public string PlayerName { get; set; } = "Player";
+
+    /// <summary>上次使用的账号类型：<c>offline</c> 或 <c>microsoft</c>。</summary>
+    public string AccountType { get; set; } = "offline";
     public int MemoryMb { get; set; } = 4096;
 
     /// <summary>游戏版本列表 / 清单的获取源，同时用于游戏文件与 Java 下载（默认自动）。</summary>

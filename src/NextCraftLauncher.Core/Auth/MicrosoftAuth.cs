@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -39,11 +40,67 @@ public static class MicrosoftAuth
     /// <summary>Xbox Live 公共客户端 ID（沿用官方的公开应用标识）。</summary>
     public const string ClientId = "00000000402b5328";
 
+    /// <summary>授权完成后微软跳回的地址；内嵌浏览器拦截到它就说明登录已结束。</summary>
+    public const string RedirectUri = "https://login.live.com/oauth20_desktop.srf";
+
     private const string Scope = "service::user.auth.xboxlive.com::MBI_SSL";
     private const string DeviceCodeUrl = "https://login.live.com/oauth20_connect.srf";
     private const string TokenUrl = "https://login.live.com/oauth20_token.srf";
+    private const string AuthorizeUrl = "https://login.live.com/oauth20_authorize.srf";
 
     private static readonly HttpClient Http = CreateClient();
+
+    // ------------------------------------------------------------ 内嵌登录页
+
+    /// <summary>内嵌浏览器打开的微软登录页地址（隐式授权，令牌随跳转地址返回）。</summary>
+    public static string CreateAuthorizeUrl()
+    {
+        return AuthorizeUrl +
+               "?client_id=" + Uri.EscapeDataString(ClientId) +
+               "&response_type=token" +
+               "&redirect_uri=" + Uri.EscapeDataString(RedirectUri) +
+               "&scope=" + Uri.EscapeDataString(Scope);
+    }
+
+    /// <summary>
+    /// 解析登录页的跳转地址：拿到令牌时返回它们，用户拒绝授权时抛出说明，
+    /// 其他地址（登录还没结束）返回 <c>null</c>。
+    /// </summary>
+    public static LiveTokens? ParseRedirect(Uri url)
+    {
+        if (!url.AbsoluteUri.StartsWith(RedirectUri, StringComparison.OrdinalIgnoreCase)) return null;
+
+        var fragment = url.Fragment.Length > 1 ? url.Fragment[1..] : string.Empty;
+        if (fragment.Length == 0) return null;
+
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in fragment.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = pair.IndexOf('=');
+            if (separator <= 0) continue;
+
+            var key = Uri.UnescapeDataString(pair[..separator]);
+            values[key] = Uri.UnescapeDataString(pair[(separator + 1)..].Replace('+', ' '));
+        }
+
+        if (values.TryGetValue("error", out var error))
+        {
+            var description = values.GetValueOrDefault("error_description");
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(description)
+                ? $"登录失败（{error}）。"
+                : description);
+        }
+
+        if (!values.TryGetValue("access_token", out var access) || string.IsNullOrEmpty(access)) return null;
+
+        values.TryGetValue("refresh_token", out var refresh);
+        var seconds = values.TryGetValue("expires_in", out var raw) &&
+                      int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : 3600;
+
+        return new LiveTokens(access, refresh ?? string.Empty, DateTimeOffset.UtcNow.AddSeconds(seconds));
+    }
 
     // ------------------------------------------------------------ 设备码
 

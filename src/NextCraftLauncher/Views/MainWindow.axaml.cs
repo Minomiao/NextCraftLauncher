@@ -1,12 +1,16 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
+using NextCraftLauncher.Core.Auth;
 using NextCraftLauncher.Core.Logging;
 using NextCraftLauncher.Core.Settings;
 using NextCraftLauncher.ViewModels;
@@ -31,6 +35,7 @@ public partial class MainWindow : Window
         {
             _viewModel.GameStarted -= OnGameStarted;
             _viewModel.GameExited -= OnGameExited;
+            _viewModel.MicrosoftSignInHandler = null;
         }
 
         _viewModel = DataContext as MainViewModel;
@@ -39,7 +44,30 @@ public partial class MainWindow : Window
         {
             _viewModel.GameStarted += OnGameStarted;
             _viewModel.GameExited += OnGameExited;
+            _viewModel.MicrosoftSignInHandler = ShowMicrosoftSignInAsync;
             ReportMetrics();
+        }
+    }
+
+    /// <summary>打开应用内的 Microsoft 登录窗口；用户关闭窗口时返回被取消。</summary>
+    private async Task<MicrosoftSignInAttempt> ShowMicrosoftSignInAsync(CancellationToken cancellationToken)
+    {
+        var window = new MicrosoftSignInWindow();
+
+        try
+        {
+            using var registration = cancellationToken.Register(() => Dispatcher.UIThread.Post(() =>
+            {
+                if (window.IsVisible) window.Close(null);
+            }));
+
+            var tokens = await window.ShowDialog<LiveTokens?>(this);
+            return new MicrosoftSignInAttempt(!window.RuntimeMissing, tokens);
+        }
+        catch (Exception exception)
+        {
+            LauncherLog.Error("显示 Microsoft 登录窗口失败", exception);
+            return new MicrosoftSignInAttempt(false, null);
         }
     }
 

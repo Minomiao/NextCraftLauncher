@@ -24,6 +24,14 @@
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
 
+  <!--
+    WebView2 通过内建 COM 互操作调用浏览器组件；裁剪后的程序默认不带这部分支持，
+    不开启会在创建环境时抛出 TypeLoadException。
+  -->
+  <PropertyGroup>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+  </PropertyGroup>
+
   <ItemGroup>
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
@@ -42,6 +50,8 @@
     <TrimmerRootAssembly Include="NextCraftLauncher" />
     <TrimmerRootAssembly Include="NextCraftLauncher.Core" />
     <TrimmerRootAssembly Include="NextCraftLauncher.Download" />
+    <!-- WebView2 的 COM 互操作包装在裁剪后会抛出 TypeLoadException。 -->
+    <TrimmerRootAssembly Include="Microsoft.Web.WebView2.Core" />
   </ItemGroup>
 
   <ItemGroup>
@@ -53,6 +63,7 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
   </ItemGroup>
 
   <Target Name="CleanPublishSymbols" AfterTargets="Publish" Condition="'$(PublishSingleFile)' == 'true'">

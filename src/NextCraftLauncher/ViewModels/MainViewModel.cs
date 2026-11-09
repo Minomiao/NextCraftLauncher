@@ -3328,6 +3328,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void UseMicrosoftAccount() => IsMicrosoftAccount = true;
 
+    /// <summary>由视图提供的应用内登录窗口；为 <c>null</c> 时退回设备码登录。</summary>
+    public Func<CancellationToken, Task<MicrosoftSignInAttempt>>? MicrosoftSignInHandler { get; set; }
+
     [RelayCommand]
     private async Task LoginMicrosoftAsync()
     {
@@ -3338,68 +3341,91 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _loginCts = cts;
 
         IsLoggingIn = true;
-        IsLoginDialogOpen = true;
+        IsLoginDialogOpen = false;
         LoginUserCode = string.Empty;
         LoginVerificationUri = string.Empty;
-        LoginStatusText = "正在获取登录代码…";
 
         try
         {
-            var device = await MicrosoftAuth.RequestDeviceCodeAsync(cts.Token);
+            var tokens = await WaitForLiveTokensAsync(cts.Token);
+            if (tokens is null) return;
 
-            LoginUserCode = device.UserCode;
-            LoginVerificationUri = device.VerificationUri;
-            LoginStatusText = $"请打开 {device.VerificationUri} 并输入下方代码";
+            LoginStatusText = "正在验证 Minecraft 账户…";
+            var result = await MicrosoftAuth.FinishLoginAsync(
+                tokens.AccessToken, tokens.RefreshToken, cts.Token);
 
-            var deadline = DateTimeOffset.UtcNow.AddSeconds(device.ExpiresInSeconds);
-            var interval = TimeSpan.FromSeconds(Math.Max(3, device.IntervalSeconds));
-
-            while (DateTimeOffset.UtcNow < deadline)
+            _account = new StoredAccount
             {
-                await Task.Delay(interval, cts.Token);
+                Type = "microsoft",
+                Name = result.Profile.Name,
+                Uuid = result.Profile.Uuid,
+                RefreshToken = string.IsNullOrEmpty(tokens.RefreshToken) ? null : tokens.RefreshToken,
+                AccessToken = result.MinecraftAccessToken,
+                AccessTokenExpiresAt = result.AccessTokenExpiresAt,
+                Xuid = result.Xuid,
+            };
 
-                var tokens = await MicrosoftAuth.PollDeviceCodeAsync(device.DeviceCode, cts.Token);
-                if (tokens is null) continue;
+            AccountStore.Save(_account);
+            ApplyAccount();
+            IsMicrosoftAccount = true;
 
-                LoginStatusText = "正在验证 Minecraft 账户…";
-                var result = await MicrosoftAuth.FinishLoginAsync(
-                    tokens.AccessToken, tokens.RefreshToken, cts.Token);
-
-                _account = new StoredAccount
-                {
-                    Type = "microsoft",
-                    Name = result.Profile.Name,
-                    Uuid = result.Profile.Uuid,
-                    RefreshToken = string.IsNullOrEmpty(tokens.RefreshToken) ? null : tokens.RefreshToken,
-                    AccessToken = result.MinecraftAccessToken,
-                    AccessTokenExpiresAt = result.AccessTokenExpiresAt,
-                    Xuid = result.Xuid,
-                };
-
-                AccountStore.Save(_account);
-                ApplyAccount();
-                IsMicrosoftAccount = true;
-
-                IsLoginDialogOpen = false;
-                Status = $"已登录正版账号：{result.Profile.Name}";
-                LauncherLog.Info($"正版登录成功：{result.Profile.Name}（{result.Profile.Uuid}）");
-                return;
-            }
-
-            LoginStatusText = "登录代码已过期，请重新获取。";
+            IsLoginDialogOpen = false;
+            Status = $"已登录正版账号：{result.Profile.Name}";
+            LauncherLog.Info($"正版登录成功：{result.Profile.Name}（{result.Profile.Uuid}）");
         }
         catch (OperationCanceledException)
         {
         }
         catch (Exception exception)
         {
-            LoginStatusText = "登录失败：" + exception.Message;
+            if (IsLoginDialogOpen) LoginStatusText = "登录失败：" + exception.Message;
+            Status = "正版登录失败：" + exception.Message;
             LauncherLog.Warn($"正版登录失败：{exception.Message}");
         }
         finally
         {
             if (ReferenceEquals(_loginCts, cts)) IsLoggingIn = false;
         }
+    }
+
+    /// <summary>优先用应用内登录窗口拿到 Live 令牌；窗口不可用时退回设备码流程。</summary>
+    private async Task<LiveTokens?> WaitForLiveTokensAsync(CancellationToken cancellationToken)
+    {
+        if (MicrosoftSignInHandler is { } signIn)
+        {
+            Status = "正在打开 Microsoft 登录窗口…";
+            var attempt = await signIn(cancellationToken);
+            if (attempt.Handled)
+            {
+                if (attempt.Tokens is null) Status = "已取消正版登录";
+                return attempt.Tokens;
+            }
+
+            LauncherLog.Warn("无法打开 Microsoft 登录窗口，改用设备码登录。");
+        }
+
+        // 没有 WebView2 运行时（或窗口创建失败）时，用手机/浏览器输码登录。
+        IsLoginDialogOpen = true;
+        LoginStatusText = "正在获取登录代码…";
+
+        var device = await MicrosoftAuth.RequestDeviceCodeAsync(cancellationToken);
+        LoginUserCode = device.UserCode;
+        LoginVerificationUri = device.VerificationUri;
+        LoginStatusText = $"请打开 {device.VerificationUri} 并输入下方代码";
+
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(device.ExpiresInSeconds);
+        var interval = TimeSpan.FromSeconds(Math.Max(3, device.IntervalSeconds));
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            await Task.Delay(interval, cancellationToken);
+
+            var tokens = await MicrosoftAuth.PollDeviceCodeAsync(device.DeviceCode, cancellationToken);
+            if (tokens is not null) return tokens;
+        }
+
+        LoginStatusText = "登录代码已过期，请重新获取。";
+        return null;
     }
 
     [RelayCommand]

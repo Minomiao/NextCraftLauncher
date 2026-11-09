@@ -41,7 +41,7 @@ public static class LoaderVersionCatalog
     private static DateTimeOffset _fabricApiFetchedAt;
 
     private static string FabricApiCachePath => Path.Combine(
-        AppSettings.DataDirectory, "cache", "fabric-api", "maven-metadata.xml");
+        AppSettings.DataDirectory, "cache", "loaders", "fabric-api", "maven-metadata.xml");
 
     /// <summary>
     /// 从网络获取加载器列表并写入本地缓存。

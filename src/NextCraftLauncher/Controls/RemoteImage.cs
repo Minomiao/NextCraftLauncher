@@ -76,7 +76,11 @@ public sealed class RemoteImage : Control
             return;
         }
 
-        context.DrawImage(image, new Rect(image.Size), bounds);
+        // 图片同样裁成圆角，和列表其他元素保持一致。
+        using (context.PushClip(new RoundedRect(bounds, CornerRadius)))
+        {
+            context.DrawImage(image, new Rect(image.Size), bounds);
+        }
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)

@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -111,11 +112,21 @@ public partial class App : Application
             window.Opacity = 1;
         }
 
+        // 只把 Opacity 改回 1 并不代表已经画好了：合成器还没渲染新的一帧，
+        // 马上关掉启动画面就会先露出一块空白或只画了一半的窗口。
+        var paintWatch = System.Diagnostics.Stopwatch.StartNew();
+        await WaitForPaintAsync(window, 2);
+        var paintMilliseconds = paintWatch.ElapsedMilliseconds;
+
         splash.Close();
+
+        // 界面已经画好且启动画面已收起，再开始联网预取。
+        viewModel.StartBackgroundWork();
 
         LauncherLog.Info(
             $"进入主界面（窗口构建 {buildMilliseconds} ms，显示 {buildWatch.ElapsedMilliseconds} ms，" +
-            $"窗口 {shownMilliseconds} ms，预热 {warmWatch.ElapsedMilliseconds - shownMilliseconds} ms）");
+            $"窗口 {shownMilliseconds} ms，预热 {warmWatch.ElapsedMilliseconds - shownMilliseconds} ms，" +
+            $"绘制 {paintMilliseconds} ms）");
     }
 
     /// <summary>
@@ -132,5 +143,18 @@ public partial class App : Application
 
         viewModel.ShowLaunchPageCommand.Execute(null);
         await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+    }
+
+    /// <summary>等待窗口真正渲染出若干帧，而不是只等属性变更完成。</summary>
+    private static async Task WaitForPaintAsync(TopLevel topLevel, int frames)
+    {
+        for (var index = 0; index < frames; index++)
+        {
+            var painted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            topLevel.RequestAnimationFrame(_ => Dispatcher.UIThread.Post(() => painted.TrySetResult()));
+
+            // 万一没有新帧（例如窗口被最小化），也不要卡住启动流程。
+            await Task.WhenAny(painted.Task, Task.Delay(TimeSpan.FromMilliseconds(1000)));
+        }
     }
 }

@@ -44,6 +44,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool _versionNameEdited;
     private bool _updatingVersionName;
     private bool _initialized;
+    private bool _backgroundWorkStarted;
     private int _activeTaskCount;
     private readonly LoaderVersionPrefetcher _loaderPrefetcher;
     private StoredAccount? _account;
@@ -96,7 +97,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// 启动界面期间完成本地初始化：扫描版本、发现 Java，然后让远程清单与后台预取自行运行。
+    /// 启动界面期间完成本地初始化：扫描版本、发现 Java，并先填上缓存的远程清单。
     /// </summary>
     public async Task InitializeAsync()
     {
@@ -113,6 +114,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ApplyRemoteManifest(cached, markLoaded: false);
 
         LauncherLog.Info("本地初始化完成");
+    }
+
+    /// <summary>
+    /// 主窗口画好之后才开始联网预取，避免窗口刚出现时后台任务抢占 UI 线程。
+    /// </summary>
+    public void StartBackgroundWork()
+    {
+        if (_backgroundWorkStarted) return;
+        _backgroundWorkStarted = true;
 
         _ = PrefetchRemoteVersionsAsync();
         _ = Task.Run(RunLoaderPrefetcherAsync);
@@ -3080,9 +3090,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         await DownloadJavaRuntimeAsync(item.ComponentName, item.MajorVersion, label);
     }
 
-    private bool IsJavaRuntimeInstalled(string componentName)
+    private static bool IsJavaRuntimeInstalled(string minecraftDirectory, string componentName)
     {
-        var runtimeDirectory = Path.Combine(MinecraftDirectory, "runtime", componentName);
+        var runtimeDirectory = Path.Combine(minecraftDirectory, "runtime", componentName);
         if (!Directory.Exists(runtimeDirectory)) return false;
 
         var executable = OperatingSystem.IsWindows() ? "java.exe" : "java";
@@ -3096,14 +3106,30 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// 刷新各运行时的安装状态。递归搜文件名很费磁盘，放到线程池做，避免启动和打开下载页时卡 UI。
+    /// </summary>
     private void UpdateJavaRuntimeInstalledStatus()
     {
         if (_allJavaRuntimes.Count == 0) return;
 
-        foreach (var item in _allJavaRuntimes)
-            item.IsInstalled = IsJavaRuntimeInstalled(item.ComponentName);
+        var directory = MinecraftDirectory;
+        var items = _allJavaRuntimes.ToArray();
 
-        UpdateJavaRuntimeCatalogStatus();
+        _ = Task.Run(() =>
+        {
+            var results = items
+                .Select(item => (Item: item, Installed: IsJavaRuntimeInstalled(directory, item.ComponentName)))
+                .ToArray();
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                foreach (var (item, installed) in results)
+                    item.IsInstalled = installed;
+
+                UpdateJavaRuntimeCatalogStatus();
+            });
+        });
     }
 
     private void UpdateJavaRuntimeCatalogStatus()

@@ -21,6 +21,33 @@
             <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+
+        <!-- 游戏名输入框：只用一条下划线，不要整个框 -->
+        <Style Selector="TextBox.nameInput">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Padding" Value="0,0,0,2" />
+            <Setter Property="VerticalContentAlignment" Value="Bottom" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBox.nameInput /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="0" />
+        </Style>
+        <Style Selector="TextBox.nameInput:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        </Style>
+        <Style Selector="TextBox.nameInput:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
     </UserControl.Styles>
 
     <Grid ColumnDefinitions="176,1,*" ColumnSpacing="16">
@@ -42,24 +69,9 @@
         <Grid Grid.Column="2">
 
             <!-- 启动 -->
-            <Grid IsVisible="{Binding IsStartSectionSelected}" RowDefinitions="Auto,*">
+            <Grid IsVisible="{Binding IsStartSectionSelected}">
 
-                <!-- 顶部：账号类型 -->
-                <StackPanel Grid.Row="0" Spacing="10" HorizontalAlignment="Center" Margin="0,6,0,0">
-                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
-                        <Button Classes="accountTab"
-                                Classes.selected="{Binding IsOfflineAccount}"
-                                Content="离线"
-                                Command="{Binding UseOfflineAccountCommand}" />
-                        <Button Classes="accountTab"
-                                Classes.selected="{Binding IsMicrosoftAccount}"
-                                Content="正版"
-                                Command="{Binding UseMicrosoftAccountCommand}" />
-                    </StackPanel>
-                </StackPanel>
-
-                <StackPanel Grid.Row="1"
-                            Spacing="12"
+                <StackPanel Spacing="12"
                             MaxWidth="520"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
@@ -87,8 +99,10 @@
                                     Spacing="8"
                                     HorizontalAlignment="Center"
                                     Margin="0,4,0,6">
-                            <TextBox Classes="toolbar"
-                                     Width="220"
+                            <!-- 宽度与启动按钮一致，高度为其 2/3，内容居中 -->
+                            <TextBox Classes="nameInput"
+                                     Width="240"
+                                     Height="32"
                                      Text="{Binding PlayerName}"
                                      IsVisible="{Binding IsOfflineAccount}" />
 
@@ -141,9 +155,24 @@
                                    IsVisible="{Binding HasLaunchWarning}" />
                 </StackPanel>
 
+                <!-- 顶部账号切换：叠加在原有布局上方，不影响中间内容的居中 -->
+                <StackPanel VerticalAlignment="Top"
+                            HorizontalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="4"
+                            Margin="0,6,0,0">
+                    <Button Classes="accountTab"
+                            Classes.selected="{Binding IsOfflineAccount}"
+                            Content="离线"
+                            Command="{Binding UseOfflineAccountCommand}" />
+                    <Button Classes="accountTab"
+                            Classes.selected="{Binding IsMicrosoftAccount}"
+                            Content="正版"
+                            Command="{Binding UseMicrosoftAccountCommand}" />
+                </StackPanel>
+
                 <!-- 正版登录 -->
-                <Border Grid.RowSpan="2"
-                        IsVisible="{Binding IsLoginDialogOpen}"
+                <Border IsVisible="{Binding IsLoginDialogOpen}"
                         Background="#33000000">
                     <Border Width="420"
                             Padding="24"

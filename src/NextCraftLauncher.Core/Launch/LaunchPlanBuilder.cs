@@ -10,7 +10,10 @@ public sealed record LaunchOptions(
     bool IsolateGameDirectory,
     int Width = 854,
     int Height = 480,
-    bool Fullscreen = false);
+    bool Fullscreen = false,
+    string? AccessToken = null,
+    string? Uuid = null,
+    string? Xuid = null);
 
 public sealed class LaunchPlan
 {
@@ -41,7 +44,14 @@ public static class LaunchPlanBuilder
 
         var environment = LaunchEnvironment.Current;
         var username = string.IsNullOrWhiteSpace(options.PlayerName) ? "Player" : options.PlayerName.Trim();
-        var uuid = OfflineAuth.CreateOfflineUuid(username);
+
+        // 正版账号使用登录得到的令牌与 UUID；否则退回离线账号。
+        var online = !string.IsNullOrWhiteSpace(options.AccessToken);
+        var uuid = online && !string.IsNullOrWhiteSpace(options.Uuid)
+            ? options.Uuid!
+            : OfflineAuth.CreateOfflineUuid(username);
+        var accessToken = online ? options.AccessToken! : "0";
+
         var gameDirectory = options.IsolateGameDirectory
             ? version.VersionDirectory
             : version.MinecraftDirectory;
@@ -57,13 +67,13 @@ public static class LaunchPlanBuilder
             ["game_assets"] = Path.Combine(version.AssetsDirectory, "virtual", "legacy"),
             ["assets_index_name"] = version.AssetsIndexId,
             ["auth_uuid"] = uuid,
-            ["auth_access_token"] = "0",
-            ["auth_session"] = $"token:0:{uuid}",
-            ["user_type"] = "msa",
+            ["auth_access_token"] = accessToken,
+            ["auth_session"] = $"token:{accessToken}:{uuid}",
+            ["user_type"] = online ? "msa" : "legacy",
             ["version_type"] = version.Merged.Type ?? "release",
             ["user_properties"] = "{}",
             ["clientid"] = string.Empty,
-            ["auth_xuid"] = string.Empty,
+            ["auth_xuid"] = options.Xuid ?? string.Empty,
             ["launcher_name"] = LauncherName,
             ["launcher_version"] = LauncherVersion,
             ["natives_directory"] = version.NativesDirectory,

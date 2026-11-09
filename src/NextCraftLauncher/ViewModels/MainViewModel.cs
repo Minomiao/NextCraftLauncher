@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Threading;
+using NextCraftLauncher.Core.Auth;
 using NextCraftLauncher.Core.Java;
 using NextCraftLauncher.Core.Launch;
 using NextCraftLauncher.Core.Logging;
@@ -45,6 +46,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool _initialized;
     private int _activeTaskCount;
     private readonly LoaderVersionPrefetcher _loaderPrefetcher;
+    private StoredAccount? _account;
+    private CancellationTokenSource? _loginCts;
 
     public MainViewModel()
     {
@@ -52,6 +55,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _minecraftDirectory = _settings.MinecraftDirectory;
         ModCatalog.CurseForgeApiKey = _settings.CurseForgeApiKey;
         _playerName = _settings.PlayerName;
+        _account = AccountStore.Load();
+        ApplyAccount();
         _memoryMb = MemoryOptions.Contains(_settings.MemoryMb) ? _settings.MemoryMb : 4096;
         _selectedGameMirrorIndex = (int)_settings.GameMirror;
         _selectedForgeMirrorIndex = LoaderMirrorIndexFrom(_settings.ForgeMirror);
@@ -383,6 +388,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private GameFolderItemViewModel? _selectedGameFolder;
     [ObservableProperty] private JavaRuntime? _selectedJava;
     [ObservableProperty] private string _playerName = "Player";
+    [ObservableProperty] private bool _isMicrosoftAccount;
+    [ObservableProperty] private string _accountDisplayName = "离线账号";
+    [ObservableProperty] private string _accountSubtitle = "";
+    [ObservableProperty] private bool _isLoginDialogOpen;
+    [ObservableProperty] private bool _isLoggingIn;
+    [ObservableProperty] private string _loginUserCode = string.Empty;
+    [ObservableProperty] private string _loginVerificationUri = string.Empty;
+    [ObservableProperty] private string _loginStatusText = string.Empty;
     [ObservableProperty] private int _memoryMb = 4096;
     [ObservableProperty] private string _status = "就绪";
     [ObservableProperty] private bool _isBusy;
@@ -3274,6 +3287,152 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    // ------------------------------------------------------------ 账号（正版登录）
+
+    private void ApplyAccount()
+    {
+        if (_account is { IsMicrosoft: true })
+        {
+            IsMicrosoftAccount = true;
+            AccountDisplayName = _account.Name ?? "正版账号";
+            AccountSubtitle = "Microsoft 账户";
+        }
+        else
+        {
+            IsMicrosoftAccount = false;
+            AccountDisplayName = "离线账号";
+            AccountSubtitle = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoginMicrosoftAsync()
+    {
+        if (IsLoggingIn) return;
+
+        _loginCts?.Cancel();
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _loginCts = cts;
+
+        IsLoggingIn = true;
+        IsLoginDialogOpen = true;
+        LoginUserCode = string.Empty;
+        LoginVerificationUri = string.Empty;
+        LoginStatusText = "正在获取登录代码…";
+
+        try
+        {
+            var device = await MicrosoftAuth.RequestDeviceCodeAsync(cts.Token);
+
+            LoginUserCode = device.UserCode;
+            LoginVerificationUri = device.VerificationUri;
+            LoginStatusText = $"请打开 {device.VerificationUri} 并输入下方代码";
+
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(device.ExpiresInSeconds);
+            var interval = TimeSpan.FromSeconds(Math.Max(3, device.IntervalSeconds));
+
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                await Task.Delay(interval, cts.Token);
+
+                var tokens = await MicrosoftAuth.PollDeviceCodeAsync(device.DeviceCode, cts.Token);
+                if (tokens is null) continue;
+
+                LoginStatusText = "正在验证 Minecraft 账户…";
+                var result = await MicrosoftAuth.FinishLoginAsync(
+                    tokens.AccessToken, tokens.RefreshToken, cts.Token);
+
+                _account = new StoredAccount
+                {
+                    Type = "microsoft",
+                    Name = result.Profile.Name,
+                    Uuid = result.Profile.Uuid,
+                    RefreshToken = string.IsNullOrEmpty(tokens.RefreshToken) ? null : tokens.RefreshToken,
+                    AccessToken = result.MinecraftAccessToken,
+                    AccessTokenExpiresAt = result.AccessTokenExpiresAt,
+                    Xuid = result.Xuid,
+                };
+
+                AccountStore.Save(_account);
+                ApplyAccount();
+
+                IsLoginDialogOpen = false;
+                Status = $"已登录正版账号：{result.Profile.Name}";
+                LauncherLog.Info($"正版登录成功：{result.Profile.Name}（{result.Profile.Uuid}）");
+                return;
+            }
+
+            LoginStatusText = "登录代码已过期，请重新获取。";
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            LoginStatusText = "登录失败：" + exception.Message;
+            LauncherLog.Warn($"正版登录失败：{exception.Message}");
+        }
+        finally
+        {
+            if (ReferenceEquals(_loginCts, cts)) IsLoggingIn = false;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelMicrosoftLogin()
+    {
+        _loginCts?.Cancel();
+        IsLoginDialogOpen = false;
+        IsLoggingIn = false;
+    }
+
+    [RelayCommand]
+    private void LogoutMicrosoft()
+    {
+        _loginCts?.Cancel();
+        IsLoginDialogOpen = false;
+        IsLoggingIn = false;
+
+        _account = null;
+        AccountStore.Clear();
+        ApplyAccount();
+        Status = "已退出正版账号，使用离线账号启动";
+    }
+
+    /// <summary>启动前取可用的正版令牌；过期时用刷新令牌续期。</summary>
+    private async Task<(string Name, string Uuid, string AccessToken, string? Xuid)> EnsureMicrosoftSessionAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_account is not { IsMicrosoft: true })
+            throw new InvalidOperationException("尚未登录正版账号。");
+
+        if (!string.IsNullOrEmpty(_account.AccessToken) &&
+            !string.IsNullOrEmpty(_account.Uuid) &&
+            _account.AccessTokenExpiresAt - DateTimeOffset.UtcNow > TimeSpan.FromMinutes(5))
+        {
+            return (_account.Name ?? "Player", _account.Uuid, _account.AccessToken, _account.Xuid);
+        }
+
+        if (string.IsNullOrWhiteSpace(_account.RefreshToken))
+            throw new InvalidOperationException("正版登录已过期，请重新登录。");
+
+        Status = "正在刷新正版账号…";
+        var tokens = await MicrosoftAuth.RefreshAsync(_account.RefreshToken, cancellationToken);
+        var result = await MicrosoftAuth.FinishLoginAsync(tokens.AccessToken, tokens.RefreshToken, cancellationToken);
+
+        _account.RefreshToken = string.IsNullOrEmpty(tokens.RefreshToken) ? _account.RefreshToken : tokens.RefreshToken;
+        _account.AccessToken = result.MinecraftAccessToken;
+        _account.AccessTokenExpiresAt = result.AccessTokenExpiresAt;
+        _account.Name = result.Profile.Name;
+        _account.Uuid = result.Profile.Uuid;
+        _account.Xuid = result.Xuid;
+        _account.Type = "microsoft";
+        AccountStore.Save(_account);
+        ApplyAccount();
+
+        return (result.Profile.Name, result.Profile.Uuid, result.MinecraftAccessToken, result.Xuid);
+    }
+
     [RelayCommand]
     private async Task LaunchAsync()
     {
@@ -3287,8 +3446,23 @@ public partial class MainViewModel : ObservableObject, IDisposable
         try
         {
             var (width, height, fullscreen) = ResolveGameWindow();
+
+            var playerName = PlayerName;
+            string? accessToken = null;
+            string? uuid = null;
+            string? xuid = null;
+
+            if (IsMicrosoftAccount)
+            {
+                var session = await EnsureMicrosoftSessionAsync(_lifetime.Token);
+                playerName = session.Name;
+                accessToken = session.AccessToken;
+                uuid = session.Uuid;
+                xuid = session.Xuid;
+            }
+
             var options = new LaunchOptions(
-                PlayerName, MemoryMb, IsVersionIsolated, width, height, fullscreen);
+                playerName, MemoryMb, IsVersionIsolated, width, height, fullscreen, accessToken, uuid, xuid);
             var plan = LaunchPlanBuilder.Build(_resolved, SelectedJava, options);
 
             LauncherLog.Info($"启动游戏：{_resolved.Id}（Java {SelectedJava.MajorVersion}）");

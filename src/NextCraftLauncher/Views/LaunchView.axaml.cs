@@ -1,4 +1,6 @@
+using System;
 using Avalonia.Controls;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using NextCraftLauncher.ViewModels;
@@ -10,6 +12,27 @@ public partial class LaunchView : UserControl
     public LaunchView()
     {
         InitializeComponent();
+    }
+
+    private async void OnCopyLoginCodeClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel) return;
+
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null || string.IsNullOrEmpty(viewModel.LoginUserCode)) return;
+
+        await clipboard.SetTextAsync(viewModel.LoginUserCode);
+    }
+
+    private async void OnOpenLoginLinkClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel) return;
+
+        var launcher = TopLevel.GetTopLevel(this)?.Launcher;
+        if (launcher is null) return;
+        if (!Uri.TryCreate(viewModel.LoginVerificationUri, UriKind.Absolute, out var uri)) return;
+
+        await launcher.LaunchUriAsync(uri);
     }
 
     private async void OnAddGameFolderClick(object? sender, RoutedEventArgs e)

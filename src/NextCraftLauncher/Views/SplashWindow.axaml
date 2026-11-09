@@ -5,6 +5,7 @@
         Height="320"
         CanResize="False"
         ShowInTaskbar="False"
+        Icon="/Assets/app.ico"
         WindowDecorations="None"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource SystemControlBackgroundAltHighBrush}"

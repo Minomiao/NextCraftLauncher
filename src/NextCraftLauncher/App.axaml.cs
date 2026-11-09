@@ -36,7 +36,11 @@ public partial class App : Application
             desktop.MainWindow = splash;
             splash.Show();
 
-            _ = StartMainWindowAsync(desktop, splash);
+            // 让启动画面先画出首帧。紧接着的初始化与主窗口解析会长时间占用 UI 线程，
+            // 若在同一个调用栈里直接开始，启动画面可能一次都没绘制就被替换掉。
+            Dispatcher.UIThread.Post(
+                () => _ = StartMainWindowAsync(desktop, splash),
+                DispatcherPriority.Background);
         }
 
         base.OnFrameworkInitializationCompleted();

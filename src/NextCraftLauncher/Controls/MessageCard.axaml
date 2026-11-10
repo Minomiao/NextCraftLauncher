@@ -2,6 +2,62 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="NextCraftLauncher.Controls.MessageCard">
 
+    <UserControl.Styles>
+        <!--
+            实心按钮：底色由代码按 Kind 设置，悬停/按下只用不透明度做反馈，
+            避免主题把背景覆盖成强调色。
+        -->
+        <Style Selector="Button.solid">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Border Name="PART_Root"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <ContentPresenter Name="PART_ContentPresenter"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              HorizontalContentAlignment="Center"
+                                              VerticalContentAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.solid:pointerover /template/ Border#PART_Root">
+            <Setter Property="Opacity" Value="0.9" />
+        </Style>
+        <Style Selector="Button.solid:pressed /template/ Border#PART_Root">
+            <Setter Property="Opacity" Value="0.78" />
+        </Style>
+
+        <!--
+            主题会给模板里的 ContentPresenter 上悬停/按下背景、前景和边框，
+            表现出来就是按钮里多一个内框、字变黑。这里全部压回去。
+        -->
+        <Style Selector="Button.solid:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.solid:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.solid:disabled /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+    </UserControl.Styles>
+
     <!-- 通用提示卡片：遮罩 + 卡片。外观由 Kind 预设决定，文字与显隐由属性控制。 -->
     <Border x:Name="Mask" Background="#66000000" IsVisible="False">
         <Border Width="480"
@@ -44,7 +100,7 @@
                             IsVisible="False"
                             Click="OnOpenLogClick" />
                     <Button x:Name="ExportButton"
-                            Classes="primary"
+                            Classes="solid"
                             Content="导出错误报告"
                             Height="32"
                             Padding="14,0"

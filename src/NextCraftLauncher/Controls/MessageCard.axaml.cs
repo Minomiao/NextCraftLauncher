@@ -168,6 +168,14 @@ public partial class MessageCard : UserControl
         LogButton.IsVisible = detailed;
         ExportButton.IsVisible = detailed;
 
+        // 主按钮底色跟标题一致，而不是主题强调色。
+        ExportButton.Background = Kind switch
+        {
+            MessageKind.Error => ErrorBrush,
+            MessageKind.Warning => WarningBrush,
+            _ => null,
+        };
+
         CloseButton.Content = CloseText;
     }
 

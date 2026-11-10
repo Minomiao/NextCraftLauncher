@@ -161,10 +161,11 @@
             </Border>
         </Border>
 
-        <!-- 下载 / 安装错误弹窗（置顶，背景模糊） -->
-        <controls:ErrorDialog IsOpen="{Binding IsDownloadErrorDialogOpen}"
+        <!-- 下载 / 安装错误弹窗（置顶，背景模糊）：Error 预设 -->
+        <controls:MessageCard IsOpen="{Binding IsDownloadErrorDialogOpen}"
+                              Kind="Error"
                               Title="{Binding DownloadErrorTitle}"
-                              Hint="{Binding DownloadErrorHint}"
+                              Message="{Binding DownloadErrorHint}"
                               CloseRequested="OnErrorDialogClose"
                               OpenLogRequested="OnErrorDialogOpenLog"
                               ExportRequested="OnErrorDialogExport" />

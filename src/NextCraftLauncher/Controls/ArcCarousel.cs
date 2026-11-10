@@ -16,9 +16,9 @@ using Avalonia.VisualTree;
 namespace NextCraftLauncher.Controls;
 
 /// <summary>
-/// 试验用的无容器弧形轮播：不画任何底色或边框，一次只显示一项；
-/// 滚轮给出冲量，减速靠阻尼，会依次经过中间的每一页，最后吸附停在某一页。
-/// 选中项通过双向绑定同步给视图模型。
+/// 试验用的无容器弧形轮播：不画任何底色或边框，一次只显示一项。
+/// 滚轮每格移动一格目标页，页面用弹簧追目标，因此每次滚动都一定生效，
+/// 连续滚动会依次经过中间的每一页，最后稳稳停在一页上。
 /// </summary>
 public class ArcCarousel : UserControl
 {
@@ -33,23 +33,11 @@ public class ArcCarousel : UserControl
     public static readonly StyledProperty<IDataTemplate?> ItemTemplateProperty =
         AvaloniaProperty.Register<ArcCarousel, IDataTemplate?>(nameof(ItemTemplate));
 
-    /// <summary>阻尼（1/s）：越大停得越快，滑过的页数越少。</summary>
-    private const double Friction = 7.5;
+    /// <summary>弹簧刚度：越大越跟手，越小越“重”。</summary>
+    private const double Stiffness = 60;
 
-    /// <summary>每格滚轮给出的速度（页/秒）。等于阻尼时，一格刚好滑一页。</summary>
-    private const double Impulse = 7.5;
-
-    /// <summary>反向滚动时抵消力的倍数：大于 1 收得更快。</summary>
-    private const double CancelBoost = 1.8;
-
-    /// <summary>速度上限（页/秒），避免连续滚轮把速度叠到失控。</summary>
-    private const double MaxSpeed = 40;
-
-    /// <summary>速度低于此值开始吸附到最近的整页。</summary>
-    private const double SnapSpeed = 1.6;
-
-    /// <summary>吸附刚度：把当前页拉正。</summary>
-    private const double SnapStiffness = 45;
+    /// <summary>阻尼（1/s）：越小回弹越明显，越大越干脆。</summary>
+    private const double Friction = 9;
 
     private const double MaxOffset = 2.4;
 
@@ -66,7 +54,10 @@ public class ArcCarousel : UserControl
     /// <summary>当前显示位置，单位是「页」，可以是小数。</summary>
     private double _page;
 
-    /// <summary>累计速度（页/秒）：滚轮不断叠加冲量，阻尼让它衰减。</summary>
+    /// <summary>目标页，滚轮每格加减 1；弹簧把 <see cref="_page"/> 拉向它。</summary>
+    private double _target;
+
+    /// <summary>弹簧速度（页/秒）。</summary>
     private double _velocity;
 
     public ArcCarousel()
@@ -147,6 +138,7 @@ public class ArcCarousel : UserControl
         }
 
         _page = Math.Max(0, SelectedIndex());
+        _target = _page;
         _velocity = 0;
         ApplyAll();
         _animating = false;
@@ -177,7 +169,7 @@ public class ArcCarousel : UserControl
         return -1;
     }
 
-    /// <summary>外部（启动恢复、其它入口）改了选中项时，直接把页面位置对齐过去。</summary>
+    /// <summary>外部（启动恢复、其它入口）改了选中项时，直接把位置和目标都对齐过去。</summary>
     private void OnSelectedItemChanged()
     {
         if (_syncingSelection) return;
@@ -189,6 +181,7 @@ public class ArcCarousel : UserControl
         if (_animating && Math.Abs(index - _page) < 1.5) return;
 
         _page = index;
+        _target = index;
         _velocity = 0;
         ApplyAll();
     }
@@ -241,33 +234,46 @@ public class ArcCarousel : UserControl
             return;
         }
 
-        // 1. 阻尼：速度按指数衰减，这就是“阻力”，滚轮给的总冲量决定能滑多远。
+        // 与目标页的环形最短距离，避免跨过首尾时绕一大圈。
+        var remaining = ShortestDelta(_target - _page, count);
+
+        // 1. 弹簧：速度向目标页加速，阻尼让它收敛，略带一点过冲。
+        _velocity += remaining * Stiffness * delta;
         _velocity *= Math.Exp(-Friction * delta);
 
-        // 2. 速度不快时向最近的整页吸附，保证最后停在某一页而不是停在两页之间。
-        var nearest = Math.Round(_page);
-        if (Math.Abs(_velocity) < SnapSpeed)
-            _velocity += (nearest - _page) * SnapStiffness * delta;
-
-        // 3. 推进位置；归一化到 [0, count) 以支持无头尾循环。
+        // 2. 推进位置。
         _page = Normalize(_page + _velocity * delta, count);
+        _target = Normalize(_target, count);
 
         ApplyAll();
         SyncSelection();
 
-        // 4. 停稳判定：速度足够小且已经对齐到整页。
-        var settled = Math.Abs(_velocity) < 0.05 && Math.Abs(Math.Round(_page) - _page) < 0.01;
+        // 3. 停稳判定（用推进后的位置重新计算剩余距离）。
+        var left = ShortestDelta(_target - _page, count);
+        var settled = Math.Abs(left) < 0.004 && Math.Abs(_velocity) < 0.03;
         if (!settled)
         {
             if (!RequestFrame()) _animating = false;
             return;
         }
 
-        _page = Normalize(Math.Round(_page), count);
+        _page = Normalize(_target, count);
         _velocity = 0;
         ApplyAll();
         SyncSelection();
         _animating = false;
+    }
+
+    /// <summary>把差值折算到 (-count/2, count/2]，用于环形最短路径。</summary>
+    private static double ShortestDelta(double value, int count)
+    {
+        if (count == 0) return 0;
+
+        value %= count;
+        if (value > count / 2.0) value -= count;
+        else if (value < -count / 2.0) value += count;
+
+        return value;
     }
 
     /// <summary>把位置换算成每一项的偏移；跨过半圈时取最短方向。</summary>
@@ -278,9 +284,7 @@ public class ArcCarousel : UserControl
 
         for (var i = 0; i < count; i++)
         {
-            var offset = i - _page;
-            if (offset > count / 2.0) offset -= count;
-            else if (offset < -count / 2.0) offset += count;
+            var offset = ShortestDelta(i - _page, count);
 
             var entry = _entries[i];
             entry.Offset = offset;
@@ -352,25 +356,16 @@ public class ArcCarousel : UserControl
         var delta = horizontal ? e.Delta.X : e.Delta.Y;
         if (delta == 0) return;
 
-        ApplyImpulse(delta > 0 ? -1 : 1);
+        ApplyStep(delta > 0 ? -1 : 1);
         e.Handled = true;
     }
 
-    /// <summary>把滚轮格数换成冲量；反向时只抵消已有的力，剩下的惯性继续滑。</summary>
-    private void ApplyImpulse(int notches)
+    /// <summary>移动一格目标页。反向时先吃掉当前惯性，避免还没停下就多翻一页。</summary>
+    private void ApplyStep(int step)
     {
-        var opposing = _velocity * notches < 0;
+        if (_velocity * step < 0) _velocity = 0;
 
-        // 反向时抵消力放大，停得更快；同向仍按原冲量叠加。
-        var magnitude = Math.Abs(notches) * Impulse * (opposing ? CancelBoost : 1);
-        var impulse = Math.Sign(notches) * magnitude;
-        var next = _velocity + impulse;
-
-        // 反向滚动只用来抵消：最多减到 0，不会因为这一格就翻到反方向；
-        // 还没被抵消掉的惯性保留下来，继续按阻尼减速，而不是硬停。
-        if (opposing && _velocity * next < 0) next = 0;
-
-        _velocity = Math.Clamp(next, -MaxSpeed, MaxSpeed);
+        _target += step;
         EnsureFrames();
     }
 

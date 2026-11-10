@@ -41,6 +41,8 @@ public class ArcCarousel : UserControl
 
     private const double MaxOffset = 2.4;
 
+    private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
+
     private readonly Grid _host = new();
     private readonly List<Entry> _entries = new();
 
@@ -122,11 +124,21 @@ public class ArcCarousel : UserControl
                     IsHitTestVisible = false,
                 };
 
-                var entry = new Entry(item, content);
-                content.RenderTransform = entry.Group;
-                content.RenderTransformOrigin = RelativePoint.Center;
+                // 透明底的 Border 包一层，这样条目本身可被点到（内容控件默认不参与命中测试）。
+                var host = new Border
+                {
+                    Child = content,
+                    Background = Brushes.Transparent,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
 
-                _host.Children.Add(content);
+                var entry = new Entry(item, host);
+                host.RenderTransform = entry.Group;
+                host.RenderTransformOrigin = RelativePoint.Center;
+                host.PointerPressed += (_, args) => OnItemPressed(entry, args);
+
+                _host.Children.Add(host);
                 _entries.Add(entry);
             }
 
@@ -343,6 +355,24 @@ public class ArcCarousel : UserControl
 
         // 越靠近中心的越在上层，避免两侧的项盖住当前项。
         entry.Host.ZIndex = (int)Math.Round(100 - distance * 10);
+
+        // 两侧的项可以点击翻页，给个手型光标。
+        var clickable = distance > 0.5;
+        if (entry.Clickable != clickable)
+        {
+            entry.Clickable = clickable;
+            entry.Host.Cursor = clickable ? HandCursor : null;
+        }
+    }
+
+    /// <summary>点两侧的项切到那一页；点中间项不做事。</summary>
+    private void OnItemPressed(Entry entry, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(entry.Host).Properties.IsLeftButtonPressed) return;
+        if (Math.Abs(entry.Offset) < 0.5) return;
+
+        ApplyStep(entry.Offset < 0 ? -1 : 1);
+        e.Handled = true;
     }
 
     // ------------------------------------------------------------ 滚轮
@@ -373,7 +403,7 @@ public class ArcCarousel : UserControl
 
     private sealed class Entry
     {
-        public Entry(object? item, ContentControl host)
+        public Entry(object? item, Border host)
         {
             Item = item;
             Host = host;
@@ -386,7 +416,9 @@ public class ArcCarousel : UserControl
 
         public object? Item { get; }
 
-        public ContentControl Host { get; }
+        public Border Host { get; }
+
+        public bool Clickable { get; set; }
 
         public ScaleTransform Scale { get; } = new(1, 1);
 

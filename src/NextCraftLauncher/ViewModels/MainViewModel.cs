@@ -605,8 +605,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ? $"Java {_resolved.RequiredJavaMajor}+（{component}）"
             : $"Java {_resolved.RequiredJavaMajor}+（自动选择组件）";
 
-    public bool HasLaunchWarning => !string.IsNullOrEmpty(LaunchWarning);
-
     public string EffectiveGameDirectory => _resolved is null
         ? "-"
         : IsVersionIsolated
@@ -1478,8 +1476,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (deleted) await RefreshAsync();
     }
-
-    partial void OnLaunchWarningChanged(string? value) => OnPropertyChanged(nameof(HasLaunchWarning));
 
     partial void OnIsVersionIsolatedChanged(bool value) => OnPropertyChanged(nameof(EffectiveGameDirectory));
 

@@ -155,18 +155,13 @@
                         <Button Content="启动"
                                 Command="{Binding LaunchCommand}"
                                 IsEnabled="{Binding CanLaunch}"
+                                ToolTip.Tip="{Binding LaunchWarning}"
+                                ToolTip.ShowOnDisabled="True"
                                 Classes="primary"
                                 Width="240"
                                 Height="48"
                                 HorizontalAlignment="Center"
                                 Margin="0,8,0,0" />
-
-                        <TextBlock Text="{Binding LaunchWarning}"
-                                   Foreground="#D13438"
-                                   FontSize="12"
-                                   TextWrapping="Wrap"
-                                   TextAlignment="Center"
-                                   IsVisible="{Binding HasLaunchWarning}" />
                 </StackPanel>
 
                 <!-- 顶部账号切换：叠加在原有布局上方，不影响中间内容的居中 -->

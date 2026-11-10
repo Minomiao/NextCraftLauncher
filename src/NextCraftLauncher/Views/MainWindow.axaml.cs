@@ -119,7 +119,7 @@ public partial class MainWindow : Window
     private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();
 
     /// <summary>打开当天的日志文件；文件不存在时打开日志目录。</summary>
-    private void OnOpenLogFileClick(object? sender, RoutedEventArgs e)
+    private void OpenLogFile()
     {
         try
         {
@@ -136,7 +136,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>导出包含异常全文与最近日志的错误报告，方便发给他人排查。</summary>
-    private async void OnExportErrorReportClick(object? sender, RoutedEventArgs e)
+    private async Task ExportErrorReportAsync()
     {
         if (DataContext is not MainViewModel viewModel) return;
 
@@ -169,6 +169,16 @@ public partial class MainWindow : Window
             LauncherLog.Error("导出错误报告失败", exception);
         }
     }
+
+    private void OnErrorDialogClose(object? sender, EventArgs e)
+    {
+        if (DataContext is MainViewModel viewModel)
+            viewModel.CloseDownloadErrorDialogCommand.Execute(null);
+    }
+
+    private void OnErrorDialogOpenLog(object? sender, EventArgs e) => OpenLogFile();
+
+    private void OnErrorDialogExport(object? sender, EventArgs e) => _ = ExportErrorReportAsync();
 
     private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
     {

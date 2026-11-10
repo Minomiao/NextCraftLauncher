@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:NextCraftLauncher.ViewModels"
         xmlns:views="using:NextCraftLauncher.Views"
+        xmlns:controls="using:NextCraftLauncher.Controls"
         xmlns:media="using:Avalonia.Media"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -161,53 +162,12 @@
         </Border>
 
         <!-- 下载 / 安装错误弹窗（置顶，背景模糊） -->
-        <Border IsVisible="{Binding IsDownloadErrorDialogOpen}"
-                Background="#66000000">
-            <Border Width="480"
-                    Padding="24"
-                    CornerRadius="12"
-                    Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="{Binding DownloadErrorTitle}"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="#D13438"
-                               TextWrapping="Wrap" />
-
-                    <TextBlock Text="{Binding DownloadErrorHint}"
-                               FontSize="12.5"
-                               Opacity="0.75"
-                               TextWrapping="Wrap"
-                               IsVisible="{Binding HasDownloadErrorHint}" />
-
-                    <TextBlock Text="如果要寻求帮助，请向他人发送导出的错误报告文件，而不是发送这个窗口的截图。"
-                               FontSize="12"
-                               Opacity="0.55"
-                               TextWrapping="Wrap" />
-
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8"
-                                Margin="0,4,0,0"
-                                HorizontalAlignment="Right">
-                        <Button Content="确定"
-                                Height="32"
-                                Padding="14,0"
-                                Command="{Binding CloseDownloadErrorDialogCommand}" />
-                        <Button Content="打开 log 文件"
-                                Height="32"
-                                Padding="14,0"
-                                Click="OnOpenLogFileClick" />
-                        <Button Classes="primary"
-                                Content="导出错误报告"
-                                Height="32"
-                                Padding="14,0"
-                                Click="OnExportErrorReportClick" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </Border>
+        <controls:ErrorDialog IsOpen="{Binding IsDownloadErrorDialogOpen}"
+                              Title="{Binding DownloadErrorTitle}"
+                              Hint="{Binding DownloadErrorHint}"
+                              CloseRequested="OnErrorDialogClose"
+                              OpenLogRequested="OnErrorDialogOpenLog"
+                              ExportRequested="OnErrorDialogExport" />
     </Panel>
 
 </Window>

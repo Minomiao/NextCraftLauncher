@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="NextCraftLauncher.Controls.ErrorDialog">
+
+    <!-- 置顶错误弹窗：遮罩 + 卡片。具体文字与显示由 ErrorDialog 的属性控制。 -->
+    <Border x:Name="Mask" Background="#66000000" IsVisible="False">
+        <Border Width="480"
+                Padding="24"
+                CornerRadius="12"
+                Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
+            <StackPanel Spacing="12">
+                <TextBlock x:Name="TitleText"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="#D13438"
+                           TextWrapping="Wrap" />
+
+                <TextBlock x:Name="HintText"
+                           FontSize="12.5"
+                           Opacity="0.75"
+                           TextWrapping="Wrap"
+                           IsVisible="False" />
+
+                <TextBlock x:Name="AdviceText"
+                           FontSize="12"
+                           Opacity="0.55"
+                           TextWrapping="Wrap"
+                           IsVisible="False" />
+
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8"
+                            Margin="0,4,0,0"
+                            HorizontalAlignment="Right">
+                    <Button Content="确定"
+                            Height="32"
+                            Padding="14,0"
+                            Click="OnCloseClick" />
+                    <Button Content="打开 log 文件"
+                            Height="32"
+                            Padding="14,0"
+                            Click="OnOpenLogClick" />
+                    <Button Classes="primary"
+                            Content="导出错误报告"
+                            Height="32"
+                            Padding="14,0"
+                            Click="OnExportClick" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Border>
+</UserControl>

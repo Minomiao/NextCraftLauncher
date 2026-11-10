@@ -3527,6 +3527,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
+        // 刚切换版本时解析可能还没结束，等它完成再用 _resolved，避免启动到上一个版本。
+        await _detailsTask;
+
         if (!CanLaunch || _resolved is null || SelectedJava is null) return;
 
         IsLaunching = true;
@@ -3636,8 +3639,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         VersionDetails = "正在解析版本...";
-        _resolved = null;
-        UpdateLaunchWarning();
+
+        // 切换版本时不清空上一份解析结果：否则启动按钮会先变灰、警告文字会先消失，
+        // 解析完再变回来，看起来就像在闪。启动命令会等这次解析完成后再校验。
 
         try
         {

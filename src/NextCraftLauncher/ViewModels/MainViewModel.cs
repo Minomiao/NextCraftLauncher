@@ -447,6 +447,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>启动页的版本详情页（目前只显示版本信息）是否打开。</summary>
     [ObservableProperty] private bool _isVersionDetailOpen;
 
+    /// <summary>打开详情页之前所在的区块，用来决定「返回」回到哪里。</summary>
+    private LaunchSection _sectionBeforeVersionDetail = LaunchSection.Versions;
+
     // 下载/安装失败时的置顶错误弹窗。
     [ObservableProperty] private bool _isDownloadErrorDialogOpen;
     [ObservableProperty] private string _downloadErrorTitle = string.Empty;
@@ -1379,7 +1382,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ShowLaunchPage() => CurrentPage = AppPage.Launch;
 
     [RelayCommand]
-    private void ShowStartSection() => CurrentLaunchSection = LaunchSection.Start;
+    private void ShowStartSection()
+    {
+        IsVersionDetailOpen = false;
+        CurrentLaunchSection = LaunchSection.Start;
+    }
 
     [RelayCommand]
     private void ShowVersionsSection()
@@ -1449,11 +1456,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (version is not null) SelectedVersion = version;
         if (SelectedVersion is null) return;
 
+        _sectionBeforeVersionDetail = CurrentLaunchSection;
         IsVersionDetailOpen = true;
     }
 
+    /// <summary>启动按钮下方的「版本设置」：直接打开当前版本的设置页。</summary>
     [RelayCommand]
-    private void CloseVersionSettings() => IsVersionDetailOpen = false;
+    private void OpenCurrentVersionSettings() => OpenVersionSettings(null);
+
+    [RelayCommand]
+    private void CloseVersionSettings()
+    {
+        IsVersionDetailOpen = false;
+        CurrentLaunchSection = _sectionBeforeVersionDetail;
+    }
 
     [RelayCommand]
     private void CancelVersionDelete() => IsVersionDeleteDialogOpen = false;

@@ -100,23 +100,7 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid ColumnDefinitions="176,1,*" ColumnSpacing="16">
-
-        <!-- 左侧边栏 -->
-        <StackPanel Spacing="2" VerticalAlignment="Top" Margin="0,2,0,0">
-            <Button Classes="side"
-                    Classes.selected="{Binding IsStartSectionSelected}"
-                    Content="启动"
-                    Command="{Binding ShowStartSectionCommand}" />
-            <Button Classes="side"
-                    Classes.selected="{Binding IsVersionsSectionSelected}"
-                    Content="版本"
-                    Command="{Binding ShowVersionsSectionCommand}" />
-        </StackPanel>
-
-        <Border Grid.Column="1" Classes="vline" />
-
-        <Grid Grid.Column="2">
+    <Grid>
 
             <!-- 启动 -->
             <Grid IsVisible="{Binding IsStartSectionSelected}">
@@ -210,6 +194,27 @@
                                 Height="48"
                                 HorizontalAlignment="Center"
                                 Margin="0,8,0,0" />
+
+                        <!-- 版本选择 / 版本设置：强调色描边，与上面启动按钮同宽 -->
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="8"
+                              Width="240"
+                              HorizontalAlignment="Center">
+                            <Button Classes="outline"
+                                    Content="版本选择"
+                                    Height="34"
+                                    FontSize="12"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding ShowVersionsSectionCommand}" />
+                            <Button Grid.Column="1"
+                                    Classes="outline"
+                                    Content="版本设置"
+                                    Height="34"
+                                    FontSize="12"
+                                    HorizontalAlignment="Stretch"
+                                    ToolTip.Tip="设置当前版本"
+                                    Command="{Binding OpenCurrentVersionSettingsCommand}" />
+                        </Grid>
                 </StackPanel>
 
                 <!-- 顶部账号切换：叠加在原有布局上方，不影响中间内容的居中 -->
@@ -282,9 +287,17 @@
             <Grid IsVisible="{Binding IsVersionsSectionSelected}">
                 <Grid RowDefinitions="Auto,*" RowSpacing="12" IsVisible="{Binding !IsVersionDetailOpen}">
 
-                    <!-- 文件夹下拉 + 重新扫描 + 导入 -->
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                        <ComboBox ItemsSource="{Binding GameFolders}"
+                    <!-- 返回 + 文件夹下拉 + 重新扫描 + 导入 -->
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                        <Button Classes="soft"
+                                Content="返回"
+                                Height="34"
+                                Padding="12,0"
+                                FontSize="12"
+                                Command="{Binding ShowStartSectionCommand}" />
+
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding GameFolders}"
                                   SelectedItem="{Binding SelectedGameFolder}"
                                   HorizontalAlignment="Stretch"
                                   MinHeight="34"
@@ -306,7 +319,7 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
 
-                        <Button Grid.Column="1"
+                        <Button Grid.Column="2"
                                 Classes="soft"
                                 Content="重新扫描"
                                 Height="34"
@@ -314,7 +327,7 @@
                                 Command="{Binding RefreshCommand}"
                                 IsEnabled="{Binding !IsBusy}" />
 
-                        <DropDownButton Grid.Column="2"
+                        <DropDownButton Grid.Column="3"
                                         Classes="soft"
                                         Content="导入"
                                         Height="34"
@@ -406,6 +419,5 @@
                     </ScrollViewer>
                 </Grid>
             </Grid>
-        </Grid>
     </Grid>
 </UserControl>

@@ -510,7 +510,11 @@ public partial class MainWindow : Window
         if (e.PropertyName == nameof(MainViewModel.CurrentPage))
         {
             // 拖拽中的指示器由指针驱动，不要在此处抢回。
-            if (!_navDragging) SnapNavIndicator(animate: true);
+            if (_navDragging) return;
+
+            // 启动预热时窗口还是透明的，此时切页直接落位，
+            // 否则窗口刚显示出来时还能看到高亮在滑动。
+            SnapNavIndicator(animate: IsVisible && Opacity >= 1);
             return;
         }
 

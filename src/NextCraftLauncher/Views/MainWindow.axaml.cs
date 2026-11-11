@@ -58,58 +58,62 @@ public partial class MainWindow : Window
         NavBar.AddHandler(PointerReleasedEvent, OnNavPointerReleased, RoutingStrategies.Tunnel);
     }
 
-    private const double NavDragThreshold = 60;
-
-    private Point? _navDragOrigin;
-    private bool _navDragged;
+    private bool _navDragging;
+    private bool _navPageChanged;
 
     private void OnNavPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
-        _navDragged = false;
-        _navDragOrigin = e.GetPosition(this);
+        _navDragging = true;
+        _navPageChanged = false;
+
+        FollowNavPointer(e.GetPosition(NavBar));
     }
 
     private void OnNavPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (_navDragOrigin is not { } origin) return;
+        if (!_navDragging) return;
 
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
-            _navDragOrigin = null;
+            _navDragging = false;
             return;
         }
 
-        var delta = e.GetPosition(this).X - origin.X;
-        if (Math.Abs(delta) < NavDragThreshold) return;
-
-        _navDragOrigin = null;
-        _navDragged = true;
-
-        // 向左拖看下一页，向右拖看上一页。
-        StepPage(delta < 0 ? 1 : -1);
+        // 不按距离计算：指针停在哪个按钮上，高亮就实时跟到哪个。
+        FollowNavPointer(e.GetPosition(NavBar));
     }
 
     private void OnNavPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        _navDragOrigin = null;
+        _navDragging = false;
 
-        if (!_navDragged) return;
+        if (!_navPageChanged) return;
 
         // 拖拽已经切过页了，吞掉这次释放，避免按钮再触发一次点击把页切回去。
-        _navDragged = false;
+        _navPageChanged = false;
         e.Handled = true;
     }
 
-    /// <summary>按当前页在导航里的位置前后切换；超出范围则不动。</summary>
-    private void StepPage(int delta)
+    /// <summary>指针跑到哪个导航按钮上就切到对应页。</summary>
+    private void FollowNavPointer(Point position)
     {
         if (_viewModel is null) return;
 
-        var target = (int)_viewModel.CurrentPage + delta;
+        if (NavLaunchButton.Bounds.Contains(position) && _viewModel.CurrentPage != AppPage.Launch)
+            SwitchPage(AppPage.Launch);
+        else if (NavDownloadButton.Bounds.Contains(position) && _viewModel.CurrentPage != AppPage.Download)
+            SwitchPage(AppPage.Download);
+        else if (NavSettingsButton.Bounds.Contains(position) && _viewModel.CurrentPage != AppPage.Settings)
+            SwitchPage(AppPage.Settings);
+    }
 
-        switch ((AppPage)target)
+    private void SwitchPage(AppPage page)
+    {
+        if (_viewModel is null) return;
+
+        switch (page)
         {
             case AppPage.Launch:
                 _viewModel.ShowLaunchPageCommand.Execute(null);
@@ -123,6 +127,8 @@ public partial class MainWindow : Window
                 _viewModel.ShowSettingsPageCommand.Execute(null);
                 break;
         }
+
+        _navPageChanged = true;
     }
 
     protected override void OnDataContextChanged(EventArgs e)

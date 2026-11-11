@@ -73,14 +73,17 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <Button Classes="nav"
+                            x:Name="NavLaunchButton"
                             Classes.selected="{Binding IsLaunchPageSelected}"
                             Content="启动"
                             Command="{Binding ShowLaunchPageCommand}" />
                     <Button Classes="nav"
+                            x:Name="NavDownloadButton"
                             Classes.selected="{Binding IsDownloadPageSelected}"
                             Content="下载"
                             Command="{Binding ShowDownloadPageCommand}" />
                     <Button Classes="nav"
+                            x:Name="NavSettingsButton"
                             Classes.selected="{Binding IsSettingsPageSelected}"
                             Content="设置"
                             Command="{Binding ShowSettingsPageCommand}" />

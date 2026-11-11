@@ -26,6 +26,13 @@
             <Setter Property="FontSize" Value="14" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
+        <!-- 选中态只由共享指示器表达，按钮自身不再出现悬停/按下色块 -->
+        <Style Selector="Button.nav:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.nav:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
 
         <Style Selector="Button.caption">
             <Setter Property="Width" Value="28" />
@@ -67,7 +74,7 @@
                        x:Name="NavBar"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center">
-                    <!-- 唯一的高亮指示器：位置与宽度由代码驱动，拖拽时连续跟随指针 -->
+                    <!-- 唯一的高亮指示器：位置与宽度由代码驱动，拖动时淡出 -->
                     <Border x:Name="NavIndicator"
                             Width="0"
                             Height="32"
@@ -75,6 +82,7 @@
                             Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center"
+                            RenderTransformOrigin="50%,50%"
                             IsHitTestVisible="False">
                     </Border>
 

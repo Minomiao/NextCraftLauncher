@@ -1,5 +1,7 @@
 using System;
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -56,9 +58,47 @@ public partial class MessageCard : UserControl
     public static readonly StyledProperty<string> CloseTextProperty =
         AvaloniaProperty.Register<MessageCard, string>(nameof(CloseText), "确定");
 
+    /// <summary>卡片入场：从上方落下，并且从一侧先出现（带一点斜度）。</summary>
+    private const double EnterOffsetY = -28;
+    private const double EnterAngle = -4.5;
+
+    private readonly RotateTransform _tilt;
+    private readonly TranslateTransform _offset;
+
     public MessageCard()
     {
         InitializeComponent();
+
+        // 旋转 + 位移各自带过渡：旋转让左右两侧先后到位，像斜着落下再放平。
+        _tilt = new RotateTransform(EnterAngle)
+        {
+            Transitions = new Transitions
+            {
+                new DoubleTransition
+                {
+                    Property = RotateTransform.AngleProperty,
+                    Duration = TimeSpan.FromMilliseconds(560),
+                    Easing = new CubicEaseOut(),
+                },
+            },
+        };
+
+        _offset = new TranslateTransform(0, EnterOffsetY)
+        {
+            Transitions = new Transitions
+            {
+                new DoubleTransition
+                {
+                    Property = TranslateTransform.YProperty,
+                    Duration = TimeSpan.FromMilliseconds(560),
+                    Easing = new BackEaseOut(),
+                },
+            },
+        };
+
+        Card.RenderTransform = new TransformGroup { Children = { _tilt, _offset } };
+        Card.RenderTransformOrigin = RelativePoint.Center;
+
         Apply();
     }
 
@@ -137,6 +177,12 @@ public partial class MessageCard : UserControl
     private void Apply()
     {
         Mask.IsVisible = IsOpen;
+
+        // 打开时从“透明 + 上移 + 斜着”过渡到终态；关闭时直接复位，等下次打开再播。
+        Mask.Opacity = IsOpen ? 1 : 0;
+        Card.Opacity = IsOpen ? 1 : 0;
+        _offset.Y = IsOpen ? 0 : EnterOffsetY;
+        _tilt.Angle = IsOpen ? 0 : EnterAngle;
 
         TitleText.Text = Title ?? string.Empty;
 

@@ -1,13 +1,18 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using NextCraftLauncher.Core.Auth;
@@ -19,6 +24,27 @@ namespace NextCraftLauncher.Views;
 
 public partial class MainWindow : Window
 {
+    /// <summary>错误卡片打开时，背景模糊从无到有地出现。</summary>
+    private static readonly Animation BackdropBlurAnimation = new()
+    {
+        Duration = TimeSpan.FromMilliseconds(450),
+        Easing = new CubicEaseOut(),
+        FillMode = FillMode.Forward,
+        Children =
+        {
+            new KeyFrame
+            {
+                Cue = new Cue(0d),
+                Setters = { new Setter(BlurEffect.RadiusProperty, 0d) },
+            },
+            new KeyFrame
+            {
+                Cue = new Cue(1d),
+                Setters = { new Setter(BlurEffect.RadiusProperty, 12d) },
+            },
+        },
+    };
+
     private MainViewModel? _viewModel;
 
     public MainWindow()
@@ -35,6 +61,7 @@ public partial class MainWindow : Window
         {
             _viewModel.GameStarted -= OnGameStarted;
             _viewModel.GameExited -= OnGameExited;
+            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             _viewModel.MicrosoftSignInHandler = null;
         }
 
@@ -44,8 +71,26 @@ public partial class MainWindow : Window
         {
             _viewModel.GameStarted += OnGameStarted;
             _viewModel.GameExited += OnGameExited;
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
             _viewModel.MicrosoftSignInHandler = ShowMicrosoftSignInAsync;
             ReportMetrics();
+        }
+    }
+
+    /// <summary>错误卡片打开时让背景模糊逐渐出现，关闭时直接移除。</summary>
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MainViewModel.IsDownloadErrorDialogOpen)) return;
+
+        if (_viewModel?.IsDownloadErrorDialogOpen == true)
+        {
+            var effect = new BlurEffect { Radius = 0 };
+            ContentRoot.Effect = effect;
+            _ = BackdropBlurAnimation.RunAsync(effect);
+        }
+        else
+        {
+            ContentRoot.Effect = null;
         }
     }
 

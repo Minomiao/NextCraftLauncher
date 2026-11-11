@@ -3,7 +3,6 @@
         xmlns:vm="using:NextCraftLauncher.ViewModels"
         xmlns:views="using:NextCraftLauncher.Views"
         xmlns:controls="using:NextCraftLauncher.Controls"
-        xmlns:media="using:Avalonia.Media"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="820"
@@ -50,19 +49,10 @@
             <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
             <Setter Property="CornerRadius" Value="14" />
         </Style>
-
-        <!-- 错误弹窗打开时模糊背后的界面 -->
-        <Style Selector="Grid.blurred">
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <media:BlurEffect Radius="12" />
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Styles>
 
     <Panel>
-        <Grid RowDefinitions="Auto,*" Classes.blurred="{Binding IsDownloadErrorDialogOpen}">
+        <Grid x:Name="ContentRoot" RowDefinitions="Auto,*">
 
         <!-- 沉浸式标题栏：左侧品牌、居中导航，可拖动 -->
         <Grid Grid.Row="0"

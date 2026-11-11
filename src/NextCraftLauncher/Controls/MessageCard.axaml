@@ -59,13 +59,26 @@
     </UserControl.Styles>
 
     <!-- 通用提示卡片：遮罩 + 卡片。外观由 Kind 预设决定，文字与显隐由属性控制。 -->
-    <Border x:Name="Mask" Background="#66000000" IsVisible="False">
-        <Border Width="480"
+    <Border x:Name="Mask" Background="#66000000" Opacity="0" IsVisible="False">
+        <Border.Transitions>
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.32" Easing="CubicEaseOut" />
+            </Transitions>
+        </Border.Transitions>
+
+        <Border x:Name="Card"
+                Width="530"
                 Padding="24"
                 CornerRadius="12"
+                Opacity="0"
                 Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center">
+            <Border.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.32" Easing="CubicEaseOut" />
+                </Transitions>
+            </Border.Transitions>
             <StackPanel Spacing="12">
                 <TextBlock x:Name="TitleText"
                            FontSize="18"

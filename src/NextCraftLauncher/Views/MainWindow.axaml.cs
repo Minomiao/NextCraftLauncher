@@ -154,6 +154,9 @@ public partial class MainWindow : Window
     private double _navPressX;
     private IDisposable? _navSquashTimer;
 
+    /// <summary>当前正跟着高亮一起缩小的按钮文字；没按住时为 null。</summary>
+    private ScaleTransform? _navSquashTextScale;
+
     /// <summary>导航按钮顺序，与从左到右的页面顺序一致。</summary>
     private static readonly AppPage[] NavPages = { AppPage.Launch, AppPage.Download, AppPage.Settings };
 
@@ -215,7 +218,7 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    /// <summary>松开或失去指针：拖动结束后让高亮滑到当前页；没拖动则交给按钮的点击。</summary>
+    /// <summary>松开或失去指针：按住期间保持缩小，松开后恢复；拖动结束后让高亮滑到当前页。</summary>
     private void EndNavPress()
     {
         if (!_navPressed) return;
@@ -223,6 +226,10 @@ public partial class MainWindow : Window
         _navPressed = false;
         _navDragRects = null;
         _navPendingX = null;
+
+        _navSquashTimer?.Dispose();
+        _navSquashTimer = null;
+        ReleaseNavSquash();
 
         if (!_navDragging) return;
 
@@ -275,15 +282,40 @@ public partial class MainWindow : Window
             scale.ScaleY = 1;
         }
 
-        var textScale = _viewModel is null ? null : NavButtonScale(_viewModel.CurrentPage);
+        _navSquashTextScale = _viewModel is null ? null : NavButtonScale(_viewModel.CurrentPage);
 
-        SetNavSquash(NavSquashScale, NavSquashIn, textScale);
+        SetNavSquash(NavSquashScale, NavSquashIn, _navSquashTextScale);
 
         _navSquashTimer = DispatcherTimer.RunOnce(() =>
         {
             _navSquashTimer = null;
-            SetNavSquash(1, NavSquashOut, textScale);
+
+            // 还按着就停在缩小后的尺寸，等松开再恢复。
+            if (_navPressed) return;
+
+            ReleaseNavSquash();
         }, TimeSpan.FromMilliseconds(95));
+    }
+
+    private void ReleaseNavSquash()
+    {
+        SetNavSquash(1, NavSquashOut, _navSquashTextScale);
+        _navSquashTextScale = null;
+    }
+
+    /// <summary>拖动中让被高亮盖住的按钮文字一起保持缩小。</summary>
+    private void FollowSquashText(Rect rect)
+    {
+        if (!_navPressed || _navDragRects is not { } rects) return;
+
+        var scale = NavButtonScale(NavPages[NavPageIndex(rect.Center.X, rects)]);
+        if (ReferenceEquals(scale, _navSquashTextScale)) return;
+
+        if (_navSquashTextScale is { } previous)
+            SetNavSquashText(previous, 1, NavSquashOut);
+
+        _navSquashTextScale = scale;
+        SetNavSquashText(scale, NavSquashScale, NavSquashIn);
     }
 
     private void SetNavSquash(double value, Transitions transitions, ScaleTransform? textScale)
@@ -294,9 +326,14 @@ public partial class MainWindow : Window
 
         if (textScale is null) return;
 
-        textScale.Transitions = transitions;
-        textScale.ScaleX = value;
-        textScale.ScaleY = value;
+        SetNavSquashText(textScale, value, transitions);
+    }
+
+    private static void SetNavSquashText(ScaleTransform scale, double value, Transitions transitions)
+    {
+        scale.Transitions = transitions;
+        scale.ScaleX = value;
+        scale.ScaleY = value;
     }
 
     private ScaleTransform NavButtonScale(AppPage page) => page switch
@@ -359,6 +396,8 @@ public partial class MainWindow : Window
         // 宽度很少变（三个标签等宽），只有真变了才触发一次布局。
         if (Math.Abs(NavIndicator.Width - rect.Width) > 0.01)
             NavIndicator.Width = rect.Width;
+
+        FollowSquashText(rect);
     }
 
     private void UseNavIndicatorTransitions(bool enabled)

@@ -115,8 +115,15 @@ public partial class MainWindow : Window
     private bool _navDragging;
     private bool _navPageChanged;
 
-    /// <summary>导航按钮顺序，与向左到右的页面顺序一致。</summary>
+    /// <summary>导航按钮顺序，与从左到右的页面顺序一致。</summary>
     private static readonly AppPage[] NavPages = { AppPage.Launch, AppPage.Download, AppPage.Settings };
+
+    /// <summary>按下时缓存下来的按钮位置；拖动过程中不变，避免每次移动都重新换算。</summary>
+    private Rect[]? _navDragRects;
+
+    /// <summary>待处理的最新指针横坐标，每帧只应用一次。</summary>
+    private double? _navPendingX;
+    private bool _navUpdateQueued;
 
     /// <summary>指示器上一次被设置到的位置；布局变化时用来判断是否需要重新贴齐。</summary>
     private Rect? _navIndicatorTarget;
@@ -124,10 +131,15 @@ public partial class MainWindow : Window
     private void OnNavPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (!TryGetNavRects(out var rects)) return;
 
         var position = e.GetPosition(NavBar);
+        _navDragRects = rects;
         _navDragging = true;
         _navPageChanged = false;
+
+        // 拖动期间由代码直接落位，不再逐帧触发过渡。
+        UseNavIndicatorTransitions(false);
 
         // 按下先把高亮“抬起”并对齐到指针所在的按钮，之后的移动才连续跟随。
         LiftNavIndicator();
@@ -164,6 +176,8 @@ public partial class MainWindow : Window
 
         _navDragging = false;
         _navPageChanged = false;
+        _navDragRects = null;
+        _navPendingX = null;
 
         SettleNavIndicator();
         SnapNavIndicator(animate: true);
@@ -172,23 +186,41 @@ public partial class MainWindow : Window
     /// <summary>按下时把高亮对齐到指针所在的按钮。</summary>
     private void PressNavPointer(Point position)
     {
-        if (_viewModel is null || !TryGetNavRects(out var rects)) return;
+        if (_viewModel is null || _navDragRects is not { } rects) return;
 
         var index = NavPageIndex(position.X, rects);
         if (NavPages[index] != _viewModel.CurrentPage) SwitchPage(NavPages[index]);
 
-        SetNavIndicator(rects[index], animate: false);
+        ApplyNavIndicator(rects[index]);
     }
 
-    /// <summary>拖动中：高亮以指针为中心连续移动，页面跟着切到指针所在的按钮。</summary>
+    /// <summary>拖动中：切换页面，并把高亮位置交给本帧稍后统一应用。</summary>
     private void FollowNavPointer(Point position)
     {
-        if (_viewModel is null || !TryGetNavRects(out var rects)) return;
+        if (_viewModel is null || _navDragRects is not { } rects) return;
 
         var index = NavPageIndex(position.X, rects);
         if (NavPages[index] != _viewModel.CurrentPage) SwitchPage(NavPages[index]);
 
-        SetNavIndicator(NavIndicatorRect(position.X, rects), animate: false);
+        _navPendingX = position.X;
+        if (_navUpdateQueued) return;
+
+        // 指针事件可能远高于刷新率，每帧只处理最后一次。
+        _navUpdateQueued = true;
+        Dispatcher.UIThread.Post(FlushNavIndicator, DispatcherPriority.Render);
+    }
+
+    private void FlushNavIndicator()
+    {
+        _navUpdateQueued = false;
+
+        var x = _navPendingX;
+        _navPendingX = null;
+
+        if (x is not { } value || !_navDragging) return;
+        if (_navDragRects is not { } rects) return;
+
+        ApplyNavIndicator(NavIndicatorRect(value, rects));
     }
 
     /// <summary>指针落在哪个按钮的区间内；按按钮之间空隙的中点划分，越界时取两端。</summary>
@@ -241,19 +273,28 @@ public partial class MainWindow : Window
 
     private void SetNavIndicator(Rect rect, bool animate)
     {
-        _navIndicatorTarget = rect;
-
-        NavIndicator.Transitions = animate ? NavIndicatorSizeTransition : null;
-        _navIndicatorOffset.Transitions = animate ? NavIndicatorSlideTransition : null;
-
-        _navIndicatorOffset.X = rect.X;
-        NavIndicator.Width = rect.Width;
-
-        if (animate) return;
+        UseNavIndicatorTransitions(animate);
+        ApplyNavIndicator(rect);
 
         // 直接落位后把过渡恢复，之后的页面切换仍然带动画。
-        NavIndicator.Transitions = NavIndicatorSizeTransition;
-        _navIndicatorOffset.Transitions = NavIndicatorSlideTransition;
+        if (!animate) UseNavIndicatorTransitions(true);
+    }
+
+    /// <summary>直接落位，不做任何过渡或动画设置。</summary>
+    private void ApplyNavIndicator(Rect rect)
+    {
+        _navIndicatorTarget = rect;
+        _navIndicatorOffset.X = rect.X;
+
+        // 宽度很少变（三个标签等宽），只有真变了才触发一次布局。
+        if (Math.Abs(NavIndicator.Width - rect.Width) > 0.01)
+            NavIndicator.Width = rect.Width;
+    }
+
+    private void UseNavIndicatorTransitions(bool enabled)
+    {
+        NavIndicator.Transitions = enabled ? NavIndicatorSizeTransition : null;
+        _navIndicatorOffset.Transitions = enabled ? NavIndicatorSlideTransition : null;
     }
 
     private void SnapNavIndicator(bool animate)

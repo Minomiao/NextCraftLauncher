@@ -106,8 +106,8 @@
             <Grid IsVisible="{Binding IsStartSectionSelected}">
 
                 <StackPanel Spacing="12"
-                            MaxWidth="640"
-                            HorizontalAlignment="Center"
+                            MaxWidth="1000"
+                            HorizontalAlignment="Stretch"
                             VerticalAlignment="Center">
                         <TextBlock Text="当前版本"
                                    FontSize="12"
@@ -117,8 +117,8 @@
                         <!-- 实验：主界面的大版本显示做成无容器的弧形轮播，一次一页 -->
                         <controls:ArcCarousel ItemsSource="{Binding Versions}"
                                               SelectedItem="{Binding SelectedVersion}"
-                                              Width="640"
-                                              Height="104">
+                                              Height="104"
+                                              HorizontalAlignment="Stretch">
                             <controls:ArcCarousel.ItemTemplate>
                                 <DataTemplate x:DataType="vm:VersionItemViewModel">
                                     <StackPanel Spacing="2" MaxWidth="440">

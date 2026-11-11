@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using NextCraftLauncher.Core.Launch;
 using NextCraftLauncher.Core.Logging;
 using NextCraftLauncher.Core.Settings;
 using NextCraftLauncher.Download.Minecraft;
@@ -33,6 +34,9 @@ public sealed class LoaderInstallOptions
 
     /// <summary>安装器实时输出的日志行（仅 Forge / NeoForge）。</summary>
     public IProgress<string>? Log { get; init; }
+
+    /// <summary>运行安装器的 Java 大版本，用于解码它的输出；未知时为 0。</summary>
+    public int JavaMajor { get; init; }
 
     public DownloadClient? Client { get; init; }
 }
@@ -396,7 +400,7 @@ public static class LoaderInstaller
                 $"正在运行 {displayName} 安装器…", null, MinecraftDownloadStage.Files));
 
             var (exitCode, output) = await RunInstallerAsync(
-                options.JavaPath!, installerPath, tempRoot, options.Log, cancellationToken);
+                options.JavaPath!, options.JavaMajor, installerPath, tempRoot, options.Log, cancellationToken);
 
             // 部分安装器在失败时仍然返回 0，需要同时检查输出。
             var failed = exitCode != 0 ||
@@ -657,6 +661,7 @@ public static class LoaderInstaller
 
     private static async Task<(int ExitCode, IReadOnlyList<string> Output)> RunInstallerAsync(
         string javaPath,
+        int javaMajor,
         string installerPath,
         string minecraftDirectory,
         IProgress<string>? log,
@@ -671,6 +676,10 @@ public static class LoaderInstaller
             RedirectStandardError = true,
             CreateNoWindow = true,
         };
+
+        var outputEncoding = ProcessOutputEncoding.For(javaMajor);
+        startInfo.StandardOutputEncoding = outputEncoding;
+        startInfo.StandardErrorEncoding = outputEncoding;
 
         startInfo.ArgumentList.Add("-jar");
         startInfo.ArgumentList.Add(installerPath);

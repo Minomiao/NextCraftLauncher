@@ -18,6 +18,10 @@ public sealed record LaunchOptions(
 public sealed class LaunchPlan
 {
     public required string JavaPath { get; init; }
+
+    /// <summary>启动用的 Java 大版本，用来决定子进程输出的解码方式。</summary>
+    public required int JavaMajor { get; init; }
+
     public required IReadOnlyList<string> Arguments { get; init; }
     public required string WorkingDirectory { get; init; }
     public required string VersionId { get; init; }
@@ -123,6 +127,7 @@ public static class LaunchPlanBuilder
         return new LaunchPlan
         {
             JavaPath = java.Path,
+            JavaMajor = java.MajorVersion,
             Arguments = arguments,
             WorkingDirectory = gameDirectory,
             VersionId = version.Id,

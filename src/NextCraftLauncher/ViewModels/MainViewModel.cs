@@ -2875,6 +2875,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             NotifyDownloadStats();
 
             string? javaPath = null;
+            var javaMajor = 0;
 
             if (loader is "forge" or "neoforge")
             {
@@ -2896,6 +2897,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 }
 
                 javaPath = java.Path;
+                javaMajor = java.MajorVersion;
             }
 
             var lastInstallTicks = 0L;
@@ -2980,6 +2982,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                             _settings.DefaultIsolation).IsIsolated,
                         Mirror = ResolveLoaderMirror(loader),
                         JavaPath = javaPath,
+                        JavaMajor = javaMajor,
                         VersionName = desiredName,
                         Progress = installProgress,
                         Log = installLog,

@@ -25,6 +25,11 @@ public static class GameLauncher
             WorkingDirectory = plan.WorkingDirectory,
         };
 
+        // 中文系统的 Java 8 输出 GBK、新版本输出 UTF-8，弄错就会满屏乱码。
+        var outputEncoding = ProcessOutputEncoding.For(plan.JavaMajor);
+        startInfo.StandardOutputEncoding = outputEncoding;
+        startInfo.StandardErrorEncoding = outputEncoding;
+
         foreach (var argument in plan.Arguments)
             startInfo.ArgumentList.Add(argument);
 

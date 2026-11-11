@@ -444,6 +444,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isVersionDeleteDialogOpen;
     [ObservableProperty] private string _versionDeleteDialogMessage = string.Empty;
 
+    /// <summary>启动页的版本详情页（目前只显示版本信息）是否打开。</summary>
+    [ObservableProperty] private bool _isVersionDetailOpen;
+
     // 下载/安装失败时的置顶错误弹窗。
     [ObservableProperty] private bool _isDownloadErrorDialogOpen;
     [ObservableProperty] private string _downloadErrorTitle = string.Empty;
@@ -1379,7 +1382,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ShowStartSection() => CurrentLaunchSection = LaunchSection.Start;
 
     [RelayCommand]
-    private void ShowVersionsSection() => CurrentLaunchSection = LaunchSection.Versions;
+    private void ShowVersionsSection()
+    {
+        // 从侧边栏回到「版本」时总是先看到列表。
+        IsVersionDetailOpen = false;
+        CurrentLaunchSection = LaunchSection.Versions;
+    }
 
     [RelayCommand]
     private void ShowDownloadVersions() => CurrentDownloadSection = DownloadSection.Versions;
@@ -1422,8 +1430,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ShowSettingsDownload() => CurrentSettingsSection = SettingsSection.Download;
 
     [RelayCommand]
-    private void RequestVersionDelete()
+    private void RequestVersionDelete(VersionItemViewModel? version)
     {
+        if (version is not null) SelectedVersion = version;
         if (SelectedVersion is null) return;
 
         VersionDeleteDialogMessage =
@@ -1432,6 +1441,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
             "完全删除会从磁盘移除整个版本文件夹，且无法恢复。";
         IsVersionDeleteDialogOpen = true;
     }
+
+    /// <summary>进入某个版本的设置页；目前该页只展示版本信息。</summary>
+    [RelayCommand]
+    private void OpenVersionSettings(VersionItemViewModel? version)
+    {
+        if (version is not null) SelectedVersion = version;
+        if (SelectedVersion is null) return;
+
+        IsVersionDetailOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseVersionSettings() => IsVersionDetailOpen = false;
 
     [RelayCommand]
     private void CancelVersionDelete() => IsVersionDeleteDialogOpen = false;
@@ -1442,6 +1464,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var version = SelectedVersion;
         IsVersionDeleteDialogOpen = false;
         if (version is null) return;
+
+        IsVersionDetailOpen = false;
 
         var directory = AppSettings.NormalizePath(version.DirectoryPath);
         if (directory is not null &&
@@ -1464,6 +1488,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var version = SelectedVersion;
         IsVersionDeleteDialogOpen = false;
         if (version is null || IsBusy || IsLaunching) return;
+
+        IsVersionDetailOpen = false;
 
         var directory = AppSettings.NormalizePath(version.DirectoryPath);
         var versionsRoot = AppSettings.NormalizePath(Path.Combine(MinecraftDirectory, "versions"));

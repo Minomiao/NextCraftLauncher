@@ -21,11 +21,25 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
         </Style>
+
+        <!-- 默认不画底色：整行被高亮（悬浮 / 选中）时才露出按钮底色 -->
+        <Style Selector="ListBoxItem:pointerover Button.rowAction /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RowActionBackgroundBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style Selector="ListBoxItem:selected Button.rowAction /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RowActionBackgroundBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+
+        <!-- 按钮自己的悬浮 / 按下比行高亮再深一档 -->
         <Style Selector="Button.rowAction:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource RowActionBackgroundHoverBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
         </Style>
         <Style Selector="Button.rowAction:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseMediumBrush}" />
+            <Setter Property="Background" Value="{DynamicResource RowActionBackgroundPressedBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
         </Style>
         <Style Selector="Button.rowAction.remove">
             <Setter Property="Foreground" Value="#D13438" />

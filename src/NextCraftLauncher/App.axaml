@@ -16,10 +16,19 @@
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="TaskCardBackgroundBrush" Color="#FFFFFFFF" />
                     <SolidColorBrush x:Key="TaskCardBorderBrush" Color="#E4E4E7" />
+
+                    <!-- 列表行内小按钮的底色：只在整行高亮时看得见 -->
+                    <SolidColorBrush x:Key="RowActionBackgroundBrush" Color="#14000000" />
+                    <SolidColorBrush x:Key="RowActionBackgroundHoverBrush" Color="#1F000000" />
+                    <SolidColorBrush x:Key="RowActionBackgroundPressedBrush" Color="#29000000" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="TaskCardBackgroundBrush" Color="#2AFFFFFF" />
                     <SolidColorBrush x:Key="TaskCardBorderBrush" Color="#33FFFFFF" />
+
+                    <SolidColorBrush x:Key="RowActionBackgroundBrush" Color="#1FFFFFFF" />
+                    <SolidColorBrush x:Key="RowActionBackgroundHoverBrush" Color="#2EFFFFFF" />
+                    <SolidColorBrush x:Key="RowActionBackgroundPressedBrush" Color="#3DFFFFFF" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>

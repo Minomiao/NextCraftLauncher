@@ -135,7 +135,8 @@
                                     <TextBlock Text="{Binding AccountSubtitle}"
                                                FontSize="11"
                                                Opacity="0.55"
-                                               HorizontalAlignment="Center" />
+                                               HorizontalAlignment="Center"
+                                               IsVisible="{Binding HasMicrosoftAccount}" />
                                 </StackPanel>
                                 <Button Classes="toolbar soft"
                                         Content="登录"

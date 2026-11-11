@@ -3372,15 +3372,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void UseOfflineAccount() => IsMicrosoftAccount = false;
 
     [RelayCommand]
-    private async Task UseMicrosoftAccountAsync()
-    {
-        IsMicrosoftAccount = true;
-
-        // 已经登录过就直接切过去；没有账号时切过来就弹出登录窗口，不需要再点一次「登录」。
-        if (HasMicrosoftAccount || IsLoggingIn) return;
-
-        await LoginMicrosoftAsync();
-    }
+    private void UseMicrosoftAccount() => IsMicrosoftAccount = true;
 
     /// <summary>由视图提供的应用内登录窗口；为 <c>null</c> 时退回设备码登录。</summary>
     public Func<CancellationToken, Task<MicrosoftSignInAttempt>>? MicrosoftSignInHandler { get; set; }

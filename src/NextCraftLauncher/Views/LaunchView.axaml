@@ -108,7 +108,7 @@
                                    HorizontalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" />
 
-                        <!-- 账号：离线游戏名输入框保持原来的位置 -->
+                        <!-- 账号：离线游戏名输入框保持原来的位置；正版时名字与按钮在同一行居中 -->
                         <StackPanel Orientation="Horizontal"
                                     Spacing="8"
                                     HorizontalAlignment="Center"
@@ -124,9 +124,7 @@
                                         Spacing="8"
                                         VerticalAlignment="Center"
                                         IsVisible="{Binding IsMicrosoftAccount}">
-                                <StackPanel Spacing="1"
-                                            MinWidth="180"
-                                            VerticalAlignment="Center">
+                                <StackPanel Spacing="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding AccountDisplayName}"
                                                FontSize="14"
                                                FontWeight="SemiBold"
@@ -138,6 +136,7 @@
                                                HorizontalAlignment="Center"
                                                IsVisible="{Binding HasMicrosoftAccount}" />
                                 </StackPanel>
+
                                 <Button Classes="toolbar soft"
                                         Content="登录"
                                         Command="{Binding LoginMicrosoftCommand}"
@@ -171,13 +170,13 @@
                             Spacing="4"
                             Margin="0,6,0,0">
                     <Button Classes="accountTab"
-                            Classes.selected="{Binding IsOfflineAccount}"
-                            Content="离线"
-                            Command="{Binding UseOfflineAccountCommand}" />
-                    <Button Classes="accountTab"
                             Classes.selected="{Binding IsMicrosoftAccount}"
                             Content="正版"
                             Command="{Binding UseMicrosoftAccountCommand}" />
+                    <Button Classes="accountTab"
+                            Classes.selected="{Binding IsOfflineAccount}"
+                            Content="离线"
+                            Command="{Binding UseOfflineAccountCommand}" />
                 </StackPanel>
 
                 <!-- 正版登录 -->

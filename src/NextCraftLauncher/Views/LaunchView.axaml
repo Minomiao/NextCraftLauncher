@@ -11,6 +11,7 @@
 
     <UserControl.Styles>
         <!-- 版本列表里每行的小按钮 -->
+        <!-- 默认完全隐藏（含文字）：整行悬浮或选中时才淡入 -->
         <Style Selector="Button.rowAction">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -20,9 +21,22 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12" Easing="CubicEaseOut" />
+                </Transitions>
+            </Setter>
         </Style>
 
-        <!-- 默认不画底色：整行被高亮（悬浮 / 选中）时才露出按钮底色 -->
+        <Style Selector="ListBoxItem:pointerover Button.rowAction">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="ListBoxItem:selected Button.rowAction">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- 整行被高亮（悬浮 / 选中）时才露出按钮底色 -->
         <Style Selector="ListBoxItem:pointerover Button.rowAction /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource RowActionBackgroundBrush}" />
             <Setter Property="CornerRadius" Value="6" />

@@ -51,11 +51,8 @@ public partial class MainWindow : Window
     /// <summary>指示器的横向位移，与 <see cref="NavIndicator"/> 的宽度一起构成完整的滑动动画。</summary>
     private readonly TranslateTransform _navIndicatorOffset = new();
 
-    /// <summary>指示器的缩放，用于按下时的“抬起”手感。</summary>
-    private readonly ScaleTransform _navIndicatorScale = new();
-
-    /// <summary>按下指示器抬起到的倍数。</summary>
-    private const double NavIndicatorLiftScale = 1.12;
+    /// <summary>横向移动超过这个距离才算是拖动（否则只是点击）。</summary>
+    private const double NavDragThreshold = 4;
 
     /// <summary>指示器从当前页滑到目标页时的过渡。</summary>
     private static readonly Transitions NavIndicatorSizeTransition = new()
@@ -78,33 +75,13 @@ public partial class MainWindow : Window
         },
     };
 
-    private static readonly Transitions NavIndicatorLiftTransition = new()
-    {
-        new DoubleTransition
-        {
-            Property = ScaleTransform.ScaleXProperty,
-            Duration = TimeSpan.FromMilliseconds(160),
-            Easing = new CubicEaseOut(),
-        },
-        new DoubleTransition
-        {
-            Property = ScaleTransform.ScaleYProperty,
-            Duration = TimeSpan.FromMilliseconds(160),
-            Easing = new CubicEaseOut(),
-        },
-    };
-
     public MainWindow()
     {
         InitializeComponent();
         SizeChanged += (_, _) => ReportMetrics();
 
         // 导航按钮所在区域支持左右拖拽切页（按下后再横向拖）。
-        var transform = new TransformGroup();
-        transform.Children.Add(_navIndicatorOffset);
-        transform.Children.Add(_navIndicatorScale);
-        NavIndicator.RenderTransform = transform;
-        _navIndicatorScale.Transitions = NavIndicatorLiftTransition;
+        NavIndicator.RenderTransform = _navIndicatorOffset;
 
         NavBar.AddHandler(PointerPressedEvent, OnNavPointerPressed, RoutingStrategies.Tunnel);
         NavBar.AddHandler(PointerMovedEvent, OnNavPointerMoved, RoutingStrategies.Tunnel);
@@ -112,8 +89,10 @@ public partial class MainWindow : Window
         NavBar.LayoutUpdated += OnNavBarLayoutUpdated;
     }
 
+    private bool _navPressed;
     private bool _navDragging;
     private bool _navPageChanged;
+    private double _navPressX;
 
     /// <summary>导航按钮顺序，与从左到右的页面顺序一致。</summary>
     private static readonly AppPage[] NavPages = { AppPage.Launch, AppPage.Download, AppPage.Settings };
@@ -133,36 +112,40 @@ public partial class MainWindow : Window
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         if (!TryGetNavRects(out var rects)) return;
 
-        var position = e.GetPosition(NavBar);
         _navDragRects = rects;
-        _navDragging = true;
+        _navPressX = e.GetPosition(NavBar).X;
+        _navPressed = true;
+        _navDragging = false;
         _navPageChanged = false;
-
-        // 拖动期间由代码直接落位，不再逐帧触发过渡。
-        UseNavIndicatorTransitions(false);
-
-        // 按下先把高亮“抬起”并对齐到指针所在的按钮，之后的移动才连续跟随。
-        LiftNavIndicator();
-        PressNavPointer(position);
     }
 
     private void OnNavPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (!_navDragging) return;
+        if (!_navPressed) return;
 
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
-            EndNavDrag();
+            EndNavPress();
             return;
         }
 
-        FollowNavPointer(e.GetPosition(NavBar));
+        var x = e.GetPosition(NavBar).X;
+        if (!_navDragging)
+        {
+            if (Math.Abs(x - _navPressX) < NavDragThreshold) return;
+
+            // 真的开始拖了：拖动期间由代码直接落位，不逐帧触发过渡。
+            _navDragging = true;
+            UseNavIndicatorTransitions(false);
+        }
+
+        FollowNavPointer(x);
     }
 
     private void OnNavPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         var wasPageChanged = _navPageChanged;
-        EndNavDrag();
+        EndNavPress();
 
         if (!wasPageChanged) return;
 
@@ -170,39 +153,32 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void EndNavDrag()
+    /// <summary>松开或失去指针：拖动结束后让高亮滑到当前页；没拖动则交给按钮的点击。</summary>
+    private void EndNavPress()
     {
+        if (!_navPressed) return;
+
+        _navPressed = false;
+        _navDragRects = null;
+        _navPendingX = null;
+
         if (!_navDragging) return;
 
         _navDragging = false;
         _navPageChanged = false;
-        _navDragRects = null;
-        _navPendingX = null;
 
-        SettleNavIndicator();
         SnapNavIndicator(animate: true);
     }
 
-    /// <summary>按下时把高亮对齐到指针所在的按钮。</summary>
-    private void PressNavPointer(Point position)
-    {
-        if (_viewModel is null || _navDragRects is not { } rects) return;
-
-        var index = NavPageIndex(position.X, rects);
-        if (NavPages[index] != _viewModel.CurrentPage) SwitchPage(NavPages[index]);
-
-        ApplyNavIndicator(rects[index]);
-    }
-
     /// <summary>拖动中：切换页面，并把高亮位置交给本帧稍后统一应用。</summary>
-    private void FollowNavPointer(Point position)
+    private void FollowNavPointer(double x)
     {
         if (_viewModel is null || _navDragRects is not { } rects) return;
 
-        var index = NavPageIndex(position.X, rects);
+        var index = NavPageIndex(x, rects);
         if (NavPages[index] != _viewModel.CurrentPage) SwitchPage(NavPages[index]);
 
-        _navPendingX = position.X;
+        _navPendingX = x;
         if (_navUpdateQueued) return;
 
         // 指针事件可能远高于刷新率，每帧只处理最后一次。
@@ -256,19 +232,6 @@ public partial class MainWindow : Window
 
         var start = Math.Clamp(pointer - width / 2, left, right - width);
         return new Rect(start, rects[0].Y, width, rects[0].Height);
-    }
-
-    /// <summary>按下时高亮轻轻抬起，提示可以拖拽。</summary>
-    private void LiftNavIndicator()
-    {
-        _navIndicatorScale.ScaleX = NavIndicatorLiftScale;
-        _navIndicatorScale.ScaleY = NavIndicatorLiftScale;
-    }
-
-    private void SettleNavIndicator()
-    {
-        _navIndicatorScale.ScaleX = 1;
-        _navIndicatorScale.ScaleY = 1;
     }
 
     private void SetNavIndicator(Rect rect, bool animate)

@@ -82,7 +82,6 @@
                             Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center"
-                            RenderTransformOrigin="50%,50%"
                             IsHitTestVisible="False">
                     </Border>
 

@@ -74,7 +74,7 @@
                        x:Name="NavBar"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center">
-                    <!-- 唯一的高亮指示器：位置与宽度由代码驱动，拖动时淡出 -->
+                    <!-- 唯一的高亮指示器：位置与宽度由代码驱动，拖动时以指针为中心 -->
                     <Border x:Name="NavIndicator"
                             Width="0"
                             Height="32"

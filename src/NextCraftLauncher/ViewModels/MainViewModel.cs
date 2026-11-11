@@ -451,6 +451,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private Exception? _downloadErrorException;
     private string _downloadErrorContext = string.Empty;
 
+    // 当前版本不能启动时用 notice 卡片说明原因。
+    [ObservableProperty] private bool _isLaunchNoticeOpen;
+    [ObservableProperty] private string _launchNoticeTitle = string.Empty;
+    [ObservableProperty] private string _launchNoticeMessage = string.Empty;
+
+    [RelayCommand]
+    private void CloseLaunchNotice() => IsLaunchNoticeOpen = false;
+
+    private void ShowLaunchNotice(string message, string title = "无法启动")
+    {
+        LaunchNoticeTitle = title;
+        LaunchNoticeMessage = message;
+        IsLaunchNoticeOpen = true;
+    }
+
     public bool HasDownloadErrorHint => !string.IsNullOrEmpty(DownloadErrorHint);
 
     partial void OnDownloadErrorHintChanged(string value)
@@ -3517,16 +3532,31 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task LaunchAsync()
     {
+        // 正在扫描版本或已经在启动时，点按钮不应该弹出“无法启动”。
+        if (IsBusy || IsLaunching) return;
+
         if (IsMicrosoftAccount && !HasMicrosoftAccount)
         {
-            Status = "请先登录正版账号，或切换到离线账号";
+            ShowLaunchNotice("已选择正版账号，但尚未登录：请点击上方的「登录」，或切换到离线账号。");
             return;
         }
 
         // 刚切换版本时解析可能还没结束，等它完成再用 _resolved，避免启动到上一个版本。
         await _detailsTask;
 
-        if (!CanLaunch || _resolved is null || SelectedJava is null) return;
+        if (!CanLaunch || _resolved is null || SelectedJava is null)
+        {
+            var reason = LaunchWarning;
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                reason = SelectedVersion is null
+                    ? "还没有选择版本：请先在「版本」里选择要启动的版本。"
+                    : "当前版本暂时无法启动。";
+            }
+
+            ShowLaunchNotice(reason);
+            return;
+        }
 
         IsLaunching = true;
         Status = "正在启动...";

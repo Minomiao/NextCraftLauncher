@@ -148,6 +148,22 @@
             <Setter Property="Opacity" Value="0.78" />
         </Style>
 
+        <!-- 不能启动时按钮变灰，但仍可点击（点击后用 notice 卡片说明原因） -->
+        <Style Selector="Button.primary.disabled">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+        </Style>
+        <Style Selector="Button.primary.disabled:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <Setter Property="Opacity" Value="0.9" />
+        </Style>
+        <Style Selector="Button.primary.disabled:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <Setter Property="Opacity" Value="0.78" />
+        </Style>
+
         <Style Selector="Button.danger">
             <Setter Property="Background" Value="#D13438" />
             <Setter Property="Foreground" Value="White" />

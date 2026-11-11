@@ -154,10 +154,9 @@
 
                         <Button Content="启动"
                                 Command="{Binding LaunchCommand}"
-                                IsEnabled="{Binding CanLaunch}"
-                                ToolTip.Tip="{Binding LaunchWarning}"
-                                ToolTip.ShowOnDisabled="True"
                                 Classes="primary"
+                                Classes.disabled="{Binding !CanLaunch}"
+                                ToolTip.Tip="{Binding LaunchWarning}"
                                 Width="240"
                                 Height="48"
                                 HorizontalAlignment="Center"
@@ -344,6 +343,13 @@
                 </Grid>
             </Grid>
         </Grid>
-    </Grid>
 
+        <!-- 不能启动时的说明卡片（Notice 预设） -->
+        <controls:MessageCard Grid.ColumnSpan="3"
+                              IsOpen="{Binding IsLaunchNoticeOpen}"
+                              Kind="Notice"
+                              Title="{Binding LaunchNoticeTitle}"
+                              Message="{Binding LaunchNoticeMessage}"
+                              CloseRequested="OnCloseLaunchNotice" />
+    </Grid>
 </UserControl>

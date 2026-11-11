@@ -10,6 +10,7 @@ using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
@@ -47,19 +48,48 @@ public partial class MainWindow : Window
 
     private MainViewModel? _viewModel;
 
+    /// <summary>指示器的横向位移，与 <see cref="NavIndicator"/> 的宽度一起构成完整的滑动动画。</summary>
+    private readonly TranslateTransform _navIndicatorTransform = new();
+
+    /// <summary>指示器从当前页滑到目标页时的过渡；拖拽期间置空以直接跟随指针。</summary>
+    private static readonly Transitions NavIndicatorSizeTransition = new()
+    {
+        new DoubleTransition
+        {
+            Property = Layoutable.WidthProperty,
+            Duration = TimeSpan.FromMilliseconds(220),
+            Easing = new CubicEaseOut(),
+        },
+    };
+
+    private static readonly Transitions NavIndicatorSlideTransition = new()
+    {
+        new DoubleTransition
+        {
+            Property = TranslateTransform.XProperty,
+            Duration = TimeSpan.FromMilliseconds(220),
+            Easing = new CubicEaseOut(),
+        },
+    };
+
     public MainWindow()
     {
         InitializeComponent();
         SizeChanged += (_, _) => ReportMetrics();
 
         // 导航按钮所在区域支持左右拖拽切页（按下后再横向拖）。
+        NavIndicator.RenderTransform = _navIndicatorTransform;
         NavBar.AddHandler(PointerPressedEvent, OnNavPointerPressed, RoutingStrategies.Tunnel);
         NavBar.AddHandler(PointerMovedEvent, OnNavPointerMoved, RoutingStrategies.Tunnel);
         NavBar.AddHandler(PointerReleasedEvent, OnNavPointerReleased, RoutingStrategies.Tunnel);
+        NavBar.LayoutUpdated += OnNavBarLayoutUpdated;
     }
 
     private bool _navDragging;
     private bool _navPageChanged;
+
+    /// <summary>指示器上一次被设置到的位置；布局变化时用来判断是否需要重新贴齐。</summary>
+    private Rect? _navIndicatorTarget;
 
     private void OnNavPointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -77,36 +107,140 @@ public partial class MainWindow : Window
 
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
-            _navDragging = false;
+            EndNavDrag();
             return;
         }
 
-        // 不按距离计算：指针停在哪个按钮上，高亮就实时跟到哪个。
+        // 不按距离计算：指针停在哪，高亮就实时跟到哪。
         FollowNavPointer(e.GetPosition(NavBar));
     }
 
     private void OnNavPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        _navDragging = false;
+        var wasPageChanged = _navPageChanged;
+        EndNavDrag();
 
-        if (!_navPageChanged) return;
+        if (!wasPageChanged) return;
 
         // 拖拽已经切过页了，吞掉这次释放，避免按钮再触发一次点击把页切回去。
-        _navPageChanged = false;
         e.Handled = true;
     }
 
-    /// <summary>指针跑到哪个导航按钮上就切到对应页。</summary>
+    private void EndNavDrag()
+    {
+        if (!_navDragging) return;
+
+        _navDragging = false;
+        _navPageChanged = false;
+        SnapNavIndicator();
+    }
+
+    /// <summary>指针跑到哪个导航按钮上就切到对应页，并让指示器连续跟随指针横向位置。</summary>
     private void FollowNavPointer(Point position)
     {
-        if (_viewModel is null) return;
+        if (_viewModel is null || !TryGetNavRects(out var rects)) return;
 
-        if (NavLaunchButton.Bounds.Contains(position) && _viewModel.CurrentPage != AppPage.Launch)
-            SwitchPage(AppPage.Launch);
-        else if (NavDownloadButton.Bounds.Contains(position) && _viewModel.CurrentPage != AppPage.Download)
-            SwitchPage(AppPage.Download);
-        else if (NavSettingsButton.Bounds.Contains(position) && _viewModel.CurrentPage != AppPage.Settings)
-            SwitchPage(AppPage.Settings);
+        var target = PageAt(rects, position) ?? _viewModel.CurrentPage;
+        if (target != _viewModel.CurrentPage) SwitchPage(target);
+
+        MoveNavIndicator(position.X, rects);
+    }
+
+    private static AppPage? PageAt(Rect[] rects, Point position)
+    {
+        if (rects[0].Contains(position)) return AppPage.Launch;
+        if (rects[1].Contains(position)) return AppPage.Download;
+        if (rects[2].Contains(position)) return AppPage.Settings;
+        return null;
+    }
+
+    /// <summary>把指针的横坐标换算成指示器的位置与宽度，相邻按钮之间平滑插值。</summary>
+    private void MoveNavIndicator(double x, Rect[] rects)
+    {
+        var index = rects.Length - 1;
+
+        for (var i = 0; i < rects.Length - 1; i++)
+        {
+            if (x > rects[i].Center.X && x <= rects[i + 1].Center.X)
+            {
+                var t = (x - rects[i].Center.X) / (rects[i + 1].Center.X - rects[i].Center.X);
+                SetNavIndicator(Interpolate(rects[i], rects[i + 1], t), animate: false);
+                return;
+            }
+        }
+
+        if (x <= rects[0].Center.X) index = 0;
+
+        SetNavIndicator(rects[index], animate: false);
+    }
+
+    private static Rect Interpolate(Rect from, Rect to, double t)
+        => new(
+            from.X + (to.X - from.X) * t,
+            from.Y,
+            from.Width + (to.Width - from.Width) * t,
+            from.Height);
+
+    private void SetNavIndicator(Rect rect, bool animate)
+    {
+        _navIndicatorTarget = rect;
+
+        NavIndicator.Transitions = animate ? NavIndicatorSizeTransition : null;
+        _navIndicatorTransform.Transitions = animate ? NavIndicatorSlideTransition : null;
+
+        NavIndicator.Width = rect.Width;
+        _navIndicatorTransform.X = rect.X;
+    }
+
+    private void SnapNavIndicator()
+    {
+        if (_viewModel is null) return;
+        if (!TryGetNavRect(_viewModel.CurrentPage, out var rect)) return;
+
+        SetNavIndicator(rect, animate: true);
+    }
+
+    /// <summary>取某个页面按钮相对导航区域的位置；布局还没完成时返回 false。</summary>
+    private bool TryGetNavRect(AppPage page, out Rect rect)
+    {
+        var button = page switch
+        {
+            AppPage.Download => NavDownloadButton,
+            AppPage.Settings => NavSettingsButton,
+            _ => NavLaunchButton,
+        };
+
+        rect = default;
+        if (button.Bounds.Width <= 0) return false;
+
+        var origin = button.TranslatePoint(default, NavBar);
+        if (origin is null) return false;
+
+        rect = new Rect(origin.Value, button.Bounds.Size);
+        return true;
+    }
+
+    private bool TryGetNavRects(out Rect[] rects)
+    {
+        rects = new Rect[3];
+        var pages = new[] { AppPage.Launch, AppPage.Download, AppPage.Settings };
+
+        for (var i = 0; i < pages.Length; i++)
+        {
+            if (!TryGetNavRect(pages[i], out rects[i])) return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>窗口首次布局完成、或按钮位置发生变化时，把指示器直接贴到当前页。</summary>
+    private void OnNavBarLayoutUpdated(object? sender, EventArgs e)
+    {
+        if (_viewModel is null || _navDragging) return;
+        if (!TryGetNavRect(_viewModel.CurrentPage, out var rect)) return;
+        if (_navIndicatorTarget == rect) return;
+
+        SetNavIndicator(rect, animate: false);
     }
 
     private void SwitchPage(AppPage page)
@@ -144,6 +278,7 @@ public partial class MainWindow : Window
         }
 
         _viewModel = DataContext as MainViewModel;
+        _navIndicatorTarget = null;
 
         if (_viewModel is not null)
         {
@@ -158,6 +293,13 @@ public partial class MainWindow : Window
     /// <summary>任意提示卡片打开时让背景模糊逐渐出现，关闭时直接移除。</summary>
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainViewModel.CurrentPage))
+        {
+            // 拖拽中的指示器由指针驱动，不要在此处抢回。
+            if (!_navDragging) SnapNavIndicator();
+            return;
+        }
+
         if (e.PropertyName != nameof(MainViewModel.IsMessageCardOpen)) return;
 
         if (_viewModel?.IsMessageCardOpen == true)

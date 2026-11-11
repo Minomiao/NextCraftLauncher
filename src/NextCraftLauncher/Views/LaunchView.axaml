@@ -343,13 +343,5 @@
                 </Grid>
             </Grid>
         </Grid>
-
-        <!-- 不能启动时的说明卡片（Notice 预设） -->
-        <controls:MessageCard Grid.ColumnSpan="3"
-                              IsOpen="{Binding IsLaunchNoticeOpen}"
-                              Kind="Notice"
-                              Title="{Binding LaunchNoticeTitle}"
-                              Message="{Binding LaunchNoticeMessage}"
-                              CloseRequested="OnCloseLaunchNotice" />
     </Grid>
 </UserControl>

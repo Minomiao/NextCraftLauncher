@@ -14,12 +14,6 @@ public partial class LaunchView : UserControl
         InitializeComponent();
     }
 
-    private void OnCloseLaunchNotice(object? sender, EventArgs e)
-    {
-        if (DataContext is MainViewModel viewModel)
-            viewModel.CloseLaunchNoticeCommand.Execute(null);
-    }
-
     private async void OnCopyLoginCodeClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel viewModel) return;

@@ -459,6 +459,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void CloseLaunchNotice() => IsLaunchNoticeOpen = false;
 
+    /// <summary>任意一张提示卡片是否打开；背景模糊按它驱动。</summary>
+    public bool IsMessageCardOpen => IsDownloadErrorDialogOpen || IsLaunchNoticeOpen;
+
+    partial void OnIsDownloadErrorDialogOpenChanged(bool value)
+        => OnPropertyChanged(nameof(IsMessageCardOpen));
+
+    partial void OnIsLaunchNoticeOpenChanged(bool value)
+        => OnPropertyChanged(nameof(IsMessageCardOpen));
+
     private void ShowLaunchNotice(string message, string title = "无法启动")
     {
         LaunchNoticeTitle = title;

@@ -77,12 +77,12 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>错误卡片打开时让背景模糊逐渐出现，关闭时直接移除。</summary>
+    /// <summary>任意提示卡片打开时让背景模糊逐渐出现，关闭时直接移除。</summary>
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(MainViewModel.IsDownloadErrorDialogOpen)) return;
+        if (e.PropertyName != nameof(MainViewModel.IsMessageCardOpen)) return;
 
-        if (_viewModel?.IsDownloadErrorDialogOpen == true)
+        if (_viewModel?.IsMessageCardOpen == true)
         {
             var effect = new BlurEffect { Radius = 0 };
             ContentRoot.Effect = effect;
@@ -219,6 +219,12 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel viewModel)
             viewModel.CloseDownloadErrorDialogCommand.Execute(null);
+    }
+
+    private void OnLaunchNoticeClose(object? sender, EventArgs e)
+    {
+        if (DataContext is MainViewModel viewModel)
+            viewModel.CloseLaunchNoticeCommand.Execute(null);
     }
 
     private void OnErrorDialogOpenLog(object? sender, EventArgs e) => OpenLogFile();

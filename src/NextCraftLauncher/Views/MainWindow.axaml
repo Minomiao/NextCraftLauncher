@@ -159,6 +159,13 @@
                               CloseRequested="OnErrorDialogClose"
                               OpenLogRequested="OnErrorDialogOpenLog"
                               ExportRequested="OnErrorDialogExport" />
+
+        <!-- 当前版本不能启动时的说明（Notice 预设） -->
+        <controls:MessageCard IsOpen="{Binding IsLaunchNoticeOpen}"
+                              Kind="Notice"
+                              Title="{Binding LaunchNoticeTitle}"
+                              Message="{Binding LaunchNoticeMessage}"
+                              CloseRequested="OnLaunchNoticeClose" />
     </Panel>
 
 </Window>

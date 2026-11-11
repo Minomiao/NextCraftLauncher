@@ -51,14 +51,19 @@ public partial class MainWindow : Window
     /// <summary>指示器的横向位移，与 <see cref="NavIndicator"/> 的宽度一起构成完整的滑动动画。</summary>
     private readonly TranslateTransform _navIndicatorOffset = new();
 
-    /// <summary>指示器的缩放，拖动开始时先收一下再弹回。</summary>
+    /// <summary>指示器的缩放，按下时先收一下再弹回。</summary>
     private readonly ScaleTransform _navIndicatorScale = new();
+
+    /// <summary>三个按钮文字的缩放，按住时与高亮一起收放。</summary>
+    private readonly ScaleTransform _navLaunchScale = new();
+    private readonly ScaleTransform _navDownloadScale = new();
+    private readonly ScaleTransform _navSettingsScale = new();
 
     /// <summary>横向移动超过这个距离才算是拖动（否则只是点击）。</summary>
     private const double NavDragThreshold = 4;
 
-    /// <summary>开始拖动时：高亮先缩小再放大回原尺寸。</summary>
-    private static readonly Transitions NavIndicatorSquashIn = new()
+    /// <summary>按下时：高亮与文字先缩小再放大回原尺寸。</summary>
+    private static readonly Transitions NavSquashIn = new()
     {
         new DoubleTransition
         {
@@ -74,7 +79,7 @@ public partial class MainWindow : Window
         },
     };
 
-    private static readonly Transitions NavIndicatorSquashOut = new()
+    private static readonly Transitions NavSquashOut = new()
     {
         new DoubleTransition
         {
@@ -91,7 +96,7 @@ public partial class MainWindow : Window
     };
 
     /// <summary>缩小到原尺寸的这个比例。</summary>
-    private const double NavIndicatorSquashScale = 0.88;
+    private const double NavSquashScale = 0.9;
 
     /// <summary>指示器从当前页滑到目标页时的过渡。</summary>
     private static readonly Transitions NavIndicatorSizeTransition = new()
@@ -124,6 +129,18 @@ public partial class MainWindow : Window
         transform.Children.Add(_navIndicatorOffset);
         transform.Children.Add(_navIndicatorScale);
         NavIndicator.RenderTransform = transform;
+
+        // 按钮文字与高亮一起缩放，所以各自带一个以中心为原点的缩放。
+        foreach (var (button, scale) in new[]
+        {
+            (NavLaunchButton, _navLaunchScale),
+            (NavDownloadButton, _navDownloadScale),
+            (NavSettingsButton, _navSettingsScale),
+        })
+        {
+            button.RenderTransform = scale;
+            button.RenderTransformOrigin = RelativePoint.Center;
+        }
 
         NavBar.AddHandler(PointerPressedEvent, OnNavPointerPressed, RoutingStrategies.Tunnel);
         NavBar.AddHandler(PointerMovedEvent, OnNavPointerMoved, RoutingStrategies.Tunnel);
@@ -160,6 +177,8 @@ public partial class MainWindow : Window
         _navPressed = true;
         _navDragging = false;
         _navPageChanged = false;
+
+        SquashNav();
     }
 
     private void OnNavPointerMoved(object? sender, PointerEventArgs e)
@@ -177,10 +196,9 @@ public partial class MainWindow : Window
         {
             if (Math.Abs(x - _navPressX) < NavDragThreshold) return;
 
-            // 真的开始拖了：高亮先缩一下再弹回，之后由代码直接落位。
+            // 真的开始拖了：高亮之后由代码直接落位。
             _navDragging = true;
             UseNavIndicatorTransitions(false);
-            SquashNavIndicator();
         }
 
         FollowNavPointer(x);
@@ -243,22 +261,50 @@ public partial class MainWindow : Window
         ApplyNavIndicator(NavIndicatorRect(value, rects));
     }
 
-    /// <summary>拖动开始时的“缩小再放大”反馈。</summary>
-    private void SquashNavIndicator()
+    /// <summary>按下时的“缩小再放大”：高亮与它盖住的按钮文字一起收放。</summary>
+    private void SquashNav()
     {
         _navSquashTimer?.Dispose();
+        _navSquashTimer = null;
 
-        _navIndicatorScale.Transitions = NavIndicatorSquashIn;
-        _navIndicatorScale.ScaleX = NavIndicatorSquashScale;
-        _navIndicatorScale.ScaleY = NavIndicatorSquashScale;
+        // 上一次动画可能还没回到原尺寸，先归位再重来。
+        foreach (var scale in new[] { _navIndicatorScale, _navLaunchScale, _navDownloadScale, _navSettingsScale })
+        {
+            scale.Transitions = null;
+            scale.ScaleX = 1;
+            scale.ScaleY = 1;
+        }
+
+        var textScale = _viewModel is null ? null : NavButtonScale(_viewModel.CurrentPage);
+
+        SetNavSquash(NavSquashScale, NavSquashIn, textScale);
 
         _navSquashTimer = DispatcherTimer.RunOnce(() =>
         {
-            _navIndicatorScale.Transitions = NavIndicatorSquashOut;
-            _navIndicatorScale.ScaleX = 1;
-            _navIndicatorScale.ScaleY = 1;
+            _navSquashTimer = null;
+            SetNavSquash(1, NavSquashOut, textScale);
         }, TimeSpan.FromMilliseconds(95));
     }
+
+    private void SetNavSquash(double value, Transitions transitions, ScaleTransform? textScale)
+    {
+        _navIndicatorScale.Transitions = transitions;
+        _navIndicatorScale.ScaleX = value;
+        _navIndicatorScale.ScaleY = value;
+
+        if (textScale is null) return;
+
+        textScale.Transitions = transitions;
+        textScale.ScaleX = value;
+        textScale.ScaleY = value;
+    }
+
+    private ScaleTransform NavButtonScale(AppPage page) => page switch
+    {
+        AppPage.Download => _navDownloadScale,
+        AppPage.Settings => _navSettingsScale,
+        _ => _navLaunchScale,
+    };
 
     /// <summary>指针落在哪个按钮的区间内；按按钮之间空隙的中点划分，越界时取两端。</summary>
     private static int NavPageIndex(double x, Rect[] rects)

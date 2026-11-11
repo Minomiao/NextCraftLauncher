@@ -51,6 +51,78 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SizeChanged += (_, _) => ReportMetrics();
+
+        // 导航按钮所在区域支持左右拖拽切页（按下后再横向拖）。
+        NavBar.AddHandler(PointerPressedEvent, OnNavPointerPressed, RoutingStrategies.Tunnel);
+        NavBar.AddHandler(PointerMovedEvent, OnNavPointerMoved, RoutingStrategies.Tunnel);
+        NavBar.AddHandler(PointerReleasedEvent, OnNavPointerReleased, RoutingStrategies.Tunnel);
+    }
+
+    private const double NavDragThreshold = 60;
+
+    private Point? _navDragOrigin;
+    private bool _navDragged;
+
+    private void OnNavPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        _navDragged = false;
+        _navDragOrigin = e.GetPosition(this);
+    }
+
+    private void OnNavPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_navDragOrigin is not { } origin) return;
+
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            _navDragOrigin = null;
+            return;
+        }
+
+        var delta = e.GetPosition(this).X - origin.X;
+        if (Math.Abs(delta) < NavDragThreshold) return;
+
+        _navDragOrigin = null;
+        _navDragged = true;
+
+        // 向左拖看下一页，向右拖看上一页。
+        StepPage(delta < 0 ? 1 : -1);
+    }
+
+    private void OnNavPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        _navDragOrigin = null;
+
+        if (!_navDragged) return;
+
+        // 拖拽已经切过页了，吞掉这次释放，避免按钮再触发一次点击把页切回去。
+        _navDragged = false;
+        e.Handled = true;
+    }
+
+    /// <summary>按当前页在导航里的位置前后切换；超出范围则不动。</summary>
+    private void StepPage(int delta)
+    {
+        if (_viewModel is null) return;
+
+        var target = (int)_viewModel.CurrentPage + delta;
+
+        switch ((AppPage)target)
+        {
+            case AppPage.Launch:
+                _viewModel.ShowLaunchPageCommand.Execute(null);
+                break;
+
+            case AppPage.Download:
+                _viewModel.ShowDownloadPageCommand.Execute(null);
+                break;
+
+            case AppPage.Settings:
+                _viewModel.ShowSettingsPageCommand.Execute(null);
+                break;
+        }
     }
 
     protected override void OnDataContextChanged(EventArgs e)

@@ -67,6 +67,7 @@
                            VerticalAlignment="Center" />
 
                 <StackPanel Grid.Column="1"
+                            x:Name="NavBar"
                             Orientation="Horizontal"
                             Spacing="4"
                             HorizontalAlignment="Center"

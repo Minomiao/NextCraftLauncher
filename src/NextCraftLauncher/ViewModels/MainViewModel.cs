@@ -1456,7 +1456,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (version is not null) SelectedVersion = version;
         if (SelectedVersion is null) return;
 
+        // 设置页挂在「版本」区块下，所以先切过去；关闭时再回到原来的区块。
         _sectionBeforeVersionDetail = CurrentLaunchSection;
+        CurrentLaunchSection = LaunchSection.Versions;
         IsVersionDetailOpen = true;
     }
 

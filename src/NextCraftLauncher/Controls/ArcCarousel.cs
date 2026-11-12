@@ -342,9 +342,10 @@ public class ArcCarousel : UserControl
         var distance = Math.Abs(offset);
 
         entry.Translate.X = 340 * offset;
-        entry.Translate.Y = 22 * offset * offset;
-        // 两侧向外倾：右侧顺时针、左侧逆时针。
-        entry.Rotate.Angle = offset * 4;
+        // 弧线向下凹：两侧比中间高（负号决定凹陷方向）。
+        entry.Translate.Y = -22 * offset * offset;
+        // 切线方向跟随弧线：右侧逆时针、左侧顺时针，两侧向外倾。
+        entry.Rotate.Angle = -offset * 4;
 
         var scale = Math.Max(0.45, 1 - distance * 0.4);
         entry.Scale.ScaleX = scale;

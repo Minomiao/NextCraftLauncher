@@ -181,7 +181,7 @@ public class ArcCarousel : UserControl
         return -1;
     }
 
-    /// <summary>外部（启动恢复、其它入口）改了选中项时，直接把位置和目标都对齐过去。</summary>
+    /// <summary>外部（列表选择、启动恢复等）改了选中项时，沿环形最短路径滚过去。</summary>
     private void OnSelectedItemChanged()
     {
         if (_syncingSelection) return;
@@ -192,10 +192,17 @@ public class ArcCarousel : UserControl
         // 自己滚动过程中同步过来的选中项不用处理，避免打断正在进行的滑动。
         if (_animating && Math.Abs(index - _page) < 1.5) return;
 
-        _page = index;
-        _target = index;
         _velocity = 0;
+        _target = Normalize(_page + ShortestDelta(index - _page, _entries.Count), _entries.Count);
         ApplyAll();
+        EnsureFrames();
+
+        // 不在可视树里、拿不到帧回调时直接落位，避免停在上一个版本。
+        if (!_animating)
+        {
+            _page = _target;
+            ApplyAll();
+        }
     }
 
     // ------------------------------------------------------------ 动画

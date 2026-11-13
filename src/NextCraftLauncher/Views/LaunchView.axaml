@@ -372,7 +372,8 @@
                                      ItemsSource="{Binding Versions}"
                                      SelectedItem="{Binding SelectedVersion}"
                                      Background="Transparent"
-                                     Padding="0,0,14,0">
+                                     Padding="0,0,14,0"
+                                     PointerReleased="OnVersionSelectedByPointer">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:VersionItemViewModel">
                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="2,3">

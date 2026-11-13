@@ -1,8 +1,11 @@
 using System;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using NextCraftLauncher.ViewModels;
 
 namespace NextCraftLauncher.Views;
@@ -12,6 +15,22 @@ public partial class LaunchView : UserControl
     public LaunchView()
     {
         InitializeComponent();
+    }
+
+    /// <summary>在版本列表里点选一个版本后直接回到启动页，轮播会从上一个版本滚过去。</summary>
+    private void OnVersionSelectedByPointer(object? sender, PointerReleasedEventArgs e)
+    {
+        if (e.InitialPressMouseButton != MouseButton.Left) return;
+        if (e.Source is not Visual source) return;
+
+        // 行内的「设置 / 删除」自己处理点击，不跳回启动页。
+        if (source.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
+
+        // 点在列表空白处也不跳。
+        if (source.FindAncestorOfType<ListBoxItem>(includeSelf: true) is null) return;
+
+        if (DataContext is MainViewModel viewModel)
+            viewModel.ShowStartSectionCommand.Execute(null);
     }
 
     private async void OnCopyLoginCodeClick(object? sender, RoutedEventArgs e)

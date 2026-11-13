@@ -8,6 +8,9 @@ public sealed class AppSettings
     public string MinecraftDirectory { get; set; } = GetDefaultMinecraftDirectory();
     public List<string> GameDirectories { get; set; } = new();
     public List<string> HiddenVersions { get; set; } = new();
+
+    /// <summary>每个游戏文件夹上次选中的版本（目录 → 版本 Id），重启后恢复。</summary>
+    public Dictionary<string, string> LastVersions { get; set; } = new();
     public string? JavaPath { get; set; }
     public string PlayerName { get; set; } = "Player";
 

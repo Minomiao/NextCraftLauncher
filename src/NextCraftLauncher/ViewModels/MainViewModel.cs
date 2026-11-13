@@ -94,6 +94,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _remoteSearchTimer.Stop();
             ApplyRemoteVersionFilter();
         };
+
+        _lastVersionSaveTimer.Tick += (_, _) =>
+        {
+            _lastVersionSaveTimer.Stop();
+            _settings.Save();
+        };
     }
 
     /// <summary>
@@ -332,6 +338,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly DispatcherTimer _remoteSearchTimer = new()
     {
         Interval = TimeSpan.FromMilliseconds(120),
+    };
+
+    /// <summary>版本选择变化很频繁（滚轮切轮播），合并成一次写盘。</summary>
+    private readonly DispatcherTimer _lastVersionSaveTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(600),
     };
 
     public ObservableCollection<JavaRuntime> JavaRuntimes { get; } = new();
@@ -718,6 +730,43 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CurrentVersionSubtitle));
         OnPropertyChanged(nameof(CanManageSelectedVersion));
         _detailsTask = LoadDetailsAsync(value);
+
+        if (value is not null) RememberVersion(MinecraftDirectory, value.Id);
+    }
+
+    /// <summary>当前游戏文件夹上次选中的版本 Id；没记录过时返回 null。</summary>
+    private string? RememberedVersionId(string directory)
+    {
+        var normalized = AppSettings.NormalizePath(directory);
+        if (normalized is null) return null;
+
+        foreach (var pair in _settings.LastVersions)
+        {
+            if (string.Equals(pair.Key, normalized, StringComparison.OrdinalIgnoreCase))
+                return pair.Value;
+        }
+
+        return null;
+    }
+
+    /// <summary>记住这个文件夹选中的版本，下次启动或切回该文件夹时恢复。</summary>
+    private void RememberVersion(string directory, string versionId)
+    {
+        var normalized = AppSettings.NormalizePath(directory);
+        if (normalized is null) return;
+        if (string.Equals(RememberedVersionId(normalized), versionId, StringComparison.Ordinal)) return;
+
+        foreach (var stale in _settings.LastVersions.Keys
+                     .Where(key => string.Equals(key, normalized, StringComparison.OrdinalIgnoreCase))
+                     .ToList())
+        {
+            _settings.LastVersions.Remove(stale);
+        }
+
+        _settings.LastVersions[normalized] = versionId;
+
+        _lastVersionSaveTimer.Stop();
+        _lastVersionSaveTimer.Start();
     }
 
     partial void OnSelectedGameFolderChanged(GameFolderItemViewModel? value)
@@ -1801,7 +1850,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             UpdateRemoteInstalledStatus();
             UpdateJavaRuntimeInstalledStatus();
 
-            var previousId = SelectedVersion?.Id;
+            var previousId = RememberedVersionId(directory) ?? SelectedVersion?.Id;
             SelectedVersion = Versions.FirstOrDefault(version => version.Id == previousId) ?? Versions.FirstOrDefault();
 
             if (refreshJava)
@@ -3814,6 +3863,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         try
         {
             _remoteSearchTimer.Stop();
+            _lastVersionSaveTimer.Stop();
             _loaderPrefetcher.LoaderVersionsCached -= OnLoaderVersionsCached;
             _loaderVersionsCts?.Cancel();
             _loaderVersionsCts?.Dispose();

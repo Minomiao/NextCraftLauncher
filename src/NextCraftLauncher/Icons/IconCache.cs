@@ -22,7 +22,7 @@ namespace NextCraftLauncher.Icons;
 public static class IconCache
 {
     /// <summary>图标素材或排版有改动时加一，旧缓存会整体重建。</summary>
-    private const int CacheVersion = 2;
+    private const int CacheVersion = 3;
 
     /// <summary>预渲染使用的角度，与 <see cref="BlockIcon"/> 的默认值一致。</summary>
     public const double Yaw = 45;

@@ -113,8 +113,7 @@
                         <controls:BlockIcon Width="84"
                                             Height="84"
                                             HorizontalAlignment="Center"
-                                            Block="{Binding CurrentVersionBlock}"
-                                            ClientJarPath="{Binding CurrentVersionJarPath}" />
+                                            Block="{Binding CurrentVersionBlock}" />
 
                         <TextBlock Text="当前版本"
                                    FontSize="12"

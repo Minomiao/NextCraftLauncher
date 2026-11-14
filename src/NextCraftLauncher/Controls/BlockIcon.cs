@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -12,10 +11,9 @@ using NextCraftLauncher.Core.Logging;
 namespace NextCraftLauncher.Controls;
 
 /// <summary>
-/// 实时渲染一个等距 3D 方块。
+/// 用项目内置贴图实时渲染一个等距 3D 方块。
 /// <para>
-/// 贴图优先从当前版本客户端 jar 里读原版贴图（观感与原版一致）；
-/// 没装游戏时退回 <c>Assets/Icons/Blocks/</c> 里的内置贴图。
+/// 贴图在 <c>Assets/Icons/Blocks/&lt;方块&gt;/</c>，按原版的结构与配色绘制；
 /// 六面模型 + 按相机剔除 + 深度排序，任意 yaw/pitch 都能画。
 /// </para>
 /// </summary>
@@ -32,23 +30,15 @@ public sealed class BlockIcon : Control
     /// <summary>方块在画布中的占比（0~1），留出边距。</summary>
     private const double FillRatio = 0.92;
 
-    /// <summary>原版草顶贴图是灰度的，用它上色。</summary>
-    private static readonly IBrush GrassTintBrush =
-        new SolidColorBrush(Color.FromArgb(0x8C, 0x91, 0xBD, 0x59));
-
     /// <summary>要渲染的方块（对应 Assets/Icons/Blocks/&lt;名称&gt;/ 下的内置贴图）。</summary>
     public static readonly StyledProperty<string> BlockProperty =
         AvaloniaProperty.Register<BlockIcon, string>(nameof(Block), "grass");
-
-    /// <summary>可选：从这个客户端 jar 里读原版贴图。</summary>
-    public static readonly StyledProperty<string?> ClientJarPathProperty =
-        AvaloniaProperty.Register<BlockIcon, string?>(nameof(ClientJarPath));
 
     private const string AssetRoot = "avares://NextCraftLauncher/Assets/Icons/Blocks/";
 
     static BlockIcon()
     {
-        AffectsRender<BlockIcon>(BlockProperty, ClientJarPathProperty, YawProperty, PitchProperty);
+        AffectsRender<BlockIcon>(BlockProperty, YawProperty, PitchProperty);
     }
 
     public BlockIcon()
@@ -61,12 +51,6 @@ public sealed class BlockIcon : Control
     {
         get => GetValue(BlockProperty);
         set => SetValue(BlockProperty, value);
-    }
-
-    public string? ClientJarPath
-    {
-        get => GetValue(ClientJarPathProperty);
-        set => SetValue(ClientJarPathProperty, value);
     }
 
     public double Yaw
@@ -86,7 +70,7 @@ public sealed class BlockIcon : Control
         var size = Math.Min(Bounds.Width, Bounds.Height);
         if (size <= 0) return;
 
-        var textures = BlockTextures.For(Block, ClientJarPath);
+        var textures = BlockTextures.For(Block);
         if (textures is null) return;
 
         var camera = CameraDirection(Yaw, Pitch);
@@ -154,12 +138,6 @@ public sealed class BlockIcon : Control
             {
                 context.DrawImage(visible[i].Texture, new Rect(0, 0, 1, 1));
 
-                // 原版草方块顶面是灰度的，靠生物群系染色；内置贴图已经是绿的，不需要叠色。
-                if (visible[i].Tint)
-                {
-                    context.DrawRectangle(GrassTintBrush, null, new Rect(0, 0, 1, 1));
-                }
-
                 var shade = visible[i].Shade;
                 if (shade > 0)
                 {
@@ -194,7 +172,6 @@ public sealed class BlockIcon : Control
         Point3[] Corners,
         IImage Texture,
         double Shade,
-        bool Tint = false,
         double Depth = 0);
 
     /// <summary>单位立方体，六面贴图。</summary>
@@ -210,8 +187,7 @@ public sealed class BlockIcon : Control
                 new Point3(h, h, h), new Point3(-h, h, h),
             },
             textures.Top,
-            0d,
-            textures.TintTop);
+            0d);
 
         yield return new Face(
             new Point3(0, -1, 0),
@@ -305,113 +281,38 @@ public sealed class BlockIcon : Control
 
     // ---------------------------------------------------------------- 贴图
 
-    private sealed record BlockTextures(IImage Top, IImage Side, IImage Bottom, bool TintTop = false)
+    private sealed record BlockTextures(IImage Top, IImage Side, IImage Bottom)
     {
         private static readonly Dictionary<string, BlockTextures?> Cache =
             new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>原版贴图优先，取不到时退回项目内置贴图。</summary>
-        public static BlockTextures? For(string block, string? jarPath)
+        /// <summary>项目内置贴图，随程序集编译，不依赖 Minecraft 客户端。</summary>
+        public static BlockTextures? For(string block)
         {
             if (string.IsNullOrWhiteSpace(block)) return null;
 
-            var key = string.IsNullOrWhiteSpace(jarPath) ? block : block + "|" + jarPath;
-
             lock (Cache)
             {
-                if (Cache.TryGetValue(key, out var cached)) return cached;
+                if (Cache.TryGetValue(block, out var cached)) return cached;
             }
 
-            var loaded = ReadFromJar(block, jarPath) ?? ReadBundled(block);
+            var loaded = Load(block);
 
             lock (Cache)
             {
-                Cache[key] = loaded;
+                Cache[block] = loaded;
             }
 
             return loaded;
         }
 
-        // ------------------------------------------------ 原版贴图（客户端 jar）
-
-        private static BlockTextures? ReadFromJar(string block, string? jarPath)
-        {
-            if (string.IsNullOrWhiteSpace(jarPath) || !File.Exists(jarPath)) return null;
-            if (JarNames(block) is not { } names) return null;
-
-            try
-            {
-                using var archive = ZipFile.OpenRead(jarPath);
-
-                var top = ReadEntry(archive, names.Top);
-                var side = ReadEntry(archive, names.Side) ?? top;
-                var bottom = ReadEntry(archive, names.Bottom) ?? side;
-
-                if (top is null || side is null || bottom is null) return null;
-
-                // 原版草方块顶面是灰度贴图，需要按生物群系上色。
-                return new BlockTextures(top, side, bottom, TintTop: block == "grass");
-            }
-            catch (Exception exception)
-            {
-                LauncherLog.Warn($"读取原版方块贴图失败（{block}）：{exception.Message}");
-                return null;
-            }
-        }
-
-        private static Bitmap? ReadEntry(ZipArchive archive, string[] names)
-        {
-            foreach (var name in names)
-            {
-                var entry = archive.GetEntry($"assets/minecraft/textures/block/{name}.png")
-                            ?? archive.GetEntry($"assets/minecraft/textures/blocks/{name}.png");
-
-                if (entry is null) continue;
-
-                using var stream = entry.Open();
-                using var memory = new MemoryStream();
-                stream.CopyTo(memory);
-                memory.Position = 0;
-
-                return new Bitmap(memory);
-            }
-
-            return null;
-        }
-
-        /// <summary>方块 → jar 内贴图名（1.13+ 名在前，旧版名在后）。</summary>
-        private static (string[] Top, string[] Side, string[] Bottom)? JarNames(string block) => block switch
-        {
-            "grass" => (
-                new[] { "grass_block_top", "grass_top" },
-                new[] { "grass_block_side", "grass_side" },
-                new[] { "dirt" }),
-            "dirt" => Same("dirt"),
-            "cobblestone" => Same("cobblestone"),
-            "gold" => Same("gold_block"),
-            "redstone" => Same("redstone_block"),
-            "lamp_on" => Same("redstone_lamp_on"),
-            "lamp_off" => Same("redstone_lamp", "redstone_lamp_off"),
-            "path" => (
-                new[] { "dirt_path_top", "grass_path_top" },
-                new[] { "dirt_path_side", "grass_path_side" },
-                new[] { "dirt" }),
-            "command_block" => Same("command_block_side", "command_block"),
-            _ => null,
-        };
-
-        private static (string[] Top, string[] Side, string[] Bottom) Same(params string[] names)
-            => (names, names, names);
-
-        // ------------------------------------------------ 内置贴图（项目资源）
-
-        private static BlockTextures? ReadBundled(string block)
+        private static BlockTextures? Load(string block)
         {
             try
             {
-                var top = ReadAsset(block, "top");
-                var side = ReadAsset(block, "side") ?? top;
-                var bottom = ReadAsset(block, "bottom") ?? side;
+                var top = Read(block, "top");
+                var side = Read(block, "side") ?? top;
+                var bottom = Read(block, "bottom") ?? side;
 
                 if (top is null || side is null || bottom is null)
                 {
@@ -423,12 +324,12 @@ public sealed class BlockIcon : Control
             }
             catch (Exception exception)
             {
-                LauncherLog.Warn($"加载内置方块贴图失败（{block}）：{exception.Message}");
+                LauncherLog.Warn($"加载方块图标贴图失败（{block}）：{exception.Message}");
                 return null;
             }
         }
 
-        private static Bitmap? ReadAsset(string block, string face)
+        private static Bitmap? Read(string block, string face)
         {
             var uri = new Uri($"{AssetRoot}{block}/{face}.png");
 

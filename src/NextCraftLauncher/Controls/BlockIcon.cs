@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using NextCraftLauncher.Core.Logging;
+using NextCraftLauncher.Icons;
 
 namespace NextCraftLauncher.Controls;
 
@@ -70,14 +72,43 @@ public sealed class BlockIcon : Control
         var size = Math.Min(Bounds.Width, Bounds.Height);
         if (size <= 0) return;
 
-        var textures = BlockTextures.For(Block);
-        if (textures is null) return;
+        // 固定角度下优先用启动时预渲染好的图片，避免每次重建几何。
+        if (Math.Abs(Yaw - IconCache.Yaw) < 0.001 &&
+            Math.Abs(Pitch - IconCache.Pitch) < 0.001 &&
+            IconCache.TryGet(Block) is { } cached)
+        {
+            var left = (Bounds.Width - size) / 2;
+            var top = (Bounds.Height - size) / 2;
+
+            using (context.PushRenderOptions(new RenderOptions
+                   {
+                       BitmapInterpolationMode = BitmapInterpolationMode.HighQuality,
+                   }))
+            {
+                context.DrawImage(cached, new Rect(left, top, size, size));
+            }
+
+            return;
+        }
 
         var camera = CameraDirection(Yaw, Pitch);
 
-        // 1. 收集可见面（法线朝向相机）。
-        var visible = new List<Face>(24);
-        foreach (var face in BuildFaces(textures, ModelFor(Block)))
+        // 0. 有同名 Sprite 贴图时，把它渲染成有厚度的立体图形。
+        var sprite = SpriteTextures.For(Block);
+        var faces = sprite is not null
+            ? BuildSpriteFaces(sprite, Yaw, Pitch)
+            : (BlockTextures.For(Block) is { } textures
+                ? BuildFaces(textures, ModelFor(Block))
+                : null);
+
+        if (faces is null) return;
+
+        // 1. 收集可见面（法线朝向相机）并投影，投影结果跟着面一起排序。
+        var visible = new List<(Face Face, Point[] Points)>(24);
+        double minX = double.MaxValue, maxX = double.MinValue;
+        double minY = double.MaxValue, maxY = double.MinValue;
+
+        foreach (var face in faces)
         {
             if (Dot(face.Normal, camera) <= 0.0001) continue;
 
@@ -85,24 +116,10 @@ public sealed class BlockIcon : Control
             foreach (var corner in face.Corners) center = center + corner;
             center = center * 0.25;
 
-            visible.Add(face with { Depth = Dot(center, camera) });
-        }
-
-        if (visible.Count == 0) return;
-
-        // 2. 投影：取所有可见角点，等比缩放居中。
-        var projected = new Point[visible.Count][];
-        double minX = double.MaxValue, maxX = double.MinValue;
-        double minY = double.MaxValue, maxY = double.MinValue;
-
-        for (var i = 0; i < visible.Count; i++)
-        {
-            var corners = visible[i].Corners;
             var points = new Point[4];
-
             for (var c = 0; c < 4; c++)
             {
-                var (sx, sy) = Project(corners[c], Yaw, Pitch);
+                var (sx, sy) = Project(face.Corners[c], Yaw, Pitch);
                 points[c] = new Point(sx, sy);
                 minX = Math.Min(minX, sx);
                 maxX = Math.Max(maxX, sx);
@@ -110,9 +127,12 @@ public sealed class BlockIcon : Control
                 maxY = Math.Max(maxY, sy);
             }
 
-            projected[i] = points;
+            visible.Add((face with { Depth = Dot(center, camera) }, points));
         }
 
+        if (visible.Count == 0) return;
+
+        // 2. 等比缩放居中。
         var spanX = Math.Max(0.0001, maxX - minX);
         var spanY = Math.Max(0.0001, maxY - minY);
         var scale = size * FillRatio / Math.Max(spanX, spanY);
@@ -120,11 +140,11 @@ public sealed class BlockIcon : Control
         var offsetY = (Bounds.Height - spanY * scale) / 2 - minY * scale;
 
         // 3. 从远到近绘制（画家算法，保证同样的角度得到同样的像素）。
-        visible.Sort(static (a, b) => a.Depth.CompareTo(b.Depth));
+        visible.Sort(static (a, b) => a.Face.Depth.CompareTo(b.Face.Depth));
 
         for (var i = 0; i < visible.Count; i++)
         {
-            var points = projected[i];
+            var points = visible[i].Points;
             var p0 = new Point(points[0].X * scale + offsetX, points[0].Y * scale + offsetY);
             var p1 = new Point(points[1].X * scale + offsetX, points[1].Y * scale + offsetY);
             var p3 = new Point(points[3].X * scale + offsetX, points[3].Y * scale + offsetY);
@@ -134,12 +154,12 @@ public sealed class BlockIcon : Control
                 p3.X - p0.X, p3.Y - p0.Y,
                 p0.X, p0.Y);
 
-            matrix = visible[i].Orientation * matrix;
+            matrix = visible[i].Face.Orientation * matrix;
 
             using (context.PushTransform(matrix))
             {
-                var texture = visible[i].Texture;
-                var uv = visible[i].Uv;
+                var texture = visible[i].Face.Texture;
+                var uv = visible[i].Face.Uv;
                 var source = new Rect(
                     uv.X * texture.Size.Width,
                     uv.Y * texture.Size.Height,
@@ -148,7 +168,7 @@ public sealed class BlockIcon : Control
 
                 context.DrawImage(texture, source, new Rect(0, 0, 1, 1));
 
-                var shade = visible[i].Shade;
+                var shade = visible[i].Face.Shade;
                 if (shade > 0)
                 {
                     context.DrawRectangle(
@@ -174,6 +194,8 @@ public sealed class BlockIcon : Control
     {
         public static Point3 operator +(Point3 a, Point3 b) => new(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
 
+        public static Point3 operator -(Point3 a, Point3 b) => new(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+
         public static Point3 operator *(Point3 a, double k) => new(a.X * k, a.Y * k, a.Z * k);
     }
 
@@ -196,6 +218,7 @@ public sealed class BlockIcon : Control
         Top,
         Side,
         Bottom,
+        Front,
     }
 
     /// <summary>原版单位坐标（0~16）转成以方块中心为原点的坐标。</summary>
@@ -250,7 +273,7 @@ public sealed class BlockIcon : Control
             (FaceKind.Up, Uv(0, 0, 16, 16, TextureSlot.Top)),
             (FaceKind.Down, Uv(0, 0, 16, 16, TextureSlot.Bottom)),
             (FaceKind.North, Uv(0, 0, 16, 16)),
-            (FaceKind.South, Uv(0, 0, 16, 16)),
+            (FaceKind.South, Uv(0, 0, 16, 16, TextureSlot.Front)),
             (FaceKind.East, Uv(0, 0, 16, 16)),
             (FaceKind.West, Uv(0, 0, 16, 16)),
         }),
@@ -362,6 +385,7 @@ public sealed class BlockIcon : Control
                 {
                     TextureSlot.Top => textures.Top,
                     TextureSlot.Bottom => textures.Bottom,
+                    TextureSlot.Front => textures.Front,
                     _ => textures.Side,
                 };
 
@@ -374,6 +398,117 @@ public sealed class BlockIcon : Control
                     ShadeFor(kind));
             }
         }
+    }
+
+    // ---------------------------------------------------------------- 立体贴图
+
+    /// <summary>把一张像素图按不透明像素拉出厚度，当作一块有厚度的牌子来画。</summary>
+    private static IEnumerable<Face> BuildSpriteFaces(
+        SpriteTextures sprite, double yawDegrees, double pitchDegrees)
+    {
+        var width = sprite.Width;
+        var height = sprite.Height;
+        if (width <= 0 || height <= 0) yield break;
+
+        var pixel = 1d / Math.Max(width, height);
+        var half = Math.Max(2, Math.Round(Math.Min(width, height) * 0.22)) * pixel / 2;
+
+        var yaw = yawDegrees * Math.PI / 180;
+        var depth = CameraDirection(yawDegrees, pitchDegrees);
+        var right = new Point3(Math.Cos(yaw), 0, -Math.Sin(yaw));
+
+        // 屏幕里的“向上”：垂直于相机与 right，并缩放到投影长度为 1。
+        var up = Cross(depth, right);
+        var projectedUp = Project(up, yawDegrees, pitchDegrees);
+        var upLength = Math.Sqrt(projectedUp.X * projectedUp.X + projectedUp.Y * projectedUp.Y);
+        if (upLength < 1e-6) yield break;
+        up = up * (1 / upLength);
+        if (Project(up, yawDegrees, pitchDegrees).Y > 0) up = up * -1;
+
+        // 绕屏幕竖直轴把牌子转一点，这样既不变形，又能看到厚度。
+        const double tilt = 22 * Math.PI / 180;
+        var plateRight = right * Math.Cos(tilt) + depth * Math.Sin(tilt);
+        var plateNormal = depth * Math.Cos(tilt) - right * Math.Sin(tilt);
+
+        Point3 At(double u, double v, double d) => new(
+            plateRight.X * u + up.X * v + plateNormal.X * d,
+            plateRight.Y * u + up.Y * v + plateNormal.Y * d,
+            plateRight.Z * u + up.Z * v + plateNormal.Z * d);
+
+        var left = -width * pixel / 2;
+        var top = height * pixel / 2;
+
+        bool Opaque(int x, int y) =>
+            x >= 0 && y >= 0 && x < width && y < height && sprite.Opaque[x, y];
+
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                if (!sprite.Opaque[x, y]) continue;
+
+                var u0 = left + x * pixel;
+                var u1 = u0 + pixel;
+                var v1 = top - y * pixel;
+                var v0 = v1 - pixel;
+                var uv = new Rect((double)x / width, (double)y / height, 1d / width, 1d / height);
+
+                yield return SpriteFace(
+                    new[] { At(u0, v1, half), At(u1, v1, half), At(u1, v0, half), At(u0, v0, half) },
+                    sprite.Image, uv, 0d);
+
+                yield return SpriteFace(
+                    new[] { At(u1, v1, -half), At(u0, v1, -half), At(u0, v0, -half), At(u1, v0, -half) },
+                    sprite.Image, uv, 0.30d);
+
+                if (!Opaque(x + 1, y))
+                {
+                    yield return SpriteFace(
+                        new[] { At(u1, v1, half), At(u1, v1, -half), At(u1, v0, -half), At(u1, v0, half) },
+                        sprite.Image, uv, 0.35d);
+                }
+
+                if (!Opaque(x - 1, y))
+                {
+                    yield return SpriteFace(
+                        new[] { At(u0, v1, -half), At(u0, v1, half), At(u0, v0, half), At(u0, v0, -half) },
+                        sprite.Image, uv, 0.26d);
+                }
+
+                if (!Opaque(x, y - 1))
+                {
+                    yield return SpriteFace(
+                        new[] { At(u0, v1, -half), At(u1, v1, -half), At(u1, v1, half), At(u0, v1, half) },
+                        sprite.Image, uv, 0d);
+                }
+
+                if (!Opaque(x, y + 1))
+                {
+                    yield return SpriteFace(
+                        new[] { At(u0, v0, half), At(u1, v0, half), At(u1, v0, -half), At(u0, v0, -half) },
+                        sprite.Image, uv, 0.45d);
+                }
+            }
+        }
+    }
+
+    private static Face SpriteFace(Point3[] corners, IImage texture, Rect uv, double shade)
+    {
+        var normal = Normalize(Cross(corners[3] - corners[0], corners[1] - corners[0]));
+        return new Face(normal, corners, texture, uv, Matrix.Identity, shade);
+    }
+
+    private static Point3 Cross(Point3 a, Point3 b) => new(
+        a.Y * b.Z - a.Z * b.Y,
+        a.Z * b.X - a.X * b.Z,
+        a.X * b.Y - a.Y * b.X);
+
+    private static Point3 Normalize(Point3 value)
+    {
+        var length = Math.Sqrt(value.X * value.X + value.Y * value.Y + value.Z * value.Z);
+        return length < 1e-6
+            ? new Point3(0, 0, 0)
+            : new Point3(value.X / length, value.Y / length, value.Z / length);
     }
 
     // ---------------------------------------------------------------- 投影
@@ -417,7 +552,7 @@ public sealed class BlockIcon : Control
 
     // ---------------------------------------------------------------- 贴图
 
-    private sealed record BlockTextures(IImage Top, IImage Side, IImage Bottom)
+    private sealed record BlockTextures(IImage Top, IImage Side, IImage Bottom, IImage Front)
     {
         private static readonly Dictionary<string, BlockTextures?> Cache =
             new(StringComparer.OrdinalIgnoreCase);
@@ -449,14 +584,15 @@ public sealed class BlockIcon : Control
                 var top = Read(block, "top");
                 var side = Read(block, "side") ?? top;
                 var bottom = Read(block, "bottom") ?? side;
+                var front = Read(block, "front") ?? side;
 
-                if (top is null || side is null || bottom is null)
+                if (top is null || side is null || bottom is null || front is null)
                 {
                     LauncherLog.Warn($"方块图标贴图缺失：Assets/Icons/Blocks/{block}");
                     return null;
                 }
 
-                return new BlockTextures(top, side, bottom);
+                return new BlockTextures(top, side, bottom, front);
             }
             catch (Exception exception)
             {
@@ -479,6 +615,74 @@ public sealed class BlockIcon : Control
             }
             catch (Exception)
             {
+                return null;
+            }
+        }
+    }
+
+    /// <summary>有透明背景的图标：按不透明像素拉出厚度。</summary>
+    private sealed record SpriteTextures(IImage Image, bool[,] Opaque, int Width, int Height)
+    {
+        private const string SpriteRoot = "avares://NextCraftLauncher/Assets/Icons/Sprites/";
+
+        private static readonly Dictionary<string, SpriteTextures?> Cache =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public static SpriteTextures? For(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+
+            lock (Cache)
+            {
+                if (Cache.TryGetValue(name, out var cached)) return cached;
+            }
+
+            var loaded = Load(name);
+
+            lock (Cache)
+            {
+                Cache[name] = loaded;
+            }
+
+            return loaded;
+        }
+
+        private static SpriteTextures? Load(string name)
+        {
+            try
+            {
+                using var stream = AssetLoader.Open(new Uri($"{SpriteRoot}{name}.png"));
+                using var memory = new MemoryStream();
+                stream.CopyTo(memory);
+                memory.Position = 0;
+
+                var bitmap = new Bitmap(memory);
+                var width = bitmap.PixelSize.Width;
+                var height = bitmap.PixelSize.Height;
+                if (width <= 0 || height <= 0) return null;
+
+                var opaque = new bool[width, height];
+                using (var copy = new WriteableBitmap(
+                           bitmap.PixelSize, new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul))
+                using (var frame = copy.Lock())
+                {
+                    bitmap.CopyPixels(frame);
+
+                    for (var y = 0; y < height; y++)
+                    {
+                        var row = IntPtr.Add(frame.Address, y * frame.RowBytes);
+                        for (var x = 0; x < width; x++)
+                        {
+                            opaque[x, y] = Marshal.ReadByte(row, x * 4 + 3) >= 128;
+                        }
+                    }
+                }
+
+                return new SpriteTextures(bitmap, opaque, width, height);
+            }
+            catch (Exception)
+            {
+                // 没有同名 Sprite 时退回方块渲染，不当作错误。
                 return null;
             }
         }

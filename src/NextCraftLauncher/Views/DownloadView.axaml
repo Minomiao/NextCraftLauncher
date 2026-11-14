@@ -174,7 +174,7 @@
                                                         Classes="versionRow"
                                                         Classes.selected="{Binding Version.IsSelected}"
                                                         Command="{Binding Version.SelectCommand}">
-                                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                                                         <controls:BlockIcon Grid.Column="0"
                                                                             Width="30"
                                                                             Height="30"
@@ -189,12 +189,6 @@
                                                                        FontSize="11"
                                                                        Opacity="0.6" />
                                                         </StackPanel>
-                                                        <TextBlock Grid.Column="2"
-                                                                   Text="已安装"
-                                                                   FontSize="11"
-                                                                   Opacity="0.5"
-                                                                   VerticalAlignment="Center"
-                                                                   IsVisible="{Binding Version.IsInstalled}" />
                                                     </Grid>
                                                 </Button>
                                             </Grid>
@@ -213,7 +207,7 @@
                         <Grid RowDefinitions="Auto,*,Auto" RowSpacing="10"
                               IsVisible="{Binding IsRemoteVersionDetailOpen}">
 
-                            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+                            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
                                 <Button Classes="soft"
                                         Content="← 返回"
                                         Command="{Binding CloseRemoteVersionDetailCommand}"
@@ -235,12 +229,6 @@
                                                Opacity="0.6"
                                                TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
-                                <TextBlock Grid.Column="3"
-                                           Text="已安装"
-                                           FontSize="11"
-                                           Opacity="0.55"
-                                           VerticalAlignment="Center"
-                                           IsVisible="{Binding SelectedRemoteVersion.IsInstalled}" />
                             </Grid>
 
                             <Grid Grid.Row="1" RowDefinitions="*">

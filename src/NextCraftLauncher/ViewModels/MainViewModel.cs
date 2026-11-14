@@ -257,15 +257,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         group.IsLoading = false;
         group.IsAvailable = group.Versions.Count > 0;
         group.ErrorText = result.Error;
-
-        var visibleCount = VisibleLoaderVersions(group).Count;
         group.StatusText = result.Error is not null
             ? "获取失败"
-            : visibleCount > 0
-                ? $"{visibleCount} 个版本"
-                : group.Versions.Count > 0
-                    ? "都已安装"
-                    : "无可用版本";
+            : group.Versions.Count > 0
+                ? $"{group.Versions.Count} 个版本"
+                : "无可用版本";
 
         UpdateLoaderGroupRows(group, changed);
     }
@@ -2135,7 +2131,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         foreach (var item in _allRemoteVersions)
         {
-            if (item.IsInstalled) continue;
             if (!MatchesRemoteVersionType(item)) continue;
             if (search.Length > 0 && !item.Id.Contains(search, StringComparison.OrdinalIgnoreCase)) continue;
             filtered.Add(item);
@@ -2250,43 +2245,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (!group.IsExpanded) return;
 
-        var visible = VisibleLoaderVersions(group);
-        if (visible.Count == 0)
+        if (group.Versions.Count == 0)
         {
             rows.Add(LoaderVersionListRowViewModel.CreateEmpty(group, DescribeLoaderEmpty(group)));
             return;
         }
 
-        foreach (var version in visible)
+        foreach (var version in group.Versions)
             rows.Add(LoaderVersionListRowViewModel.CreateVersion(version));
-    }
-
-    /// <summary>已经装过的加载器版本不再列出，避免重复下载。</summary>
-    private List<LoaderVersionItemViewModel> VisibleLoaderVersions(LoaderVersionGroupViewModel group)
-        => group.Versions.Where(version => !IsLoaderVersionInstalled(group.Key, version.Version)).ToList();
-
-    /// <summary>按加载器、游戏版本与版本号判断是否已安装过。</summary>
-    private bool IsLoaderVersionInstalled(string loaderKey, string loaderVersion)
-    {
-        if (string.IsNullOrWhiteSpace(loaderVersion)) return false;
-
-        var displayName = GetLoaderDisplayName(loaderKey);
-
-        foreach (var version in Versions)
-        {
-            if (!string.Equals(version.Summary.Loader, displayName, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            if (_activeLoaderVersionId is { Length: > 0 } active &&
-                !string.IsNullOrEmpty(version.Summary.ClientVersion) &&
-                !string.Equals(version.Summary.ClientVersion, active, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            if (version.Id.EndsWith(loaderVersion, StringComparison.OrdinalIgnoreCase))
-                return true;
-        }
-
-        return false;
     }
 
     private LoaderVersionListRowViewModel CreateLoaderHeaderRow(LoaderVersionGroupViewModel group)
@@ -2296,7 +2262,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (group.IsLoading) return "正在获取版本列表…";
         if (!string.IsNullOrEmpty(group.ErrorText)) return $"获取失败：{group.ErrorText}";
-        if (group.Versions.Count > 0) return $"该版本下的 {group.DisplayName} 版本都已安装";
         return $"该版本没有可用的 {group.DisplayName} 版本";
     }
 
@@ -2339,8 +2304,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (!group.IsExpanded) return;
 
-        var visible = VisibleLoaderVersions(group);
-        if (visible.Count == 0)
+        if (group.Versions.Count == 0)
         {
             LoaderVersionRows.Insert(
                 headerIndex + 1,
@@ -2350,7 +2314,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         LoaderVersionRows.InsertRange(
             headerIndex + 1,
-            visible.Select(version =>
+            group.Versions.Select(version =>
                 LoaderVersionListRowViewModel.CreateVersion(version)));
     }
 
@@ -2679,7 +2643,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 // 已有缓存时保留内容，只提示本次刷新失败。
                 group.IsAvailable = true;
-                group.StatusText = $"{VisibleLoaderVersions(group).Count} 个版本";
+                group.StatusText = $"{group.Versions.Count} 个版本";
                 UpdateLoaderGroupRows(group, contentChanged: false);
             }
             else
@@ -2725,8 +2689,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         foreach (var item in _allRemoteVersions)
             item.IsInstalled = installed.Contains(item.Id);
 
-        // 已安装的版本不再出现在列表里，重新过滤一次（同时刷新状态文字）。
-        ApplyRemoteVersionFilter();
+        UpdateRemoteVersionsStatus();
     }
 
     private void UpdateRemoteVersionsStatus()
@@ -2763,10 +2726,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>校验并规范化版本名；名称冲突时直接给出提示。</summary>
-    private bool TryResolveVersionName(
-        string minecraftVersion,
-        bool loaderSelected,
-        out string name)
+    private bool TryResolveVersionName(out string name)
     {
         name = VersionNaming.Normalize(VersionName);
 
@@ -2776,11 +2736,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return false;
         }
 
-        var isDefaultVanilla = !loaderSelected &&
-                               string.Equals(name, minecraftVersion, StringComparison.OrdinalIgnoreCase);
-
-        if (!isDefaultVanilla &&
-            Directory.Exists(Path.Combine(MinecraftDirectory, "versions", name)))
+        if (Directory.Exists(Path.Combine(MinecraftDirectory, "versions", name)))
         {
             Status = $"版本名 “{name}” 已存在，请换一个名称";
             return false;
@@ -2796,7 +2752,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         var item = SelectedRemoteVersion;
 
-        if (!TryResolveVersionName(item.Id, loaderSelected: false, out var desiredName))
+        if (!TryResolveVersionName(out var desiredName))
             return;
 
         var task = TryCreateTask(desiredName, DownloadTaskKind.Version, item.Id);
@@ -2931,7 +2887,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var loaderVersion = _selectedLoaderVersion;
         var displayName = GetLoaderDisplayName(loader);
 
-        if (!TryResolveVersionName(item.Id, loaderSelected: true, out var desiredName))
+        if (!TryResolveVersionName(out var desiredName))
             return;
 
         var task = TryCreateTask(desiredName, DownloadTaskKind.Version, item.Id);

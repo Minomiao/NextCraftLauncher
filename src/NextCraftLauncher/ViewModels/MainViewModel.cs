@@ -621,6 +621,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public bool IsSettingsDownloadSelected => CurrentSettingsSection == SettingsSection.Download;
 
+    public bool IsSettingsAppearanceSelected => CurrentSettingsSection == SettingsSection.Appearance;
+
     public bool IsDownloadVersionsSelected => CurrentDownloadSection == DownloadSection.Versions;
 
     public bool IsDownloadModsSelected => CurrentDownloadSection == DownloadSection.Mods;
@@ -807,6 +809,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(IsSettingsLaunchSelected));
         OnPropertyChanged(nameof(IsSettingsDownloadSelected));
+        OnPropertyChanged(nameof(IsSettingsAppearanceSelected));
     }
 
     partial void OnCurrentDownloadSectionChanged(DownloadSection value)
@@ -1496,6 +1499,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowSettingsDownload() => CurrentSettingsSection = SettingsSection.Download;
+
+    [RelayCommand]
+    private void ShowSettingsAppearance() => CurrentSettingsSection = SettingsSection.Appearance;
 
     [RelayCommand]
     private void RequestVersionDelete(VersionItemViewModel? version)

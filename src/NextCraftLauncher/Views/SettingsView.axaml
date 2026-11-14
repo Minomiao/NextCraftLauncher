@@ -20,6 +20,10 @@
                     Classes.selected="{Binding IsSettingsDownloadSelected}"
                     Content="下载设置"
                     Command="{Binding ShowSettingsDownloadCommand}" />
+            <Button Classes="side"
+                    Classes.selected="{Binding IsSettingsAppearanceSelected}"
+                    Content="外观"
+                    Command="{Binding ShowSettingsAppearanceCommand}" />
         </StackPanel>
 
         <Border Grid.Column="1" Classes="vline" />
@@ -178,6 +182,9 @@
                                Text="游戏版本：自动 / Mojang 官方 / Mojang CDN / BMCLAPI。加载器：自动（官网立即请求、BMCLAPI 延迟对冲） / 官方（仅加载器官网） / BMCLAPI（优先镜像）。" />
                 </StackPanel>
             </ScrollViewer>
+
+            <!-- 外观：暂时空白，后续再加主题、图标等设置 -->
+            <Grid IsVisible="{Binding IsSettingsAppearanceSelected}" />
         </Grid>
     </Grid>
 

@@ -30,17 +30,27 @@ public sealed class BlockIcon : Control
     /// <summary>方块在画布中的占比（0~1），留出边距。</summary>
     private const double FillRatio = 0.92;
 
-    private const string AssetRoot = "avares://NextCraftLauncher/Assets/Icons/Blocks/grass/";
+    /// <summary>要渲染的方块（对应 Assets/Icons/Blocks/&lt;名称&gt;/ 下的贴图）。</summary>
+    public static readonly StyledProperty<string> BlockProperty =
+        AvaloniaProperty.Register<BlockIcon, string>(nameof(Block), "grass");
+
+    private const string AssetRoot = "avares://NextCraftLauncher/Assets/Icons/Blocks/";
 
     static BlockIcon()
     {
-        AffectsRender<BlockIcon>(YawProperty, PitchProperty);
+        AffectsRender<BlockIcon>(BlockProperty, YawProperty, PitchProperty);
     }
 
     public BlockIcon()
     {
         RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.None);
         RenderOptions.SetEdgeMode(this, EdgeMode.Aliased);
+    }
+
+    public string Block
+    {
+        get => GetValue(BlockProperty);
+        set => SetValue(BlockProperty, value);
     }
 
     public double Yaw
@@ -60,7 +70,7 @@ public sealed class BlockIcon : Control
         var size = Math.Min(Bounds.Width, Bounds.Height);
         if (size <= 0) return;
 
-        var textures = GrassTextures.Asset;
+        var textures = BlockTextures.For(Block);
         if (textures is null) return;
 
         var camera = CameraDirection(Yaw, Pitch);
@@ -164,8 +174,8 @@ public sealed class BlockIcon : Control
         double Shade,
         double Depth = 0);
 
-    /// <summary>草方块：单位立方体，六面贴图。</summary>
-    private static IEnumerable<Face> BuildCubeFaces(GrassTextures textures)
+    /// <summary>单位立方体，六面贴图。</summary>
+    private static IEnumerable<Face> BuildCubeFaces(BlockTextures textures)
     {
         const double h = 0.5;
 
@@ -271,51 +281,70 @@ public sealed class BlockIcon : Control
 
     // ---------------------------------------------------------------- 贴图
 
-    private sealed record GrassTextures(IImage Top, IImage Side, IImage Bottom)
+    private sealed record BlockTextures(IImage Top, IImage Side, IImage Bottom)
     {
-        private static GrassTextures? _instance;
-        private static bool _loaded;
+        private static readonly Dictionary<string, BlockTextures?> Cache =
+            new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>项目内置贴图，随程序集编译，不依赖 Minecraft 客户端。</summary>
-        public static GrassTextures? Asset
+        public static BlockTextures? For(string block)
         {
-            get
+            if (string.IsNullOrWhiteSpace(block)) return null;
+
+            lock (Cache)
             {
-                if (_loaded) return _instance;
+                if (Cache.TryGetValue(block, out var cached)) return cached;
+            }
 
-                _loaded = true;
+            var loaded = Load(block);
 
-                try
+            lock (Cache)
+            {
+                Cache[block] = loaded;
+            }
+
+            return loaded;
+        }
+
+        private static BlockTextures? Load(string block)
+        {
+            try
+            {
+                var top = Read(block, "top");
+                var side = Read(block, "side") ?? top;
+                var bottom = Read(block, "bottom") ?? side;
+
+                if (top is null || side is null || bottom is null)
                 {
-                    var top = Load("top");
-                    var side = Load("side");
-                    var bottom = Load("bottom");
-
-                    if (top is null || side is null || bottom is null)
-                    {
-                        LauncherLog.Warn("方块图标贴图缺失（Assets/Icons/Blocks）");
-                        return null;
-                    }
-
-                    _instance = new GrassTextures(top, side, bottom);
-                }
-                catch (Exception exception)
-                {
-                    LauncherLog.Warn($"加载方块图标贴图失败：{exception.Message}");
+                    LauncherLog.Warn($"方块图标贴图缺失：Assets/Icons/Blocks/{block}");
+                    return null;
                 }
 
-                return _instance;
+                return new BlockTextures(top, side, bottom);
+            }
+            catch (Exception exception)
+            {
+                LauncherLog.Warn($"加载方块图标贴图失败（{block}）：{exception.Message}");
+                return null;
             }
         }
 
-        private static Bitmap? Load(string name)
+        private static Bitmap? Read(string block, string face)
         {
-            var uri = new Uri($"{AssetRoot}{name}.png");
-            using var stream = AssetLoader.Open(uri);
-            using var memory = new MemoryStream();
-            stream.CopyTo(memory);
-            memory.Position = 0;
-            return new Bitmap(memory);
+            var uri = new Uri($"{AssetRoot}{block}/{face}.png");
+
+            try
+            {
+                using var stream = AssetLoader.Open(uri);
+                using var memory = new MemoryStream();
+                stream.CopyTo(memory);
+                memory.Position = 0;
+                return new Bitmap(memory);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
     }
 }

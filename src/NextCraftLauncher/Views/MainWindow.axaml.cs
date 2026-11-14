@@ -125,6 +125,11 @@ public partial class MainWindow : Window
         InitializeComponent();
         SizeChanged += (_, _) => ReportMetrics();
 
+        // 标题栏品牌/返回按钮的位移由代码驱动，初始化时先把两者的最终位置建好。
+        BrandText.RenderTransform = _brandTransform;
+        BrandBackButton.RenderTransform = _backTransform;
+        ApplyTitleBarState(_viewModel?.IsSubPageOpen == true);
+
         // 导航按钮所在区域支持左右拖拽切页（按下后再横向拖）。
         var transform = new TransformGroup();
         transform.Children.Add(_navIndicatorOffset);
@@ -154,6 +159,82 @@ public partial class MainWindow : Window
     private bool _navPageChanged;
     private double _navPressX;
     private IDisposable? _navSquashTimer;
+
+    private readonly TranslateTransform _brandTransform = new();
+    private readonly TranslateTransform _backTransform = new();
+    private int _titleBarTransition;
+
+    /// <summary>标题栏左侧切换：先收起当前元素，再让另一个进入，避免两者重叠。</summary>
+    private async Task PlayTitleBarTransitionAsync(bool subPage)
+    {
+        var version = ++_titleBarTransition;
+
+        if (subPage)
+        {
+            await AnimateTitleElementAsync(BrandText, _brandTransform, 1, 0, 0, -32, 300);
+            if (version != _titleBarTransition) return;
+
+            BrandBackButton.IsHitTestVisible = true;
+            await AnimateTitleElementAsync(BrandBackButton, _backTransform, 0, 1, 32, 0, 300);
+        }
+        else
+        {
+            BrandBackButton.IsHitTestVisible = false;
+            await AnimateTitleElementAsync(BrandBackButton, _backTransform, 1, 0, 0, 32, 260);
+            if (version != _titleBarTransition) return;
+
+            await AnimateTitleElementAsync(BrandText, _brandTransform, 0, 1, -32, 0, 300);
+        }
+    }
+
+    private static async Task AnimateTitleElementAsync(
+        Visual visual,
+        TranslateTransform transform,
+        double opacityFrom,
+        double opacityTo,
+        double offsetFrom,
+        double offsetTo,
+        int milliseconds)
+    {
+        var duration = TimeSpan.FromMilliseconds(milliseconds);
+
+        var fade = new Animation
+        {
+            Duration = duration,
+            Easing = new CubicEaseOut(),
+            Children =
+            {
+                new KeyFrame { Cue = new Cue(0d), Setters = { new Setter(Visual.OpacityProperty, opacityFrom) } },
+                new KeyFrame { Cue = new Cue(1d), Setters = { new Setter(Visual.OpacityProperty, opacityTo) } },
+            },
+        };
+
+        var slide = new Animation
+        {
+            Duration = duration,
+            Easing = new CubicEaseOut(),
+            Children =
+            {
+                new KeyFrame { Cue = new Cue(0d), Setters = { new Setter(TranslateTransform.XProperty, offsetFrom) } },
+                new KeyFrame { Cue = new Cue(1d), Setters = { new Setter(TranslateTransform.XProperty, offsetTo) } },
+            },
+        };
+
+        await Task.WhenAll(fade.RunAsync(visual), slide.RunAsync(transform));
+
+        visual.Opacity = opacityTo;
+        transform.X = offsetTo;
+    }
+
+    /// <summary>直接落位：用于初始化，或快速连续切换时取消未完成的动画。</summary>
+    private void ApplyTitleBarState(bool subPage)
+    {
+        BrandText.Opacity = subPage ? 0 : 1;
+        _brandTransform.X = subPage ? -32 : 0;
+        BrandBackButton.Opacity = subPage ? 1 : 0;
+        _backTransform.X = subPage ? 0 : 32;
+        BrandBackButton.IsHitTestVisible = subPage;
+    }
 
     /// <summary>当前正跟着高亮一起缩小的按钮文字；没按住时为 null。</summary>
     private ScaleTransform? _navSquashTextScale;
@@ -501,6 +582,7 @@ public partial class MainWindow : Window
             _viewModel.GameExited += OnGameExited;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
             _viewModel.MicrosoftSignInHandler = ShowMicrosoftSignInAsync;
+            ApplyTitleBarState(_viewModel.IsSubPageOpen);
             ReportMetrics();
         }
     }
@@ -508,6 +590,12 @@ public partial class MainWindow : Window
     /// <summary>任意提示卡片打开时让背景模糊逐渐出现，关闭时直接移除。</summary>
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainViewModel.IsSubPageOpen))
+        {
+            _ = PlayTitleBarTransitionAsync(_viewModel?.IsSubPageOpen == true);
+            return;
+        }
+
         if (e.PropertyName == nameof(MainViewModel.CurrentPage))
         {
             // 拖拽中的指示器由指针驱动，不要在此处抢回。

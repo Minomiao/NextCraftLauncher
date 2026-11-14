@@ -113,15 +113,23 @@
 
                     <Button Classes="soft brandBack"
                             Classes.subpage="{Binding IsSubPageOpen}"
-                            Content="←"
                             Command="{Binding GoBackCommand}"
                             Width="32"
                             Height="32"
                             Padding="0"
-                            FontSize="16"
                             CornerRadius="16"
                             HorizontalAlignment="Left"
-                            VerticalAlignment="Center" />
+                            VerticalAlignment="Center">
+                        <!-- 退出/返回图标：SVG 路径描边绘制，不依赖字体 -->
+                        <Path Width="12"
+                              Height="12"
+                              Data="M21 12 H5 M12 5 L5 12 L12 19"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                              StrokeThickness="1.8"
+                              StrokeLineCap="Round"
+                              StrokeJoin="Round"
+                              Stretch="Uniform" />
+                    </Button>
                 </Panel>
 
                 <Panel Grid.Column="1"

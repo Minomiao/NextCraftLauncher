@@ -14,13 +14,18 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Padding" Value="8,6" />
             <Setter Property="MinHeight" Value="30" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
         <Style Selector="Button.versionRow.selected">
             <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+        </Style>
+
+        <!-- 加载器分组行只有图标和一行标题，内边距取 8 才能上/左/下等距 -->
+        <Style Selector="Button.versionRow.loaderHeader">
+            <Setter Property="Padding" Value="8" />
         </Style>
 
         <!-- 任务卡片里的失败信息用错误色，与普通进度文字区分 -->
@@ -171,8 +176,8 @@
                                                         Command="{Binding Version.SelectCommand}">
                                                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                                                         <controls:BlockIcon Grid.Column="0"
-                                                                            Width="24"
-                                                                            Height="24"
+                                                                            Width="30"
+                                                                            Height="30"
                                                                             VerticalAlignment="Center"
                                                                             Block="{Binding Version.IconName}" />
                                                         <StackPanel Grid.Column="1" Spacing="1">
@@ -254,7 +259,7 @@
                                         <DataTemplate x:DataType="vm:LoaderVersionListRowViewModel">
                                             <Grid>
                                                 <Button IsVisible="{Binding IsHeader}"
-                                                        Classes="versionRow"
+                                                        Classes="versionRow loaderHeader"
                                                         Command="{Binding ToggleCommand}"
                                                         ToolTip.Tip="{Binding Error}">
                                                     <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="6">

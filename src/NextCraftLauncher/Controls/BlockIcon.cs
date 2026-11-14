@@ -14,7 +14,7 @@ namespace NextCraftLauncher.Controls;
 /// 用项目内置贴图实时渲染一个等距 3D 方块。
 /// <para>
 /// 贴图在 <c>Assets/Icons/Blocks/&lt;方块&gt;/</c>，按原版的结构与配色绘制；
-/// 六面模型 + 按相机剔除 + 深度排序，任意 yaw/pitch 都能画。
+/// 模型由若干长方体组成，按相机剔除 + 深度排序，任意 yaw/pitch 都能画。
 /// </para>
 /// </summary>
 public sealed class BlockIcon : Control
@@ -76,8 +76,8 @@ public sealed class BlockIcon : Control
         var camera = CameraDirection(Yaw, Pitch);
 
         // 1. 收集可见面（法线朝向相机）。
-        var visible = new List<Face>(3);
-        foreach (var face in BuildCubeFaces(textures))
+        var visible = new List<Face>(24);
+        foreach (var face in BuildFaces(textures, ModelFor(Block)))
         {
             if (Dot(face.Normal, camera) <= 0.0001) continue;
 
@@ -134,9 +134,19 @@ public sealed class BlockIcon : Control
                 p3.X - p0.X, p3.Y - p0.Y,
                 p0.X, p0.Y);
 
+            matrix = visible[i].Orientation * matrix;
+
             using (context.PushTransform(matrix))
             {
-                context.DrawImage(visible[i].Texture, new Rect(0, 0, 1, 1));
+                var texture = visible[i].Texture;
+                var uv = visible[i].Uv;
+                var source = new Rect(
+                    uv.X * texture.Size.Width,
+                    uv.Y * texture.Size.Height,
+                    uv.Width * texture.Size.Width,
+                    uv.Height * texture.Size.Height);
+
+                context.DrawImage(texture, source, new Rect(0, 0, 1, 1));
 
                 var shade = visible[i].Shade;
                 if (shade > 0)
@@ -171,73 +181,199 @@ public sealed class BlockIcon : Control
         Point3 Normal,
         Point3[] Corners,
         IImage Texture,
+        Rect Uv,
+        Matrix Orientation,
         double Shade,
         double Depth = 0);
 
-    /// <summary>单位立方体，六面贴图。</summary>
-    private static IEnumerable<Face> BuildCubeFaces(BlockTextures textures)
+    private sealed record ModelBox(Point3 Min, Point3 Max, (FaceKind Kind, FaceUv Uv)[] Faces);
+
+    /// <summary>一个面用到的贴图区域，以及贴图在面内的旋转/镜像。</summary>
+    private readonly record struct FaceUv(TextureSlot Slot, Rect Rect, Matrix Orientation);
+
+    private enum TextureSlot
     {
-        const double h = 0.5;
+        Top,
+        Side,
+        Bottom,
+    }
 
-        yield return new Face(
-            new Point3(0, 1, 0),
-            new[]
-            {
-                new Point3(-h, h, -h), new Point3(h, h, -h),
-                new Point3(h, h, h), new Point3(-h, h, h),
-            },
-            textures.Top,
-            0d);
+    /// <summary>原版单位坐标（0~16）转成以方块中心为原点的坐标。</summary>
+    private static Point3 P(double x, double y, double z) => new((x - 8) / 16, (y - 8) / 16, (z - 8) / 16);
 
-        yield return new Face(
-            new Point3(0, -1, 0),
-            new[]
-            {
-                new Point3(-h, -h, h), new Point3(h, -h, h),
-                new Point3(h, -h, -h), new Point3(-h, -h, -h),
-            },
-            textures.Bottom,
-            0.45d);
+    /// <summary>贴图区域（0~16 像素）与旋转，负方向表示镜像。</summary>
+    private static FaceUv Uv(
+        double u0,
+        double v0,
+        double u1,
+        double v1,
+        TextureSlot slot = TextureSlot.Side,
+        int rotation = 0)
+    {
+        var rect = new Rect(
+            Math.Min(u0, u1) / 16,
+            Math.Min(v0, v1) / 16,
+            Math.Abs(u1 - u0) / 16,
+            Math.Abs(v1 - v0) / 16);
 
-        yield return new Face(
-            new Point3(0, 0, -1),
-            new[]
-            {
-                new Point3(-h, h, -h), new Point3(h, h, -h),
-                new Point3(h, -h, -h), new Point3(-h, -h, -h),
-            },
-            textures.Side,
-            0.30d);
+        var orientation = Matrix.Identity;
 
-        yield return new Face(
-            new Point3(0, 0, 1),
-            new[]
-            {
-                new Point3(h, h, h), new Point3(-h, h, h),
-                new Point3(-h, -h, h), new Point3(h, -h, h),
-            },
-            textures.Side,
-            0.18d);
+        if (u1 < u0 || v1 < v0)
+        {
+            var sx = u1 < u0 ? -1d : 1d;
+            var sy = v1 < v0 ? -1d : 1d;
+            orientation = new Matrix(sx, 0, 0, sy, (1 - sx) / 2, (1 - sy) / 2);
+        }
 
-        yield return new Face(
-            new Point3(1, 0, 0),
-            new[]
-            {
-                new Point3(h, h, h), new Point3(h, h, -h),
-                new Point3(h, -h, -h), new Point3(h, -h, h),
-            },
-            textures.Side,
-            0.40d);
+        if (rotation != 0)
+        {
+            var radians = rotation * Math.PI / 180;
+            var cos = Math.Cos(radians);
+            var sin = Math.Sin(radians);
 
-        yield return new Face(
-            new Point3(-1, 0, 0),
-            new[]
+            // 绕单位正方形中心旋转，让贴图在面内转动。
+            var rotate = new Matrix(
+                cos, sin, -sin, cos,
+                0.5 - 0.5 * cos + 0.5 * sin,
+                0.5 - 0.5 * sin - 0.5 * cos);
+
+            orientation *= rotate;
+        }
+
+        return new FaceUv(slot, rect, orientation);
+    }
+
+    private static readonly ModelBox[] CubeModel =
+    {
+        new(P(0, 0, 0), P(16, 16, 16), new[]
+        {
+            (FaceKind.Up, Uv(0, 0, 16, 16, TextureSlot.Top)),
+            (FaceKind.Down, Uv(0, 0, 16, 16, TextureSlot.Bottom)),
+            (FaceKind.North, Uv(0, 0, 16, 16)),
+            (FaceKind.South, Uv(0, 0, 16, 16)),
+            (FaceKind.East, Uv(0, 0, 16, 16)),
+            (FaceKind.West, Uv(0, 0, 16, 16)),
+        }),
+    };
+
+    /// <summary>原版 template_anvil 的四个长方体与各自的贴图区域。</summary>
+    private static readonly ModelBox[] AnvilModel =
+    {
+        new(P(2, 0, 2), P(14, 4, 14), new[]
+        {
+            (FaceKind.Down, Uv(2, 2, 14, 14, TextureSlot.Side, 180)),
+            (FaceKind.Up, Uv(2, 2, 14, 14, TextureSlot.Side, 180)),
+            (FaceKind.North, Uv(2, 12, 14, 16)),
+            (FaceKind.South, Uv(2, 12, 14, 16)),
+            (FaceKind.West, Uv(0, 2, 4, 14, TextureSlot.Side, 90)),
+            (FaceKind.East, Uv(4, 2, 0, 14, TextureSlot.Side, 270)),
+        }),
+        new(P(4, 4, 3), P(12, 5, 13), new[]
+        {
+            (FaceKind.Up, Uv(4, 3, 12, 13, TextureSlot.Side, 180)),
+            (FaceKind.North, Uv(4, 11, 12, 12)),
+            (FaceKind.South, Uv(4, 11, 12, 12)),
+            (FaceKind.West, Uv(4, 3, 5, 13, TextureSlot.Side, 90)),
+            (FaceKind.East, Uv(5, 3, 4, 13, TextureSlot.Side, 270)),
+        }),
+        new(P(6, 5, 4), P(10, 10, 12), new[]
+        {
+            (FaceKind.North, Uv(6, 6, 10, 11)),
+            (FaceKind.South, Uv(6, 6, 10, 11)),
+            (FaceKind.West, Uv(5, 4, 10, 12, TextureSlot.Side, 90)),
+            (FaceKind.East, Uv(10, 4, 5, 12, TextureSlot.Side, 270)),
+        }),
+        new(P(3, 10, 0), P(13, 16, 16), new[]
+        {
+            (FaceKind.Down, Uv(3, 0, 13, 16, TextureSlot.Side, 180)),
+            (FaceKind.Up, Uv(3, 0, 13, 16, TextureSlot.Top, 180)),
+            (FaceKind.North, Uv(3, 0, 13, 6)),
+            (FaceKind.South, Uv(3, 0, 13, 6)),
+            (FaceKind.West, Uv(10, 0, 16, 16, TextureSlot.Side, 90)),
+            (FaceKind.East, Uv(16, 0, 10, 16, TextureSlot.Side, 270)),
+        }),
+    };
+
+    private static IReadOnlyList<ModelBox> ModelFor(string block) =>
+        string.Equals(block, "anvil", StringComparison.OrdinalIgnoreCase) ? AnvilModel : CubeModel;
+
+    private static double ShadeFor(FaceKind kind) => kind switch
+    {
+        FaceKind.Up => 0d,
+        FaceKind.Down => 0.45d,
+        FaceKind.North => 0.30d,
+        FaceKind.South => 0.18d,
+        FaceKind.East => 0.40d,
+        _ => 0.26d,
+    };
+
+    private static Point3 NormalFor(FaceKind kind) => kind switch
+    {
+        FaceKind.Up => new Point3(0, 1, 0),
+        FaceKind.Down => new Point3(0, -1, 0),
+        FaceKind.North => new Point3(0, 0, -1),
+        FaceKind.South => new Point3(0, 0, 1),
+        FaceKind.East => new Point3(1, 0, 0),
+        _ => new Point3(-1, 0, 0),
+    };
+
+    /// <summary>四个角按贴图的左上、右上、右下、左下排列。</summary>
+    private static Point3[] Corners(FaceKind kind, Point3 min, Point3 max) => kind switch
+    {
+        FaceKind.Up => new[]
+        {
+            new Point3(min.X, max.Y, min.Z), new Point3(max.X, max.Y, min.Z),
+            new Point3(max.X, max.Y, max.Z), new Point3(min.X, max.Y, max.Z),
+        },
+        FaceKind.Down => new[]
+        {
+            new Point3(min.X, min.Y, max.Z), new Point3(max.X, min.Y, max.Z),
+            new Point3(max.X, min.Y, min.Z), new Point3(min.X, min.Y, min.Z),
+        },
+        FaceKind.North => new[]
+        {
+            new Point3(min.X, max.Y, min.Z), new Point3(max.X, max.Y, min.Z),
+            new Point3(max.X, min.Y, min.Z), new Point3(min.X, min.Y, min.Z),
+        },
+        FaceKind.South => new[]
+        {
+            new Point3(max.X, max.Y, max.Z), new Point3(min.X, max.Y, max.Z),
+            new Point3(min.X, min.Y, max.Z), new Point3(max.X, min.Y, max.Z),
+        },
+        FaceKind.East => new[]
+        {
+            new Point3(max.X, max.Y, max.Z), new Point3(max.X, max.Y, min.Z),
+            new Point3(max.X, min.Y, min.Z), new Point3(max.X, min.Y, max.Z),
+        },
+        _ => new[]
+        {
+            new Point3(min.X, max.Y, min.Z), new Point3(min.X, max.Y, max.Z),
+            new Point3(min.X, min.Y, max.Z), new Point3(min.X, min.Y, min.Z),
+        },
+    };
+
+    private static IEnumerable<Face> BuildFaces(BlockTextures textures, IReadOnlyList<ModelBox> model)
+    {
+        foreach (var box in model)
+        {
+            foreach (var (kind, uv) in box.Faces)
             {
-                new Point3(-h, h, -h), new Point3(-h, h, h),
-                new Point3(-h, -h, h), new Point3(-h, -h, -h),
-            },
-            textures.Side,
-            0.26d);
+                var texture = uv.Slot switch
+                {
+                    TextureSlot.Top => textures.Top,
+                    TextureSlot.Bottom => textures.Bottom,
+                    _ => textures.Side,
+                };
+
+                yield return new Face(
+                    NormalFor(kind),
+                    Corners(kind, box.Min, box.Max),
+                    texture,
+                    uv.Rect,
+                    uv.Orientation,
+                    ShadeFor(kind));
+            }
+        }
     }
 
     // ---------------------------------------------------------------- 投影

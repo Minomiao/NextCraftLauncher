@@ -639,6 +639,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public string CurrentVersionSubtitle => SelectedVersion?.Subtitle ?? "在左侧「版本」中选择一个版本";
 
+    /// <summary>当前版本图标用哪个方块：快照 → 命令方块，远古版 → 圆石，其余 → 草方块。</summary>
+    public string CurrentVersionBlock => SelectedVersion?.Summary.Type switch
+    {
+        "snapshot" => "command_block",
+        "old_beta" or "old_alpha" => "cobblestone",
+        _ => "grass",
+    };
+
     public string CurrentJavaName => SelectedJava?.DisplayName ?? "未选择 Java";
 
     public string RequiredJavaDescription => _resolved is null
@@ -728,6 +736,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(CurrentVersionName));
         OnPropertyChanged(nameof(CurrentVersionSubtitle));
+        OnPropertyChanged(nameof(CurrentVersionBlock));
         OnPropertyChanged(nameof(CanManageSelectedVersion));
         _detailsTask = LoadDetailsAsync(value);
 

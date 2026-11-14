@@ -162,73 +162,102 @@ public partial class MainWindow : Window
 
     private readonly TranslateTransform _brandTransform = new();
     private readonly TranslateTransform _backTransform = new();
-    private int _titleBarTransition;
+    private bool? _titleBarState;
+    private DispatcherTimer? _titleBarTimer;
+    private long _titleBarStart;
 
-    /// <summary>标题栏左侧切换：先收起当前元素，再让另一个进入，避免两者重叠。</summary>
-    private async Task PlayTitleBarTransitionAsync(bool subPage)
+    /// <summary>标题栏左侧切换：先把当前元素收起，再让另一个进入。</summary>
+    private void StartTitleBarTransition(bool subPage)
     {
-        var version = ++_titleBarTransition;
+        _titleBarState = subPage;
+        _titleBarStart = Environment.TickCount64;
 
+        // 起点直接落位，避免中途打断后数值漂移。
         if (subPage)
         {
-            await AnimateTitleElementAsync(BrandText, _brandTransform, 1, 0, 0, -32, 300);
-            if (version != _titleBarTransition) return;
-
-            BrandBackButton.IsHitTestVisible = true;
-            await AnimateTitleElementAsync(BrandBackButton, _backTransform, 0, 1, 32, 0, 300);
+            BrandText.Opacity = 1;
+            _brandTransform.X = 0;
+            BrandBackButton.Opacity = 0;
+            _backTransform.X = 32;
+            BrandBackButton.IsHitTestVisible = false;
         }
         else
         {
+            BrandBackButton.Opacity = 1;
+            _backTransform.X = 0;
+            BrandText.Opacity = 0;
+            _brandTransform.X = -32;
             BrandBackButton.IsHitTestVisible = false;
-            await AnimateTitleElementAsync(BrandBackButton, _backTransform, 1, 0, 0, 32, 260);
-            if (version != _titleBarTransition) return;
+        }
 
-            await AnimateTitleElementAsync(BrandText, _brandTransform, 0, 1, -32, 0, 300);
+        _titleBarTimer ??= new DispatcherTimer(
+            TimeSpan.FromMilliseconds(15),
+            DispatcherPriority.Render,
+            (_, _) => TickTitleBar());
+
+        _titleBarTimer.Start();
+        TickTitleBar();
+    }
+
+    private void TickTitleBar()
+    {
+        var subPage = _titleBarState == true;
+        var elapsed = Environment.TickCount64 - _titleBarStart;
+
+        var first = subPage ? 300d : 260d;
+        const double second = 300d;
+
+        if (elapsed >= first + second)
+        {
+            _titleBarTimer?.Stop();
+            ApplyTitleBarState(subPage);
+            return;
+        }
+
+        if (subPage)
+        {
+            var outProgress = Ease(Math.Min(1, elapsed / first));
+            BrandText.Opacity = 1 - outProgress;
+            _brandTransform.X = -32 * outProgress;
+
+            if (elapsed <= first)
+            {
+                BrandBackButton.Opacity = 0;
+                _backTransform.X = 32;
+            }
+            else
+            {
+                BrandBackButton.IsHitTestVisible = true;
+                var inProgress = Ease(Math.Min(1, (elapsed - first) / second));
+                BrandBackButton.Opacity = inProgress;
+                _backTransform.X = 32 * (1 - inProgress);
+            }
+        }
+        else
+        {
+            var outProgress = Ease(Math.Min(1, elapsed / first));
+            BrandBackButton.Opacity = 1 - outProgress;
+            _backTransform.X = 32 * outProgress;
+            BrandText.Opacity = 0;
+            _brandTransform.X = -32;
+
+            if (elapsed > first)
+            {
+                var inProgress = Ease(Math.Min(1, (elapsed - first) / second));
+                BrandText.Opacity = inProgress;
+                _brandTransform.X = -32 * (1 - inProgress);
+            }
         }
     }
 
-    private static async Task AnimateTitleElementAsync(
-        Visual visual,
-        TranslateTransform transform,
-        double opacityFrom,
-        double opacityTo,
-        double offsetFrom,
-        double offsetTo,
-        int milliseconds)
-    {
-        var duration = TimeSpan.FromMilliseconds(milliseconds);
+    private static double Ease(double t) => 1 - Math.Pow(1 - t, 3);
 
-        var fade = new Animation
-        {
-            Duration = duration,
-            Easing = new CubicEaseOut(),
-            Children =
-            {
-                new KeyFrame { Cue = new Cue(0d), Setters = { new Setter(Visual.OpacityProperty, opacityFrom) } },
-                new KeyFrame { Cue = new Cue(1d), Setters = { new Setter(Visual.OpacityProperty, opacityTo) } },
-            },
-        };
-
-        var slide = new Animation
-        {
-            Duration = duration,
-            Easing = new CubicEaseOut(),
-            Children =
-            {
-                new KeyFrame { Cue = new Cue(0d), Setters = { new Setter(TranslateTransform.XProperty, offsetFrom) } },
-                new KeyFrame { Cue = new Cue(1d), Setters = { new Setter(TranslateTransform.XProperty, offsetTo) } },
-            },
-        };
-
-        await Task.WhenAll(fade.RunAsync(visual), slide.RunAsync(transform));
-
-        visual.Opacity = opacityTo;
-        transform.X = offsetTo;
-    }
-
-    /// <summary>直接落位：用于初始化，或快速连续切换时取消未完成的动画。</summary>
+    /// <summary>直接落位：用于初始化，或动画结束。</summary>
     private void ApplyTitleBarState(bool subPage)
     {
+        _titleBarState = subPage;
+        _titleBarTimer?.Stop();
+
         BrandText.Opacity = subPage ? 0 : 1;
         _brandTransform.X = subPage ? -32 : 0;
         BrandBackButton.Opacity = subPage ? 1 : 0;
@@ -592,7 +621,10 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainViewModel.IsSubPageOpen))
         {
-            _ = PlayTitleBarTransitionAsync(_viewModel?.IsSubPageOpen == true);
+            var subPage = _viewModel?.IsSubPageOpen == true;
+            if (_titleBarState == subPage) return;
+
+            StartTitleBarTransition(subPage);
             return;
         }
 

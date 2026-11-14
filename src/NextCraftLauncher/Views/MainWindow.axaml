@@ -58,26 +58,35 @@
         <Style Selector="TextBlock.brand">
             <Setter Property="RenderTransform" Value="translateX(0px)" />
             <Setter Property="Opacity" Value="1" />
+            <!-- 离开子页面：返回按钮先收起，品牌随后滑回 -->
             <Setter Property="Transitions">
                 <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut" />
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="CubicEaseOut" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Delay="0:0:0.18" Easing="CubicEaseOut" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.22" Delay="0:0:0.18" Easing="CubicEaseOut" />
                 </Transitions>
             </Setter>
         </Style>
         <Style Selector="TextBlock.brand.subpage">
             <Setter Property="RenderTransform" Value="translateX(-32px)" />
             <Setter Property="Opacity" Value="0" />
+            <!-- 进入子页面：品牌先滑出 -->
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Easing="CubicEaseOut" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.22" Easing="CubicEaseOut" />
+                </Transitions>
+            </Setter>
         </Style>
 
         <Style Selector="Button.brandBack">
             <Setter Property="RenderTransform" Value="translateX(32px)" />
             <Setter Property="Opacity" Value="0" />
             <Setter Property="IsHitTestVisible" Value="False" />
+            <!-- 离开子页面：按钮先向右滑出 -->
             <Setter Property="Transitions">
                 <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.20" Delay="0:0:0.06" Easing="CubicEaseOut" />
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.20" Delay="0:0:0.06" Easing="CubicEaseOut" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.20" Easing="CubicEaseIn" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.20" Easing="CubicEaseIn" />
                 </Transitions>
             </Setter>
         </Style>
@@ -85,6 +94,13 @@
             <Setter Property="RenderTransform" Value="translateX(0px)" />
             <Setter Property="Opacity" Value="1" />
             <Setter Property="IsHitTestVisible" Value="True" />
+            <!-- 进入子页面：等品牌滑走后再滑入 -->
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Delay="0:0:0.20" Easing="CubicEaseOut" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.22" Delay="0:0:0.20" Easing="CubicEaseOut" />
+                </Transitions>
+            </Setter>
         </Style>
     </Window.Styles>
 

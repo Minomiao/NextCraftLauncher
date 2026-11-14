@@ -376,10 +376,11 @@
                                      PointerReleased="OnVersionSelectedByPointer">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:VersionItemViewModel">
-                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Margin="2,3">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Margin="3,3">
                                             <controls:BlockIcon Grid.Column="0"
                                                                 Width="28"
                                                                 Height="28"
+                                                                AlignToOutline="True"
                                                                 VerticalAlignment="Center"
                                                                 Block="{Binding IconName}" />
 

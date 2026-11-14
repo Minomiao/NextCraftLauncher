@@ -36,11 +36,18 @@ public sealed class BlockIcon : Control
     public static readonly StyledProperty<string> BlockProperty =
         AvaloniaProperty.Register<BlockIcon, string>(nameof(Block), "grass");
 
+    /// <summary>
+    /// 按视觉轮廓对齐：让图标的轮廓贴着格子的左/上/下边，
+    /// 配合行内统一的内边距就能得到三边等距。
+    /// </summary>
+    public static readonly StyledProperty<bool> AlignToOutlineProperty =
+        AvaloniaProperty.Register<BlockIcon, bool>(nameof(AlignToOutline));
+
     private const string AssetRoot = "avares://NextCraftLauncher/Assets/Icons/Blocks/";
 
     static BlockIcon()
     {
-        AffectsRender<BlockIcon>(BlockProperty, YawProperty, PitchProperty);
+        AffectsRender<BlockIcon>(BlockProperty, AlignToOutlineProperty, YawProperty, PitchProperty);
     }
 
     public BlockIcon()
@@ -53,6 +60,12 @@ public sealed class BlockIcon : Control
     {
         get => GetValue(BlockProperty);
         set => SetValue(BlockProperty, value);
+    }
+
+    public bool AlignToOutline
+    {
+        get => GetValue(AlignToOutlineProperty);
+        set => SetValue(AlignToOutlineProperty, value);
     }
 
     public double Yaw
@@ -85,7 +98,29 @@ public sealed class BlockIcon : Control
                        BitmapInterpolationMode = BitmapInterpolationMode.HighQuality,
                    }))
             {
-                context.DrawImage(cached, new Rect(left, top, size, size));
+                if (AlignToOutline && IconCache.TryGetOutline(Block) is { Height: > 0 } outline)
+                {
+                    var iconScale = size / outline.Height;
+                    if (outline.Width * iconScale > size)
+                    {
+                        iconScale = size / outline.Width;
+                    }
+
+                    var matrix = new Matrix(
+                        iconScale, 0,
+                        0, iconScale,
+                        left - outline.X * iconScale,
+                        top - outline.Y * iconScale + (size - outline.Height * iconScale) / 2);
+
+                    using (context.PushTransform(matrix))
+                    {
+                        context.DrawImage(cached, new Rect(0, 0, cached.Size.Width, cached.Size.Height));
+                    }
+                }
+                else
+                {
+                    context.DrawImage(cached, new Rect(left, top, size, size));
+                }
             }
 
             return;

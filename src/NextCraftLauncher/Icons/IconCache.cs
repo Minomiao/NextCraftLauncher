@@ -75,6 +75,74 @@ public static class IconCache
         }
     }
 
+    private static readonly Dictionary<string, Rect> Outlines = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 图标的视觉轮廓（像素矩形），用与预渲染相同的模糊阈值量出。
+    /// 布局时按它把图标贴着格子的左/上/下摆放，就能得到三边等距。
+    /// </summary>
+    public static Rect? TryGetOutline(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+
+        lock (Gate)
+        {
+            if (Outlines.TryGetValue(name, out var cached)) return cached;
+        }
+
+        var bitmap = TryGet(name);
+        if (bitmap is null) return null;
+
+        var outline = MeasureOutline(bitmap);
+
+        lock (Gate)
+        {
+            Outlines[name] = outline;
+        }
+
+        return outline;
+    }
+
+    private static Rect MeasureOutline(Bitmap bitmap)
+    {
+        const int grid = 32;
+        const float threshold = 0.25f;
+
+        var pixelSize = bitmap.PixelSize;
+        var full = new Rect(0, 0, pixelSize.Width, pixelSize.Height);
+
+        var mask = PerceivedMask(bitmap, grid);
+        if (mask is null) return full;
+
+        var x0 = grid;
+        var y0 = grid;
+        var x1 = -1;
+        var y1 = -1;
+
+        for (var y = 0; y < grid; y++)
+        {
+            for (var x = 0; x < grid; x++)
+            {
+                if (mask[x, y] < threshold) continue;
+                x0 = Math.Min(x0, x);
+                y0 = Math.Min(y0, y);
+                x1 = Math.Max(x1, x);
+                y1 = Math.Max(y1, y);
+            }
+        }
+
+        if (x1 < x0 || y1 < y0) return full;
+
+        var cellX = (double)pixelSize.Width / grid;
+        var cellY = (double)pixelSize.Height / grid;
+
+        return new Rect(
+            x0 * cellX,
+            y0 * cellY,
+            (x1 + 1 - x0) * cellX,
+            (y1 + 1 - y0) * cellY);
+    }
+
     /// <summary>取预渲染好的图标；没有缓存时返回 <c>null</c>，由调用方自己画。</summary>
     public static Bitmap? TryGet(string name)
     {

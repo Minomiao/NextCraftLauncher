@@ -639,6 +639,33 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public string CurrentVersionSubtitle => SelectedVersion?.Subtitle ?? "在左侧「版本」中选择一个版本";
 
+    /// <summary>渲染原版方块贴图用的客户端 jar（沿 inheritsFrom 链找第一个存在的 jar）。</summary>
+    public string? CurrentVersionJarPath => SelectedVersion is null ? null : FindClientJar(SelectedVersion.Summary);
+
+    private string? FindClientJar(VersionSummary summary)
+    {
+        var current = summary;
+
+        for (var depth = 0; depth < 8; depth++)
+        {
+            var directory = Path.GetDirectoryName(current.JsonPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                var jar = Path.Combine(directory, current.Id + ".jar");
+                if (File.Exists(jar)) return jar;
+            }
+
+            if (string.IsNullOrEmpty(current.InheritsFrom)) return null;
+
+            var parent = Versions.FirstOrDefault(version => version.Id == current.InheritsFrom)?.Summary;
+            if (parent is null) return null;
+
+            current = parent;
+        }
+
+        return null;
+    }
+
     /// <summary>当前版本图标用哪个方块：快照 → 命令方块，远古版 → 圆石，其余 → 草方块。</summary>
     public string CurrentVersionBlock => SelectedVersion?.Summary.Type switch
     {
@@ -737,6 +764,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CurrentVersionName));
         OnPropertyChanged(nameof(CurrentVersionSubtitle));
         OnPropertyChanged(nameof(CurrentVersionBlock));
+        OnPropertyChanged(nameof(CurrentVersionJarPath));
         OnPropertyChanged(nameof(CanManageSelectedVersion));
         _detailsTask = LoadDetailsAsync(value);
 

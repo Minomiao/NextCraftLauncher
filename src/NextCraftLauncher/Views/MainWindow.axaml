@@ -54,7 +54,7 @@
             <Setter Property="CornerRadius" Value="14" />
         </Style>
 
-        <!-- 标题栏左侧：子页面时品牌向左滑出并淡出，随后返回按钮从左侧滑入 -->
+        <!-- 标题栏左侧：子页面时品牌向左滑出并淡出，随后返回按钮从上方滑下 -->
         <Style Selector="TextBlock.brand">
             <Setter Property="RenderTransform" Value="translateX(0px)" />
             <Setter Property="Opacity" Value="1" />
@@ -71,7 +71,7 @@
         </Style>
 
         <Style Selector="Button.brandBack">
-            <Setter Property="RenderTransform" Value="translateX(-32px)" />
+            <Setter Property="RenderTransform" Value="translateY(-26px)" />
             <Setter Property="Opacity" Value="0" />
             <Setter Property="IsHitTestVisible" Value="False" />
             <Setter Property="Transitions">
@@ -82,7 +82,7 @@
             </Setter>
         </Style>
         <Style Selector="Button.brandBack.subpage">
-            <Setter Property="RenderTransform" Value="translateX(0px)" />
+            <Setter Property="RenderTransform" Value="translateY(0px)" />
             <Setter Property="Opacity" Value="1" />
             <Setter Property="IsHitTestVisible" Value="True" />
         </Style>

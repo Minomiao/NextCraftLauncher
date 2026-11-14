@@ -60,8 +60,8 @@
             <Setter Property="Opacity" Value="1" />
             <Setter Property="Transitions">
                 <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" />
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.16" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="CubicEaseOut" />
                 </Transitions>
             </Setter>
         </Style>
@@ -76,8 +76,8 @@
             <Setter Property="IsHitTestVisible" Value="False" />
             <Setter Property="Transitions">
                 <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Delay="0:0:0.06" />
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Delay="0:0:0.06" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.20" Delay="0:0:0.06" Easing="CubicEaseOut" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.20" Delay="0:0:0.06" Easing="CubicEaseOut" />
                 </Transitions>
             </Setter>
         </Style>

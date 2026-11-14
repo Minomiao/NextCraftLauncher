@@ -334,8 +334,7 @@
                                         IsEnabled="{Binding CanDownloadSelected}"
                                         HorizontalAlignment="Right"
                                         Height="32"
-                                        Padding="18,0"
-                                        ToolTip.Tip="选中加载器时会与原版一起下载；同一版本只能选择一种加载器" />
+                                        Padding="18,0" />
                             </Grid>
                         </Grid>
                     </Grid>

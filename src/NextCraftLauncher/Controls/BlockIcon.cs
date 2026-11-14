@@ -30,7 +30,7 @@ public sealed class BlockIcon : Control
     /// <summary>方块在画布中的占比（0~1），留出边距。</summary>
     private const double FillRatio = 0.92;
 
-    private const string AssetRoot = "avares://NextCraftLauncher/Assets/Icons/Blocks/";
+    private const string AssetRoot = "avares://NextCraftLauncher/Assets/Icons/Blocks/grass/";
 
     static BlockIcon()
     {
@@ -287,9 +287,9 @@ public sealed class BlockIcon : Control
 
                 try
                 {
-                    var top = Load("grass_top");
-                    var side = Load("grass_side");
-                    var bottom = Load("dirt");
+                    var top = Load("top");
+                    var side = Load("side");
+                    var bottom = Load("bottom");
 
                     if (top is null || side is null || bottom is null)
                     {

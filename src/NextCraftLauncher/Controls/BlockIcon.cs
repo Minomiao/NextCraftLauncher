@@ -1,28 +1,24 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using NextCraftLauncher.Core.Logging;
 
 namespace NextCraftLauncher.Controls;
 
 /// <summary>
-/// 用版本客户端 jar 里的原版贴图，实时渲染一个等距 3D 方块。
+/// 用项目内自带的方块贴图，实时渲染一个等距 3D 方块。
 /// <para>
-/// 目前内置草方块：六面模型 + 按相机剔除 + 深度排序，任意 yaw/pitch 都能画，
-/// 后续接入模型文件（elements / textures）时只需替换这里的模型数据。
+/// 贴图放在 <c>Assets/Icons/Blocks/</c>（随程序集编译，不依赖 Minecraft 客户端）；
+/// 六面模型 + 按相机剔除 + 深度排序，任意 yaw/pitch 都能画。
 /// </para>
 /// </summary>
 public sealed class BlockIcon : Control
 {
-    /// <summary>要从中读取贴图的客户端 jar。</summary>
-    public static readonly StyledProperty<string?> ClientJarPathProperty =
-        AvaloniaProperty.Register<BlockIcon, string?>(nameof(ClientJarPath));
-
     /// <summary>水平旋转角（度）。</summary>
     public static readonly StyledProperty<double> YawProperty =
         AvaloniaProperty.Register<BlockIcon, double>(nameof(Yaw), 45d);
@@ -31,27 +27,20 @@ public sealed class BlockIcon : Control
     public static readonly StyledProperty<double> PitchProperty =
         AvaloniaProperty.Register<BlockIcon, double>(nameof(Pitch), 30d);
 
-    /// <summary>方块单位在画布中的占比（0~1），留出边距。</summary>
+    /// <summary>方块在画布中的占比（0~1），留出边距。</summary>
     private const double FillRatio = 0.92;
 
-    /// <summary>草方块顶面贴图是灰度的，原版靠生物群系染色；这里用默认草色近似。</summary>
-    private static readonly Color GrassTintColor = Color.FromArgb(0x8C, 0x91, 0xBD, 0x59);
+    private const string AssetRoot = "avares://NextCraftLauncher/Assets/Icons/Blocks/";
 
     static BlockIcon()
     {
-        AffectsRender<BlockIcon>(ClientJarPathProperty, YawProperty, PitchProperty);
+        AffectsRender<BlockIcon>(YawProperty, PitchProperty);
     }
 
     public BlockIcon()
     {
         RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.None);
         RenderOptions.SetEdgeMode(this, EdgeMode.Aliased);
-    }
-
-    public string? ClientJarPath
-    {
-        get => GetValue(ClientJarPathProperty);
-        set => SetValue(ClientJarPathProperty, value);
     }
 
     public double Yaw
@@ -71,10 +60,7 @@ public sealed class BlockIcon : Control
         var size = Math.Min(Bounds.Width, Bounds.Height);
         if (size <= 0) return;
 
-        var jar = ClientJarPath;
-        if (string.IsNullOrWhiteSpace(jar)) return;
-
-        var textures = GrassTexturesCache.Get(jar);
+        var textures = GrassTextures.Asset;
         if (textures is null) return;
 
         var camera = CameraDirection(Yaw, Pitch);
@@ -142,12 +128,6 @@ public sealed class BlockIcon : Control
             {
                 context.DrawImage(visible[i].Texture, new Rect(0, 0, 1, 1));
 
-                if (visible[i].Tinted)
-                {
-                    context.DrawRectangle(
-                        new SolidColorBrush(GrassTintColor), null, new Rect(0, 0, 1, 1));
-                }
-
                 var shade = visible[i].Shade;
                 if (shade > 0)
                 {
@@ -182,10 +162,9 @@ public sealed class BlockIcon : Control
         Point3[] Corners,
         IImage Texture,
         double Shade,
-        bool Tinted,
         double Depth = 0);
 
-    /// <summary>草方块：单位立方体，六面贴图，顶面染色。</summary>
+    /// <summary>草方块：单位立方体，六面贴图。</summary>
     private static IEnumerable<Face> BuildCubeFaces(GrassTextures textures)
     {
         const double h = 0.5;
@@ -198,8 +177,7 @@ public sealed class BlockIcon : Control
                 new Point3(h, h, h), new Point3(-h, h, h),
             },
             textures.Top,
-            0d,
-            Tinted: true);
+            0d);
 
         yield return new Face(
             new Point3(0, -1, 0),
@@ -209,8 +187,7 @@ public sealed class BlockIcon : Control
                 new Point3(h, -h, -h), new Point3(-h, -h, -h),
             },
             textures.Bottom,
-            0.45d,
-            Tinted: false);
+            0.45d);
 
         yield return new Face(
             new Point3(0, 0, -1),
@@ -220,8 +197,7 @@ public sealed class BlockIcon : Control
                 new Point3(h, -h, -h), new Point3(-h, -h, -h),
             },
             textures.Side,
-            0.30d,
-            Tinted: false);
+            0.30d);
 
         yield return new Face(
             new Point3(0, 0, 1),
@@ -231,8 +207,7 @@ public sealed class BlockIcon : Control
                 new Point3(-h, -h, h), new Point3(h, -h, h),
             },
             textures.Side,
-            0.18d,
-            Tinted: false);
+            0.18d);
 
         yield return new Face(
             new Point3(1, 0, 0),
@@ -242,8 +217,7 @@ public sealed class BlockIcon : Control
                 new Point3(h, -h, -h), new Point3(h, -h, h),
             },
             textures.Side,
-            0.40d,
-            Tinted: false);
+            0.40d);
 
         yield return new Face(
             new Point3(-1, 0, 0),
@@ -253,8 +227,7 @@ public sealed class BlockIcon : Control
                 new Point3(-h, -h, h), new Point3(-h, -h, -h),
             },
             textures.Side,
-            0.26d,
-            Tinted: false);
+            0.26d);
     }
 
     // ---------------------------------------------------------------- 投影
@@ -298,76 +271,51 @@ public sealed class BlockIcon : Control
 
     // ---------------------------------------------------------------- 贴图
 
-    private sealed record GrassTextures(IImage Top, IImage Side, IImage Bottom);
-
-    /// <summary>按 jar 缓存解析结果；贴图很小，加载一次就够。</summary>
-    private static class GrassTexturesCache
+    private sealed record GrassTextures(IImage Top, IImage Side, IImage Bottom)
     {
-        private static readonly Dictionary<string, GrassTextures?> Entries = new(StringComparer.OrdinalIgnoreCase);
+        private static GrassTextures? _instance;
+        private static bool _loaded;
 
-        public static GrassTextures? Get(string jarPath)
+        /// <summary>项目内置贴图，随程序集编译，不依赖 Minecraft 客户端。</summary>
+        public static GrassTextures? Asset
         {
-            lock (Entries)
+            get
             {
-                if (Entries.TryGetValue(jarPath, out var cached)) return cached;
-            }
+                if (_loaded) return _instance;
 
-            var loaded = Load(jarPath);
+                _loaded = true;
 
-            lock (Entries)
-            {
-                Entries[jarPath] = loaded;
-            }
-
-            return loaded;
-        }
-
-        private static GrassTextures? Load(string jarPath)
-        {
-            if (!File.Exists(jarPath)) return null;
-
-            try
-            {
-                using var archive = ZipFile.OpenRead(jarPath);
-
-                var top = ReadBitmap(archive, "grass_block_top", "grass_top");
-                var side = ReadBitmap(archive, "grass_block_side", "grass_side");
-                var bottom = ReadBitmap(archive, "dirt");
-
-                if (top is null || side is null || bottom is null)
+                try
                 {
-                    LauncherLog.Warn($"方块图标贴图不完整：{Path.GetFileName(jarPath)}");
-                    return null;
+                    var top = Load("grass_top");
+                    var side = Load("grass_side");
+                    var bottom = Load("dirt");
+
+                    if (top is null || side is null || bottom is null)
+                    {
+                        LauncherLog.Warn("方块图标贴图缺失（Assets/Icons/Blocks）");
+                        return null;
+                    }
+
+                    _instance = new GrassTextures(top, side, bottom);
+                }
+                catch (Exception exception)
+                {
+                    LauncherLog.Warn($"加载方块图标贴图失败：{exception.Message}");
                 }
 
-                return new GrassTextures(top, side, bottom);
-            }
-            catch (Exception exception)
-            {
-                LauncherLog.Warn($"读取方块图标贴图失败：{Path.GetFileName(jarPath)}（{exception.Message}）");
-                return null;
+                return _instance;
             }
         }
 
-        /// <summary>依次尝试 1.13+ 的 block/ 与旧版的 blocks/ 目录。</summary>
-        private static Bitmap? ReadBitmap(ZipArchive archive, params string[] names)
+        private static Bitmap? Load(string name)
         {
-            foreach (var name in names)
-            {
-                var entry = archive.GetEntry($"assets/minecraft/textures/block/{name}.png")
-                            ?? archive.GetEntry($"assets/minecraft/textures/blocks/{name}.png");
-
-                if (entry is null) continue;
-
-                using var stream = entry.Open();
-                using var memory = new MemoryStream();
-                stream.CopyTo(memory);
-                memory.Position = 0;
-
-                return new Bitmap(memory);
-            }
-
-            return null;
+            var uri = new Uri($"{AssetRoot}{name}.png");
+            using var stream = AssetLoader.Open(uri);
+            using var memory = new MemoryStream();
+            stream.CopyTo(memory);
+            memory.Position = 0;
+            return new Bitmap(memory);
         }
     }
 }

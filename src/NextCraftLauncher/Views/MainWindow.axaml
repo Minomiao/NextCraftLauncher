@@ -54,30 +54,30 @@
             <Setter Property="CornerRadius" Value="14" />
         </Style>
 
-        <!-- 标题栏左侧：子页面时品牌左滑消失、返回按钮左滑出现 -->
+        <!-- 标题栏左侧：子页面时品牌向左滑出并淡出，随后返回按钮从左侧滑入 -->
         <Style Selector="TextBlock.brand">
             <Setter Property="RenderTransform" Value="translateX(0px)" />
             <Setter Property="Opacity" Value="1" />
             <Setter Property="Transitions">
                 <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" />
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.22" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.16" />
                 </Transitions>
             </Setter>
         </Style>
         <Style Selector="TextBlock.brand.subpage">
-            <Setter Property="RenderTransform" Value="translateX(-28px)" />
+            <Setter Property="RenderTransform" Value="translateX(-32px)" />
             <Setter Property="Opacity" Value="0" />
         </Style>
 
         <Style Selector="Button.brandBack">
-            <Setter Property="RenderTransform" Value="translateX(-28px)" />
+            <Setter Property="RenderTransform" Value="translateX(-32px)" />
             <Setter Property="Opacity" Value="0" />
             <Setter Property="IsHitTestVisible" Value="False" />
             <Setter Property="Transitions">
                 <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" />
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.22" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Delay="0:0:0.06" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Delay="0:0:0.06" />
                 </Transitions>
             </Setter>
         </Style>

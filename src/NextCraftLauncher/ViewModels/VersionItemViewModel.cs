@@ -1,5 +1,6 @@
 using System.IO;
 using NextCraftLauncher.Core.Minecraft;
+using NextCraftLauncher.Icons;
 
 namespace NextCraftLauncher.ViewModels;
 
@@ -17,6 +18,9 @@ public sealed class VersionItemViewModel
     public string DirectoryPath => Path.GetDirectoryName(Summary.JsonPath) ?? string.Empty;
 
     public string Subtitle => $"{(Summary.Loader ?? Summary.TypeLabel)} · Java {Summary.RequiredJava}";
+
+    /// <summary>本地版本列表里显示的图标（加载器 / 版本类型自动判定）。</summary>
+    public string IconName => VersionIcon.NameFor(Summary);
 
     /// <summary>
     /// 启动页轮播里的版本名：长名字缩小字号，保证整名显示而不是被截断。

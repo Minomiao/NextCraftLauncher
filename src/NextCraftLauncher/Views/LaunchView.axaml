@@ -109,18 +109,12 @@
                             MaxWidth="1000"
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Center">
-                        <!-- 版本图标：从客户端 jar 的原版贴图实时渲染 -->
-                        <controls:BlockIcon Width="84"
-                                            Height="84"
-                                            HorizontalAlignment="Center"
-                                            Block="{Binding CurrentVersionBlock}" />
-
                         <TextBlock Text="当前版本"
                                    FontSize="12"
                                    Opacity="0.55"
                                    HorizontalAlignment="Center" />
 
-                        <!-- 实验：主界面的大版本显示做成无容器的弧形轮播，一次一页 -->
+                        <!-- 大版本显示：无容器的弧形轮播，一次一页 -->
                         <controls:ArcCarousel ItemsSource="{Binding Versions}"
                                               SelectedItem="{Binding SelectedVersion}"
                                               Height="104"
@@ -382,8 +376,14 @@
                                      PointerReleased="OnVersionSelectedByPointer">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:VersionItemViewModel">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="2,3">
-                                            <StackPanel Spacing="1" VerticalAlignment="Center">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Margin="2,3">
+                                            <controls:BlockIcon Grid.Column="0"
+                                                                Width="28"
+                                                                Height="28"
+                                                                VerticalAlignment="Center"
+                                                                Block="{Binding IconName}" />
+
+                                            <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Id}"
                                                            FontWeight="SemiBold"
                                                            TextTrimming="CharacterEllipsis" />
@@ -393,7 +393,7 @@
                                                            TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
 
-                                            <StackPanel Grid.Column="1"
+                                            <StackPanel Grid.Column="2"
                                                         Orientation="Horizontal"
                                                         Spacing="2"
                                                         VerticalAlignment="Center">

@@ -2,6 +2,7 @@ using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NextCraftLauncher.Download.Minecraft;
+using NextCraftLauncher.Icons;
 
 namespace NextCraftLauncher.ViewModels;
 
@@ -47,4 +48,7 @@ public partial class RemoteVersionItemViewModel : ObservableObject
     public string Subtitle => ReleaseTime is DateTimeOffset time
         ? $"{TypeLabel} · {time.LocalDateTime:yyyy-MM-dd}"
         : TypeLabel;
+
+    /// <summary>下载列表里按版本类型显示的图标。</summary>
+    public string IconName => VersionIcon.NameForType(Type);
 }

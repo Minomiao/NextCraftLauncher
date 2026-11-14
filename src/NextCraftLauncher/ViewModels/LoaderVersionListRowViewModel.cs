@@ -1,5 +1,6 @@
 using System;
 using CommunityToolkit.Mvvm.Input;
+using NextCraftLauncher.Icons;
 
 namespace NextCraftLauncher.ViewModels;
 
@@ -54,6 +55,9 @@ public sealed class LoaderVersionListRowViewModel
     public bool IsEmpty => Kind == LoaderVersionRowKind.Empty;
 
     public string? Title => Group?.DisplayName;
+
+    /// <summary>分组标题行的加载器图标。</summary>
+    public string? HeaderIcon => VersionIcon.NameForLoader(Group?.Key);
 
     public string? Status => Group?.StatusText;
 

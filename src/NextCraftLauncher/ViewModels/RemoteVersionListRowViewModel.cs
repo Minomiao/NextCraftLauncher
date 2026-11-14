@@ -23,6 +23,9 @@ public sealed class RemoteVersionListRowViewModel
 
     public bool IsVersion => Version is not null;
 
+    /// <summary>版本行左侧的图标（分组标题行为 null）。</summary>
+    public string? IconName => Version?.IconName;
+
     public static RemoteVersionListRowViewModel CreateHeader(string title, int count)
         => new(title, $"{count} 个", null);
 

@@ -22,6 +22,7 @@ using NextCraftLauncher.Download.Java;
 using NextCraftLauncher.Download.Loaders;
 using NextCraftLauncher.Download.Minecraft;
 using NextCraftLauncher.Download.Mods;
+using NextCraftLauncher.Icons;
 
 namespace NextCraftLauncher.ViewModels;
 
@@ -640,13 +641,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public string CurrentVersionSubtitle => SelectedVersion?.Subtitle ?? "在左侧「版本」中选择一个版本";
 
 
-    /// <summary>当前版本图标用哪个方块：快照 → 命令方块，远古版 → 圆石，其余 → 草方块。</summary>
-    public string CurrentVersionBlock => SelectedVersion?.Summary.Type switch
-    {
-        "snapshot" => "command_block",
-        "old_beta" or "old_alpha" => "cobblestone",
-        _ => "grass",
-    };
+    /// <summary>当前版本图标用哪个图标：加载器优先，其次看原版版本类型。</summary>
+    public string CurrentVersionBlock => VersionIcon.NameFor(SelectedVersion?.Summary);
 
     public string CurrentJavaName => SelectedJava?.DisplayName ?? "未选择 Java";
 
@@ -699,6 +695,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 : text + " + Fabric API";
         }
     }
+
+    /// <summary>下载详情页的大图标：选了加载器时用加载器图标，否则按原版版本类型。</summary>
+    public string DownloadIconName =>
+        VersionIcon.NameForLoader(_selectedLoaderKey)
+        ?? VersionIcon.NameForType(SelectedRemoteVersion?.Type);
 
     public bool CanManageSelectedVersion =>
         !IsBusy &&
@@ -1425,6 +1426,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanDownloadSelectedVersion));
         OnPropertyChanged(nameof(CanDownloadSelected));
         OnPropertyChanged(nameof(PrimaryDownloadText));
+        OnPropertyChanged(nameof(DownloadIconName));
     }
 
     partial void OnVersionNameChanged(string value)
@@ -2515,6 +2517,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(CanDownloadSelected));
         OnPropertyChanged(nameof(PrimaryDownloadText));
+        OnPropertyChanged(nameof(DownloadIconName));
     }
 
     private void RefreshDefaultVersionName()

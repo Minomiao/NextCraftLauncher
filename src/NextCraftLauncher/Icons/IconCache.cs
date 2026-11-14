@@ -2,9 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using NextCraftLauncher.Controls;
 using NextCraftLauncher.Core.Logging;
 using NextCraftLauncher.Core.Settings;
@@ -17,8 +21,8 @@ namespace NextCraftLauncher.Icons;
 /// </summary>
 public static class IconCache
 {
-    /// <summary>图标素材有改动时加一，旧缓存会整体重建。</summary>
-    private const int CacheVersion = 1;
+    /// <summary>图标素材或排版有改动时加一，旧缓存会整体重建。</summary>
+    private const int CacheVersion = 2;
 
     /// <summary>预渲染使用的角度，与 <see cref="BlockIcon"/> 的默认值一致。</summary>
     public const double Yaw = 45;
@@ -189,9 +193,156 @@ public static class IconCache
         icon.Measure(new Size(Size, Size));
         icon.Arrange(new Rect(0, 0, Size, Size));
 
-        using var bitmap = new RenderTargetBitmap(new PixelSize(Size, Size), new Vector(96, 96));
-        bitmap.Render(icon);
-        bitmap.Save(path);
+        using var source = new RenderTargetBitmap(new PixelSize(Size, Size), new Vector(96, 96));
+        source.Render(icon);
+
+        var transform = OpticalTransform(source);
+        if (transform == Matrix.Identity)
+        {
+            source.Save(path);
+            return;
+        }
+
+        var canvas = new BitmapCanvas
+        {
+            Width = Size,
+            Height = Size,
+            Source = source,
+            Transform = transform,
+        };
+
+        canvas.Measure(new Size(Size, Size));
+        canvas.Arrange(new Rect(0, 0, Size, Size));
+
+        using var result = new RenderTargetBitmap(new PixelSize(Size, Size), new Vector(96, 96));
+        result.Render(canvas);
+        result.Save(path);
+    }
+
+    /// <summary>
+    /// 用缩小的 alpha 图当“模糊后的轮廓”，算出缩放/平移，
+    /// 让图标大致轮廓到左、上、下三边的距离相等。
+    /// </summary>
+    private static Matrix OpticalTransform(Bitmap bitmap)
+    {
+        const int grid = 32;
+        const float threshold = 0.25f;
+        const double fill = 0.92;
+
+        var mask = PerceivedMask(bitmap, grid);
+        if (mask is null) return Matrix.Identity;
+
+        var x0 = grid;
+        var y0 = grid;
+        var x1 = -1;
+        var y1 = -1;
+
+        for (var y = 0; y < grid; y++)
+        {
+            for (var x = 0; x < grid; x++)
+            {
+                if (mask[x, y] < threshold) continue;
+                x0 = Math.Min(x0, x);
+                y0 = Math.Min(y0, y);
+                x1 = Math.Max(x1, x);
+                y1 = Math.Max(y1, y);
+            }
+        }
+
+        if (x1 < x0 || y1 < y0) return Matrix.Identity;
+
+        var cell = (double)Size / grid;
+        var left = x0 * cell;
+        var top = y0 * cell;
+        var width = (x1 + 1 - x0) * cell;
+        var height = (y1 + 1 - y0) * cell;
+
+        // 视觉高度统一缩放，避免不同图标看起来大小不一。
+        var scale = Math.Clamp(Size * fill / height, 0.85, 1.25);
+        if (width * scale > Size) scale = Size / width;
+
+        var scaledWidth = width * scale;
+        var scaledHeight = height * scale;
+
+        var margin = (Size - scaledHeight) / 2;
+        if (margin + scaledWidth > Size) margin = Size - scaledWidth;
+        if (margin < 0) margin = 0;
+
+        return new Matrix(
+            scale, 0,
+            0, scale,
+            margin - left * scale,
+            margin - top * scale);
+    }
+
+    /// <summary>把 alpha 降采样成 grid×grid，相当于一次模糊后的轮廓强度。</summary>
+    private static float[,]? PerceivedMask(Bitmap bitmap, int grid)
+    {
+        var pixelSize = bitmap.PixelSize;
+        if (pixelSize.Width <= 0 || pixelSize.Height <= 0) return null;
+
+        var mask = new float[grid, grid];
+
+        try
+        {
+            using var copy = new WriteableBitmap(
+                pixelSize, new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
+            using var frame = copy.Lock();
+
+            bitmap.CopyPixels(frame);
+
+            for (var gy = 0; gy < grid; gy++)
+            {
+                var y0 = gy * pixelSize.Height / grid;
+                var y1 = Math.Max(y0 + 1, (gy + 1) * pixelSize.Height / grid);
+
+                for (var gx = 0; gx < grid; gx++)
+                {
+                    var x0 = gx * pixelSize.Width / grid;
+                    var x1 = Math.Max(x0 + 1, (gx + 1) * pixelSize.Width / grid);
+
+                    long sum = 0;
+                    var count = 0;
+
+                    for (var y = y0; y < y1; y++)
+                    {
+                        var row = IntPtr.Add(frame.Address, y * frame.RowBytes);
+                        for (var x = x0; x < x1; x++)
+                        {
+                            sum += Marshal.ReadByte(row, x * 4 + 3);
+                            count++;
+                        }
+                    }
+
+                    mask[gx, gy] = count == 0 ? 0 : sum / (255f * count);
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            LauncherLog.Warn($"图标轮廓测量失败：{exception.Message}");
+            return null;
+        }
+
+        return mask;
+    }
+
+    /// <summary>把预渲染结果按给定变换画到新的画布上。</summary>
+    private sealed class BitmapCanvas : Control
+    {
+        public IImage? Source { get; init; }
+
+        public Matrix Transform { get; init; } = Matrix.Identity;
+
+        public override void Render(DrawingContext context)
+        {
+            if (Source is null) return;
+
+            using (context.PushTransform(Transform))
+            {
+                context.DrawImage(Source, new Rect(0, 0, Source.Size.Width, Source.Size.Height));
+            }
+        }
     }
 
     private static string BlockPath(string name) => Path.Combine(BlocksDirectory, name + ".png");

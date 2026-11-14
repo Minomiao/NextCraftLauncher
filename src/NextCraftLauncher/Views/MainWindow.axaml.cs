@@ -19,6 +19,7 @@ using Avalonia.VisualTree;
 using NextCraftLauncher.Core.Auth;
 using NextCraftLauncher.Core.Logging;
 using NextCraftLauncher.Core.Settings;
+using NextCraftLauncher.Icons;
 using NextCraftLauncher.ViewModels;
 
 namespace NextCraftLauncher.Views;
@@ -557,6 +558,9 @@ public partial class MainWindow : Window
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
+
+        // 首次启动时把固定角度的图标预渲染成图片，之后直接读文件。
+        IconCache.EnsureRendered();
         ReportMetrics();
     }
 

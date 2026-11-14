@@ -634,6 +634,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public bool IsDownloadRunningSelected => CurrentDownloadSection == DownloadSection.Running;
 
+    /// <summary>当前在某个子页面（标题栏显示返回按钮）。</summary>
+    public bool IsSubPageOpen =>
+        (IsLaunchPageSelected && CurrentLaunchSection != LaunchSection.Start)
+        || (IsDownloadPageSelected &&
+            (IsRemoteVersionDetailOpen || IsModDetailOpen || IsDownloadRunningSelected));
+
     /// <summary>任务页当前有卡片可显示（含刚结束、等待自动移除的任务）。</summary>
     public bool HasDownloadTasks => DownloadTasks.Count > 0;
 
@@ -805,6 +811,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(IsStartSectionSelected));
         OnPropertyChanged(nameof(IsVersionsSectionSelected));
+        OnPropertyChanged(nameof(IsSubPageOpen));
     }
 
     partial void OnCurrentSettingsSectionChanged(SettingsSection value)
@@ -814,12 +821,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsSettingsAppearanceSelected));
     }
 
+    partial void OnIsVersionDetailOpenChanged(bool value)
+        => OnPropertyChanged(nameof(IsSubPageOpen));
+
+    partial void OnIsRemoteVersionDetailOpenChanged(bool value)
+        => OnPropertyChanged(nameof(IsSubPageOpen));
+
+    partial void OnIsModDetailOpenChanged(bool value)
+        => OnPropertyChanged(nameof(IsSubPageOpen));
+
     partial void OnCurrentDownloadSectionChanged(DownloadSection value)
     {
         OnPropertyChanged(nameof(IsDownloadVersionsSelected));
         OnPropertyChanged(nameof(IsDownloadModsSelected));
         OnPropertyChanged(nameof(IsDownloadJavaSelected));
         OnPropertyChanged(nameof(IsDownloadRunningSelected));
+        OnPropertyChanged(nameof(IsSubPageOpen));
 
         if (value == DownloadSection.Mods)
         {
@@ -1386,6 +1403,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsLaunchPageSelected));
         OnPropertyChanged(nameof(IsDownloadPageSelected));
         OnPropertyChanged(nameof(IsSettingsPageSelected));
+        OnPropertyChanged(nameof(IsSubPageOpen));
 
         if (value == AppPage.Download)
         {
@@ -1505,6 +1523,30 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowSettingsAppearance() => CurrentSettingsSection = SettingsSection.Appearance;
+
+    /// <summary>标题栏的返回按钮：按当前所在的子页面决定退回哪里。</summary>
+    [RelayCommand]
+    private void GoBack()
+    {
+        if (IsLaunchPageSelected)
+        {
+            if (IsVersionDetailOpen)
+                CloseVersionSettings();
+            else
+                ShowStartSection();
+
+            return;
+        }
+
+        if (!IsDownloadPageSelected) return;
+
+        if (IsRemoteVersionDetailOpen)
+            CloseRemoteVersionDetail();
+        else if (IsModDetailOpen)
+            CloseModDetail();
+        else if (IsDownloadRunningSelected)
+            ReturnFromDownloadTasks();
+    }
 
     [RelayCommand]
     private void RequestVersionDelete(VersionItemViewModel? version)

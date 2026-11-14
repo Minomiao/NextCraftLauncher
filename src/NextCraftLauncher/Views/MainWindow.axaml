@@ -53,6 +53,39 @@
             <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
             <Setter Property="CornerRadius" Value="14" />
         </Style>
+
+        <!-- 标题栏左侧：子页面时品牌左滑消失、返回按钮左滑出现 -->
+        <Style Selector="TextBlock.brand">
+            <Setter Property="RenderTransform" Value="translateX(0px)" />
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.22" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="TextBlock.brand.subpage">
+            <Setter Property="RenderTransform" Value="translateX(-28px)" />
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+
+        <Style Selector="Button.brandBack">
+            <Setter Property="RenderTransform" Value="translateX(-28px)" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.22" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.brandBack.subpage">
+            <Setter Property="RenderTransform" Value="translateX(0px)" />
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="IsHitTestVisible" Value="True" />
+        </Style>
     </Window.Styles>
 
     <Panel>
@@ -64,11 +97,30 @@
               Background="Transparent"
               PointerPressed="OnTitleBarPointerPressed">
             <Grid ColumnDefinitions="*,Auto,*" Margin="16,0,0,0">
-                <TextBlock Text="NEXT"
-                           FontSize="18"
-                           FontWeight="Bold"
-                           LetterSpacing="2"
-                           VerticalAlignment="Center" />
+                <Panel Height="52"
+                       Width="150"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Center"
+                       ClipToBounds="True">
+                    <TextBlock Classes="brand"
+                               Classes.subpage="{Binding IsSubPageOpen}"
+                               Text="NEXT"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               LetterSpacing="2"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Center" />
+
+                    <Button Classes="soft brandBack"
+                            Classes.subpage="{Binding IsSubPageOpen}"
+                            Content="← 返回"
+                            Command="{Binding GoBackCommand}"
+                            Height="30"
+                            Padding="10,0"
+                            FontSize="12"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center" />
+                </Panel>
 
                 <Panel Grid.Column="1"
                        x:Name="NavBar"

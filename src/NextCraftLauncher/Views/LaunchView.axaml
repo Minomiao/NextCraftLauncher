@@ -288,22 +288,13 @@
                 <Grid RowDefinitions="Auto,*" RowSpacing="12" IsVisible="{Binding !IsVersionDetailOpen}">
 
                     <!-- 顶部操作 -->
-                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
-                        <Button Classes="soft"
-                                Content="返回"
-                                Height="34"
-                                Padding="12,0"
-                                FontSize="12"
-                                Command="{Binding ShowStartSectionCommand}" />
-
-                        <TextBlock Grid.Column="1"
-                                   Text="版本管理"
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <TextBlock Text="版本管理"
                                    Classes="section"
                                    FontSize="13"
-                                   VerticalAlignment="Center"
-                                   Margin="4,0,0,0" />
+                                   VerticalAlignment="Center" />
 
-                        <Button Grid.Column="2"
+                        <Button Grid.Column="1"
                                 Classes="soft"
                                 Content="重新扫描"
                                 Height="34"
@@ -311,7 +302,7 @@
                                 Command="{Binding RefreshCommand}"
                                 IsEnabled="{Binding !IsBusy}" />
 
-                        <DropDownButton Grid.Column="3"
+                        <DropDownButton Grid.Column="2"
                                         Classes="soft"
                                         Content="导入"
                                         Height="34"
@@ -417,20 +408,11 @@
 
                 <!-- 版本设置：暂时只展示版本信息 -->
                 <Grid RowDefinitions="Auto,*" RowSpacing="12" IsVisible="{Binding IsVersionDetailOpen}">
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                        <Button Classes="soft"
-                                Content="返回"
-                                Height="30"
-                                Padding="12,0"
-                                FontSize="12"
-                                Command="{Binding CloseVersionSettingsCommand}" />
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding SelectedVersion.Id}"
-                                   FontSize="15"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis" />
-                    </Grid>
+                    <TextBlock Text="{Binding SelectedVersion.Id}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
 
                     <ScrollViewer Grid.Row="1"
                                   VerticalScrollBarVisibility="Auto"

@@ -243,15 +243,9 @@
                                            IsVisible="{Binding SelectedRemoteVersion.IsInstalled}" />
                             </Grid>
 
-                            <Grid Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="6">
-                                <TextBlock Text="模组加载器版本（单选，可与原版一起下载）"
-                                           Classes="fieldLabel"
-                                           FontSize="11"
-                                           Opacity="0.55"
-                                           Margin="8,0,0,0" />
-
+                            <Grid Grid.Row="1" RowDefinitions="*">
                                 <!-- 与游戏版本列表同构：分组标题行 + 版本行，共用 versionRow 样式 -->
-                                <ListBox Grid.Row="1"
+                                <ListBox
                                          Classes="versionList"
                                          ItemsSource="{Binding LoaderVersionRows}"
                                          Background="Transparent"
@@ -346,7 +340,8 @@
 
                                 <Button Grid.Row="1"
                                         Classes="primary"
-                                        Content="{Binding PrimaryDownloadText}"
+                                        Classes.disabled="{Binding HasDuplicateVersionName}"
+                                        Content="下载选中版本"
                                         Command="{Binding DownloadSelectedCommand}"
                                         IsEnabled="{Binding CanDownloadSelected}"
                                         HorizontalAlignment="Right"

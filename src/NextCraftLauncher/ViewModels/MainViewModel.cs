@@ -257,11 +257,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
         group.IsLoading = false;
         group.IsAvailable = group.Versions.Count > 0;
         group.ErrorText = result.Error;
+
+        var visibleCount = VisibleLoaderVersions(group).Count;
         group.StatusText = result.Error is not null
             ? "获取失败"
-            : group.Versions.Count > 0
-                ? $"{group.Versions.Count} 个版本"
-                : "无可用版本";
+            : visibleCount > 0
+                ? $"{visibleCount} 个版本"
+                : group.Versions.Count > 0
+                    ? "都已安装"
+                    : "无可用版本";
 
         UpdateLoaderGroupRows(group, changed);
     }
@@ -494,6 +498,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsLaunchNoticeOpen = true;
     }
 
+    /// <summary>通用的提示卡片（与启动提示共用同一张卡）。</summary>
+    private void ShowNotice(string title, string message) => ShowLaunchNotice(message, title);
+
     public bool HasDownloadErrorHint => !string.IsNullOrEmpty(DownloadErrorHint);
 
     partial void OnDownloadErrorHintChanged(string value)
@@ -684,17 +691,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
         SelectedRemoteVersion is not null &&
         VersionNaming.Normalize(VersionName).Length > 0;
 
-    public string PrimaryDownloadText
+    /// <summary>要创建的版本名已存在：按钮变灰，但仍可点击并弹出说明。</summary>
+    public bool HasDuplicateVersionName
     {
         get
         {
-            if (_selectedLoaderKey is null || _selectedLoaderVersion is null)
-                return "下载选中版本";
+            var name = VersionNaming.Normalize(VersionName);
+            if (name.Length == 0) return false;
 
-            var text = $"下载并安装 {GetLoaderDisplayName(_selectedLoaderKey)} {_selectedLoaderVersion}";
-            return string.IsNullOrEmpty(_selectedFabricApiVersion)
-                ? text
-                : text + " + Fabric API";
+            return Versions.Any(version =>
+                string.Equals(version.Id, name, StringComparison.OrdinalIgnoreCase));
         }
     }
 
@@ -1428,8 +1434,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         OnPropertyChanged(nameof(CanDownloadSelectedVersion));
         OnPropertyChanged(nameof(CanDownloadSelected));
-        OnPropertyChanged(nameof(PrimaryDownloadText));
         OnPropertyChanged(nameof(DownloadIconName));
+        OnPropertyChanged(nameof(HasDuplicateVersionName));
     }
 
     partial void OnVersionNameChanged(string value)
@@ -1438,6 +1444,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         _versionNameEdited = true;
         OnPropertyChanged(nameof(CanDownloadSelected));
+        OnPropertyChanged(nameof(HasDuplicateVersionName));
     }
 
 
@@ -2089,7 +2096,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         UpdateRemoteInstalledStatus();
-        ApplyRemoteVersionFilter();
         LauncherLog.Info($"版本清单已重建：{_allRemoteVersions.Count} 个版本（{clock.ElapsedMilliseconds} ms）");
     }
 
@@ -2129,6 +2135,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         foreach (var item in _allRemoteVersions)
         {
+            if (item.IsInstalled) continue;
             if (!MatchesRemoteVersionType(item)) continue;
             if (search.Length > 0 && !item.Id.Contains(search, StringComparison.OrdinalIgnoreCase)) continue;
             filtered.Add(item);
@@ -2143,6 +2150,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var items = group
                 .OrderByDescending(item => item.ReleaseTime ?? DateTimeOffset.MinValue)
                 .ToList();
+
+            if (items.Count == 0) continue;
 
             rows.Add(RemoteVersionListRowViewModel.CreateHeader(VersionTypeTitle(group.Key), items.Count));
             foreach (var item in items)
@@ -2241,14 +2250,43 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (!group.IsExpanded) return;
 
-        if (group.Versions.Count == 0)
+        var visible = VisibleLoaderVersions(group);
+        if (visible.Count == 0)
         {
             rows.Add(LoaderVersionListRowViewModel.CreateEmpty(group, DescribeLoaderEmpty(group)));
             return;
         }
 
-        foreach (var version in group.Versions)
+        foreach (var version in visible)
             rows.Add(LoaderVersionListRowViewModel.CreateVersion(version));
+    }
+
+    /// <summary>已经装过的加载器版本不再列出，避免重复下载。</summary>
+    private List<LoaderVersionItemViewModel> VisibleLoaderVersions(LoaderVersionGroupViewModel group)
+        => group.Versions.Where(version => !IsLoaderVersionInstalled(group.Key, version.Version)).ToList();
+
+    /// <summary>按加载器、游戏版本与版本号判断是否已安装过。</summary>
+    private bool IsLoaderVersionInstalled(string loaderKey, string loaderVersion)
+    {
+        if (string.IsNullOrWhiteSpace(loaderVersion)) return false;
+
+        var displayName = GetLoaderDisplayName(loaderKey);
+
+        foreach (var version in Versions)
+        {
+            if (!string.Equals(version.Summary.Loader, displayName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (_activeLoaderVersionId is { Length: > 0 } active &&
+                !string.IsNullOrEmpty(version.Summary.ClientVersion) &&
+                !string.Equals(version.Summary.ClientVersion, active, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (version.Id.EndsWith(loaderVersion, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private LoaderVersionListRowViewModel CreateLoaderHeaderRow(LoaderVersionGroupViewModel group)
@@ -2258,6 +2296,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (group.IsLoading) return "正在获取版本列表…";
         if (!string.IsNullOrEmpty(group.ErrorText)) return $"获取失败：{group.ErrorText}";
+        if (group.Versions.Count > 0) return $"该版本下的 {group.DisplayName} 版本都已安装";
         return $"该版本没有可用的 {group.DisplayName} 版本";
     }
 
@@ -2300,7 +2339,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (!group.IsExpanded) return;
 
-        if (group.Versions.Count == 0)
+        var visible = VisibleLoaderVersions(group);
+        if (visible.Count == 0)
         {
             LoaderVersionRows.Insert(
                 headerIndex + 1,
@@ -2310,7 +2350,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         LoaderVersionRows.InsertRange(
             headerIndex + 1,
-            group.Versions.Select(version =>
+            visible.Select(version =>
                 LoaderVersionListRowViewModel.CreateVersion(version)));
     }
 
@@ -2515,15 +2555,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void NotifyFabricApiSelectionChanged()
     {
-        OnPropertyChanged(nameof(PrimaryDownloadText));
         OnPropertyChanged(nameof(CanDownloadSelected));
     }
 
     private void NotifyLoaderSelectionChanged()
     {
         OnPropertyChanged(nameof(CanDownloadSelected));
-        OnPropertyChanged(nameof(PrimaryDownloadText));
         OnPropertyChanged(nameof(DownloadIconName));
+        OnPropertyChanged(nameof(HasDuplicateVersionName));
     }
 
     private void RefreshDefaultVersionName()
@@ -2640,7 +2679,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 // 已有缓存时保留内容，只提示本次刷新失败。
                 group.IsAvailable = true;
-                group.StatusText = $"{group.Versions.Count} 个版本";
+                group.StatusText = $"{VisibleLoaderVersions(group).Count} 个版本";
                 UpdateLoaderGroupRows(group, contentChanged: false);
             }
             else
@@ -2686,7 +2725,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         foreach (var item in _allRemoteVersions)
             item.IsInstalled = installed.Contains(item.Id);
 
-        UpdateRemoteVersionsStatus();
+        // 已安装的版本不再出现在列表里，重新过滤一次（同时刷新状态文字）。
+        ApplyRemoteVersionFilter();
     }
 
     private void UpdateRemoteVersionsStatus()
@@ -2707,6 +2747,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private async Task DownloadSelectedAsync()
     {
         if (!CanDownloadSelected || SelectedRemoteVersion is null) return;
+
+        if (HasDuplicateVersionName)
+        {
+            ShowNotice(
+                "无法下载",
+                $"版本名 “{VersionNaming.Normalize(VersionName)}” 已存在，请换一个名称。");
+            return;
+        }
 
         if (_selectedLoaderKey is not null && _selectedLoaderVersion is not null)
             await InstallSelectedLoaderAsync();

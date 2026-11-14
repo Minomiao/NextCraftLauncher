@@ -164,31 +164,44 @@ public partial class MainWindow : Window
     private readonly TranslateTransform _backTransform = new();
     private bool? _titleBarState;
     private DispatcherTimer? _titleBarTimer;
+
+    /// <summary>一整段（品牌收起 + 按钮进入）的时长。</summary>
+    private const double TitleBarFullDuration = 600;
+
+    /// <summary>品牌与按钮的滑动距离。</summary>
+    private const double TitleBarSlide = 32;
+
+    /// <summary>品牌退场结束时的进度；到这时已经基本看不见了。</summary>
+    private const double TitleBarOutEnd = 0.38;
+
+    /// <summary>按钮进场开始的进度；与品牌退场叠一小段，避免中间出现空档。</summary>
+    private const double TitleBarInStart = 0.24;
+
+    /// <summary>标题栏左侧的切换进度：0 = 品牌完全显示，1 = 返回按钮完全显示。</summary>
+    private double _titleBarProgress;
+    private double _titleBarFrom;
+    private double _titleBarTo;
     private long _titleBarStart;
+    private double _titleBarDuration = TitleBarFullDuration;
 
     /// <summary>标题栏左侧切换：先把当前元素收起，再让另一个进入。</summary>
     private void StartTitleBarTransition(bool subPage)
     {
         _titleBarState = subPage;
-        _titleBarStart = Environment.TickCount64;
 
-        // 起点直接落位，避免中途打断后数值漂移。
-        if (subPage)
+        var target = subPage ? 1d : 0d;
+        _titleBarFrom = _titleBarProgress;
+        _titleBarTo = target;
+
+        // 从当前进度接着走：中途反向不会让元素跳回起点。
+        _titleBarDuration = TitleBarFullDuration * Math.Abs(target - _titleBarFrom);
+        if (_titleBarDuration < 1)
         {
-            BrandText.Opacity = 1;
-            _brandTransform.X = 0;
-            BrandBackButton.Opacity = 0;
-            _backTransform.X = 32;
-            BrandBackButton.IsHitTestVisible = false;
+            ApplyTitleBarState(subPage);
+            return;
         }
-        else
-        {
-            BrandBackButton.Opacity = 1;
-            _backTransform.X = 0;
-            BrandText.Opacity = 0;
-            _brandTransform.X = -32;
-            BrandBackButton.IsHitTestVisible = false;
-        }
+
+        _titleBarStart = Environment.TickCount64;
 
         _titleBarTimer ??= new DispatcherTimer(
             TimeSpan.FromMilliseconds(15),
@@ -201,53 +214,29 @@ public partial class MainWindow : Window
 
     private void TickTitleBar()
     {
-        var subPage = _titleBarState == true;
         var elapsed = Environment.TickCount64 - _titleBarStart;
+        var t = _titleBarDuration <= 0 ? 1 : Math.Min(1, elapsed / _titleBarDuration);
 
-        var first = subPage ? 300d : 260d;
-        const double second = 300d;
+        _titleBarProgress = _titleBarFrom + (_titleBarTo - _titleBarFrom) * t;
+        ApplyTitleBarProgress(_titleBarProgress);
 
-        if (elapsed >= first + second)
-        {
-            _titleBarTimer?.Stop();
-            ApplyTitleBarState(subPage);
-            return;
-        }
+        if (t < 1) return;
 
-        if (subPage)
-        {
-            var outProgress = Ease(Math.Min(1, elapsed / first));
-            BrandText.Opacity = 1 - outProgress;
-            _brandTransform.X = -32 * outProgress;
+        _titleBarProgress = _titleBarTo;
+        ApplyTitleBarState(_titleBarState == true);
+    }
 
-            if (elapsed <= first)
-            {
-                BrandBackButton.Opacity = 0;
-                _backTransform.X = 32;
-            }
-            else
-            {
-                BrandBackButton.IsHitTestVisible = true;
-                var inProgress = Ease(Math.Min(1, (elapsed - first) / second));
-                BrandBackButton.Opacity = inProgress;
-                _backTransform.X = 32 * (1 - inProgress);
-            }
-        }
-        else
-        {
-            var outProgress = Ease(Math.Min(1, elapsed / first));
-            BrandBackButton.Opacity = 1 - outProgress;
-            _backTransform.X = 32 * outProgress;
-            BrandText.Opacity = 0;
-            _brandTransform.X = -32;
+    /// <summary>按进度摆放两个元素：品牌先带走，后半段按钮进来，中间留一小段重叠。</summary>
+    private void ApplyTitleBarProgress(double progress)
+    {
+        var outProgress = Ease(Math.Clamp(progress / TitleBarOutEnd, 0, 1));
+        var inProgress = Ease(Math.Clamp((progress - TitleBarInStart) / (1 - TitleBarInStart), 0, 1));
 
-            if (elapsed > first)
-            {
-                var inProgress = Ease(Math.Min(1, (elapsed - first) / second));
-                BrandText.Opacity = inProgress;
-                _brandTransform.X = -32 * (1 - inProgress);
-            }
-        }
+        BrandText.Opacity = 1 - outProgress;
+        _brandTransform.X = -TitleBarSlide * outProgress;
+        BrandBackButton.Opacity = inProgress;
+        _backTransform.X = TitleBarSlide * (1 - inProgress);
+        BrandBackButton.IsHitTestVisible = inProgress > 0.5;
     }
 
     private static double Ease(double t) => 1 - Math.Pow(1 - t, 3);
@@ -258,11 +247,12 @@ public partial class MainWindow : Window
         _titleBarState = subPage;
         _titleBarTimer?.Stop();
 
-        BrandText.Opacity = subPage ? 0 : 1;
-        _brandTransform.X = subPage ? -32 : 0;
-        BrandBackButton.Opacity = subPage ? 1 : 0;
-        _backTransform.X = subPage ? 0 : 32;
-        BrandBackButton.IsHitTestVisible = subPage;
+        _titleBarProgress = subPage ? 1 : 0;
+        _titleBarFrom = _titleBarProgress;
+        _titleBarTo = _titleBarProgress;
+        _titleBarDuration = 0;
+
+        ApplyTitleBarProgress(_titleBarProgress);
     }
 
     /// <summary>当前正跟着高亮一起缩小的按钮文字；没按住时为 null。</summary>

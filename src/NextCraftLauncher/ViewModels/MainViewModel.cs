@@ -639,6 +639,33 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public string CurrentVersionSubtitle => SelectedVersion?.Subtitle ?? "在左侧「版本」中选择一个版本";
 
+    /// <summary>用于渲染版本图标的客户端 jar（沿 inheritsFrom 找第一个存在的 jar）。</summary>
+    public string? CurrentVersionJarPath => SelectedVersion is null ? null : FindClientJar(SelectedVersion.Summary);
+
+    private string? FindClientJar(VersionSummary summary)
+    {
+        var current = summary;
+
+        for (var depth = 0; depth < 8; depth++)
+        {
+            var directory = Path.GetDirectoryName(current.JsonPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                var jar = Path.Combine(directory, current.Id + ".jar");
+                if (File.Exists(jar)) return jar;
+            }
+
+            if (string.IsNullOrEmpty(current.InheritsFrom)) return null;
+
+            var parent = Versions.FirstOrDefault(version => version.Id == current.InheritsFrom)?.Summary;
+            if (parent is null) return null;
+
+            current = parent;
+        }
+
+        return null;
+    }
+
     public string CurrentJavaName => SelectedJava?.DisplayName ?? "未选择 Java";
 
     public string RequiredJavaDescription => _resolved is null
@@ -728,6 +755,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(CurrentVersionName));
         OnPropertyChanged(nameof(CurrentVersionSubtitle));
+        OnPropertyChanged(nameof(CurrentVersionJarPath));
         OnPropertyChanged(nameof(CanManageSelectedVersion));
         _detailsTask = LoadDetailsAsync(value);
 

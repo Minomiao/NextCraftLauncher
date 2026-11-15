@@ -9,57 +9,11 @@
         <local:ViewLocator />
     </Application.DataTemplates>
 
-    <Application.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.ThemeDictionaries>
-                <!-- 任务卡片：始终比页面底色浅的悬浮面 -->
-                <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="TaskCardBackgroundBrush" Color="#FFFFFFFF" />
-                    <SolidColorBrush x:Key="TaskCardBorderBrush" Color="#E4E4E7" />
 
-                    <!-- 列表行内小按钮的底色：只在整行高亮时看得见 -->
-                    <SolidColorBrush x:Key="RowActionBackgroundBrush" Color="#14000000" />
-                    <SolidColorBrush x:Key="RowActionBackgroundHoverBrush" Color="#1F000000" />
-                    <SolidColorBrush x:Key="RowActionBackgroundPressedBrush" Color="#29000000" />
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="TaskCardBackgroundBrush" Color="#2AFFFFFF" />
-                    <SolidColorBrush x:Key="TaskCardBorderBrush" Color="#33FFFFFF" />
-
-                    <SolidColorBrush x:Key="RowActionBackgroundBrush" Color="#1FFFFFFF" />
-                    <SolidColorBrush x:Key="RowActionBackgroundHoverBrush" Color="#2EFFFFFF" />
-                    <SolidColorBrush x:Key="RowActionBackgroundPressedBrush" Color="#3DFFFFFF" />
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
-
-            <!--
-                视觉规范：页面里不再写颜色字面量，一律引用这里的 token。
-
-                · 文字层级：正文 1.0；字段标签 0.72（fieldLabel）；辅助说明 0.56（meta）；
-                  更淡的占位/分隔用 0.4。新代码不要把随意的 opacity 写在页面里。
-                · 语义色：错误 / 警告 / 遮罩 / 图片占位都在这里定义一次，
-                  样式、页面、控件代码只能引用，不得再出现 #RRGGBB。
-                · 强调色统一用 Fluent 的 SystemAccentColor，
-                  悬停 / 按下用 0.9 / 0.78 的不透明度表达，不另外调色。
-                · 卡片面、列表行内按钮底属于主题相关色，放在上面的 ThemeDictionaries 里。
-            -->
-            <SolidColorBrush x:Key="ErrorFillBrush" Color="#D13438" />
-            <SolidColorBrush x:Key="ErrorFillHoverBrush" Color="#C42B1C" />
-            <SolidColorBrush x:Key="ErrorFillPressedBrush" Color="#A4262C" />
-            <SolidColorBrush x:Key="ErrorTextBrush" Color="#D13438" />
-            <SolidColorBrush x:Key="WarningFillBrush" Color="#C77B00" />
-            <SolidColorBrush x:Key="WarningTextBrush" Color="#C77B00" />
-
-            <!-- 实心按钮上的文字：强调色底、错误底、警告底共用 -->
-            <SolidColorBrush x:Key="OnFillTextBrush" Color="#FFFFFF" />
-
-            <!-- 所有模态遮罩：提示卡片、删除确认、账号登录 -->
-            <SolidColorBrush x:Key="OverlayMaskBrush" Color="#66000000" />
-
-            <!-- 远程图片没加载出来时的占位块 -->
-            <SolidColorBrush x:Key="ImagePlaceholderBrush" Color="#24808080" />
-        </ResourceDictionary>
-    </Application.Resources>
+    <!--
+        颜色不在这里定义：见 Theme/Palette.cs，启动时由 Palette.Register 注册成
+        应用资源（可运行时换色）。这里只保留与颜色无关的样式。
+    -->
 
     <Application.Styles>
         <FluentTheme />
@@ -146,13 +100,22 @@
             <Setter Property="HorizontalContentAlignment" Value="Left" />
         </Style>
         <Style Selector="Button.side.selected">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.side:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
         </Style>
 
         <Style Selector="Button.soft">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SoftButtonBrush}" />
             <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.soft:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />
+        </Style>
+        <Style Selector="Button.soft:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonPressedBrush}" />
         </Style>
 
         <!-- 下拉按钮与普通按钮保持一致的外观 -->
@@ -162,24 +125,24 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style Selector="DropDownButton.soft">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SoftButtonBrush}" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
 
         <Style Selector="Button.primary">
-            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="CornerRadius" Value="8" />
         </Style>
         <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
             <Setter Property="Opacity" Value="0.9" />
         </Style>
         <Style Selector="Button.primary:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
             <Setter Property="Opacity" Value="0.78" />
         </Style>
@@ -187,34 +150,34 @@
         <!-- 强调色描边按钮：透明底 + 强调色边框与文字 -->
         <Style Selector="Button.outline">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
             <Setter Property="CornerRadius" Value="8" />
         </Style>
         <Style Selector="Button.outline:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
             <Setter Property="Opacity" Value="0.9" />
         </Style>
         <Style Selector="Button.outline:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
             <Setter Property="Opacity" Value="0.78" />
         </Style>
 
         <!-- 不能启动时按钮变灰，但仍可点击（点击后用 notice 卡片说明原因） -->
         <Style Selector="Button.primary.disabled">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource DisabledFillBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
         </Style>
         <Style Selector="Button.primary.disabled:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource DisabledFillBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
             <Setter Property="Opacity" Value="0.9" />
         </Style>
         <Style Selector="Button.primary.disabled:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource DisabledFillBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
             <Setter Property="Opacity" Value="0.78" />
         </Style>
@@ -262,10 +225,10 @@
             </Setter>
         </Style>
         <Style Selector="ListBoxItem:pointerover /template/ Border#PART_Root">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
         </Style>
         <Style Selector="ListBoxItem:selected /template/ Border#PART_Root">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseMediumLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillBrush}" />
         </Style>
 
         <!--
@@ -318,10 +281,10 @@
             </Setter>
         </Style>
         <Style Selector="ComboBoxItem:pointerover /template/ Border#PART_Root">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
         </Style>
         <Style Selector="ComboBoxItem:selected /template/ Border#PART_Root">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseMediumLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillBrush}" />
         </Style>
 
         <!-- 同上：ComboBoxItem 主题的选择器不限制部件名，所有 ContentPresenter 都会被上色 -->

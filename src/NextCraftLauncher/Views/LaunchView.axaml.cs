@@ -39,70 +39,18 @@ public partial class LaunchView : UserControl
         },
     };
 
-    /// <summary>按下时高亮先缩小，松手再放大回原尺寸。</summary>
-    private static readonly Transitions SquashIn = new()
-    {
-        new DoubleTransition
-        {
-            Property = ScaleTransform.ScaleXProperty,
-            Duration = TimeSpan.FromMilliseconds(90),
-            Easing = new CubicEaseOut(),
-        },
-        new DoubleTransition
-        {
-            Property = ScaleTransform.ScaleYProperty,
-            Duration = TimeSpan.FromMilliseconds(90),
-            Easing = new CubicEaseOut(),
-        },
-    };
-
-    private static readonly Transitions SquashOut = new()
-    {
-        new DoubleTransition
-        {
-            Property = ScaleTransform.ScaleXProperty,
-            Duration = TimeSpan.FromMilliseconds(170),
-            Easing = new CubicEaseOut(),
-        },
-        new DoubleTransition
-        {
-            Property = ScaleTransform.ScaleYProperty,
-            Duration = TimeSpan.FromMilliseconds(170),
-            Easing = new CubicEaseOut(),
-        },
-    };
-
-    private const double SquashScale = 0.9;
-
     private readonly TranslateTransform _pillOffset = new();
-    private readonly ScaleTransform _pillScale = new();
     private MainViewModel? _viewModel;
     private Rect? _pillTarget;
     private bool _pillAnimated;
-    private bool _dragging;
-
-    /// <summary>按下时缓存下来的按钮位置；拖动过程中不变，避免每次移动都重新换算。</summary>
-    private Rect[]? _dragRects;
-
-    /// <summary>待处理的最新指针横坐标，每帧只应用一次。</summary>
-    private double? _pendingX;
-    private bool _updateQueued;
 
     public LaunchView()
     {
         InitializeComponent();
 
-        var transform = new TransformGroup();
-        transform.Children.Add(_pillOffset);
-        transform.Children.Add(_pillScale);
+        AccountPill.RenderTransform = _pillOffset;
 
-        AccountPill.RenderTransform = transform;
-        AccountPill.RenderTransformOrigin = RelativePoint.Center;
-
-        // 账号切换的拖动与顶部导航一致：按在任意一侧即可拖过去。
-        AccountSwitch.AddHandler(PointerPressedEvent, OnAccountPointerPressed, RoutingStrategies.Tunnel);
-        AccountSwitch.AddHandler(PointerMovedEvent, OnAccountPointerMoved, RoutingStrategies.Tunnel);
-        AccountSwitch.AddHandler(PointerReleasedEvent, OnAccountPointerReleased, RoutingStrategies.Tunnel);
+        // 高亮只跟随选中项，不响应拖动；位置在布局完成与账号类型变化时同步。
         AccountSwitch.LayoutUpdated += (_, _) => SnapAccountPill(animate: false);
     }
 
@@ -126,76 +74,8 @@ public partial class LaunchView : UserControl
     {
         if (e.PropertyName is nameof(MainViewModel.IsMicrosoftAccount) or nameof(MainViewModel.IsOfflineAccount))
         {
-            if (!_dragging) SnapAccountPill(animate: true);
+            SnapAccountPill(animate: true);
         }
-    }
-
-    private void OnAccountPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
-        if (!TryGetAccountRects(out var rects)) return;
-
-        _dragging = true;
-        _dragRects = rects;
-        SetAnimated(false);
-        SetSquash(SquashScale, SquashIn);
-
-        FollowAccountPointer(e.GetPosition(AccountSwitch).X);
-    }
-
-    private void OnAccountPointerMoved(object? sender, PointerEventArgs e)
-    {
-        if (!_dragging) return;
-        FollowAccountPointer(e.GetPosition(AccountSwitch).X);
-    }
-
-    private void OnAccountPointerReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        if (!_dragging) return;
-
-        var rects = _dragRects;
-
-        _dragging = false;
-        _dragRects = null;
-        _pendingX = null;
-        SetSquash(1, SquashOut);
-
-        // 与导航栏一样，松手时按指针落点决定切到哪一侧。
-        if (rects is not null)
-        {
-            if (AccountIndexAt(e.GetPosition(AccountSwitch).X, rects) == 0)
-                _viewModel?.UseMicrosoftAccountCommand.Execute(null);
-            else
-                _viewModel?.UseOfflineAccountCommand.Execute(null);
-        }
-
-        // 点击命令在松手之后才执行，等它把账号类型改完再贴高亮。
-        _pillTarget = null;
-        Dispatcher.UIThread.Post(() => SnapAccountPill(animate: true), DispatcherPriority.Background);
-    }
-
-    /// <summary>指针事件可能远高于刷新率，每帧只处理最后一次（同导航栏）。</summary>
-    private void FollowAccountPointer(double x)
-    {
-        if (_dragRects is null) return;
-
-        _pendingX = x;
-        if (_updateQueued) return;
-
-        _updateQueued = true;
-        Dispatcher.UIThread.Post(FlushAccountPill, DispatcherPriority.Render);
-    }
-
-    private void FlushAccountPill()
-    {
-        _updateQueued = false;
-
-        var x = _pendingX;
-        _pendingX = null;
-
-        if (x is not { } value || !_dragging || _dragRects is not { } rects) return;
-
-        ApplyPill(PillRect(value, rects));
     }
 
     /// <summary>开关高亮的过渡；状态未变时不重复赋值。</summary>
@@ -208,17 +88,10 @@ public partial class LaunchView : UserControl
         _pillOffset.Transitions = animate ? PillSlide : null;
     }
 
-    private void SetSquash(double value, Transitions transitions)
-    {
-        _pillScale.Transitions = transitions;
-        _pillScale.ScaleX = value;
-        _pillScale.ScaleY = value;
-    }
-
     /// <summary>把高亮贴到当前账号类型对应的按钮上。</summary>
     private void SnapAccountPill(bool animate)
     {
-        if (_viewModel is null || _dragging) return;
+        if (_viewModel is null) return;
         if (!TryGetAccountRects(out var rects)) return;
 
         var rect = rects[_viewModel.IsMicrosoftAccount ? 0 : 1];
@@ -235,7 +108,7 @@ public partial class LaunchView : UserControl
         ApplyPill(rect);
     }
 
-    /// <summary>纯赋值，不碰过渡设置，拖动时每帧只走这里。</summary>
+    /// <summary>纯赋值，不碰过渡设置。</summary>
     private void ApplyPill(Rect rect)
     {
         _pillOffset.X = rect.X;
@@ -260,23 +133,6 @@ public partial class LaunchView : UserControl
         }
 
         return true;
-    }
-
-    /// <summary>指针落在哪个按钮上；按两个按钮的中点划分。</summary>
-    private static int AccountIndexAt(double x, Rect[] rects)
-        => x < (rects[0].Right + rects[1].X) / 2 ? 0 : 1;
-
-    /// <summary>高亮以指针为中心、夹在两端之间，与导航栏的高亮算法一致。</summary>
-    private static Rect PillRect(double x, Rect[] rects)
-    {
-        var left = rects[0].X;
-        var right = rects[^1].Right;
-        var pointer = Math.Clamp(x, left, right);
-
-        var width = rects[pointer > rects[0].Center.X ? 1 : 0].Width;
-        var start = Math.Clamp(pointer - width / 2, left, right - width);
-
-        return new Rect(start, rects[0].Y, width, rects[0].Height);
     }
 
     /// <summary>在版本列表里点选一个版本后直接回到启动页，轮播会从上一个版本滚过去。</summary>

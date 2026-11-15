@@ -12,6 +12,24 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
+  <!--
+    Release 发布默认就是最终发布的形态：自包含单文件 + 裁剪 + 压缩（约 23 MB）。
+    除了 exe 不带任何文件，用户也不需要先装 .NET 运行时，直接 `dotnet publish -c Release` 即可。
+
+    裁剪默认会把 JSON 反射关掉，而设置、调色板缓存、图标清单都靠反射读写，
+    所以显式打开 JsonSerializerIsReflectionEnabledByDefault；三个程序集已由
+    TrimmerRootAssembly 整份保留，类型不会被裁掉。
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <!--
       不指定 RID 时，dotnet build 会把所有平台/架构的 runtimes 全部拷进输出（约 550 MB）。

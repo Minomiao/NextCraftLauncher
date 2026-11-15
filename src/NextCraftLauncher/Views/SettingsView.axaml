@@ -81,7 +81,6 @@
                     Command="{Binding ShowSettingsAppearanceCommand}" />
         </StackPanel>
 
-        <Border Grid.Column="1" Classes="vline" />
 
         <Grid Grid.Column="2">
 

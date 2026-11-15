@@ -116,7 +116,6 @@
                 </StackPanel>
             </Grid>
 
-            <Border Grid.Column="1" Classes="vline" />
 
             <Grid Grid.Column="2" RowDefinitions="Auto,*">
 
@@ -660,7 +659,6 @@
                 </StackPanel>
             </Grid>
 
-            <Border Grid.Column="1" Classes="vline" />
 
             <!-- 任务列表：每个下载/安装任务一张卡片，可同时存在多个 -->
             <Grid Grid.Column="2">

@@ -363,7 +363,6 @@
                             </ListBox>
                         </Grid>
 
-                        <Border Grid.Column="1" Classes="vline" />
 
                         <!-- 本地版本列表 -->
                         <Grid Grid.Column="2" RowDefinitions="Auto,*" RowSpacing="8">

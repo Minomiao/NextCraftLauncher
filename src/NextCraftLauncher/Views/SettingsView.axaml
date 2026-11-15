@@ -37,6 +37,30 @@
             <Setter Property="Height" Value="32" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
+
+        <!-- 主题色色块：圆形，选中时在外圈描一道边 -->
+        <Style Selector="Button.swatch">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.swatch:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.swatch:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.swatch.selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
     </UserControl.Styles>
 
     <Grid ColumnDefinitions="176,1,*" ColumnSpacing="16">
@@ -241,8 +265,56 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- 外观：暂时空白，后续再加主题、图标等设置 -->
-            <Grid IsVisible="{Binding IsSettingsAppearanceSelected}" />
+            <!-- 外观：主题色 -->
+            <ScrollViewer IsVisible="{Binding IsSettingsAppearanceSelected}"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Width="550" HorizontalAlignment="Left">
+
+                    <TextBlock Text="外观" Classes="section" />
+
+                    <StackPanel Spacing="12" Margin="0,18,0,0">
+                        <!-- 系统色：位于其他颜色上方，单独一行 -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="系统" Classes="group" />
+
+                            <Button Classes="swatch"
+                                    Classes.selected="{Binding SystemAccentOption.IsSelected}"
+                                    Command="{Binding SystemAccentOption.SelectCommand}"
+                                    ToolTip.Tip="{Binding SystemAccentOption.Name}"
+                                    HorizontalAlignment="Left">
+                                <Border Width="28"
+                                        Height="28"
+                                        CornerRadius="14"
+                                        Background="{Binding SystemAccentOption.Brush}" />
+                            </Button>
+                        </StackPanel>
+
+                        <TextBlock Text="主题色" Classes="group" />
+
+                        <ItemsControl ItemsSource="{Binding AccentOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" ItemWidth="46" ItemHeight="46" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AccentOptionViewModel">
+                                    <Button Classes="swatch"
+                                            Classes.selected="{Binding IsSelected}"
+                                            Command="{Binding SelectCommand}"
+                                            ToolTip.Tip="{Binding Name}">
+                                        <Border Width="28"
+                                                Height="28"
+                                                CornerRadius="14"
+                                                Background="{Binding Brush}" />
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </Grid>
 

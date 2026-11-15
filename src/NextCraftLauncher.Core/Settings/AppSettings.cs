@@ -29,6 +29,9 @@ public sealed class AppSettings
     public string? CurseForgeApiKey { get; set; } =
         Environment.GetEnvironmentVariable("NCL_CURSEFORGE_API_KEY");
 
+    /// <summary>外观主题色（<c>#RRGGBB</c>）；为空表示跟随系统强调色。</summary>
+    public string? ThemeAccent { get; set; }
+
     /// <summary>Forge 版本列表的获取源（仅影响显示，默认自动）。</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public DownloadMirror ForgeMirror { get; set; } = DownloadMirror.Automatic;
@@ -131,6 +134,24 @@ public sealed class AppSettings
         }
 
         HiddenVersions = hiddenVersions;
+
+        ThemeAccent = NormalizeAccent(ThemeAccent);
+    }
+
+    /// <summary>主题色只接受 <c>#RRGGBB</c>；其他写法一律当作跟随系统。</summary>
+    private static string? NormalizeAccent(string? accent)
+    {
+        if (accent is null) return null;
+
+        var text = accent.Trim();
+        if (text.Length != 7 || text[0] != '#') return null;
+
+        for (var index = 1; index < text.Length; index++)
+        {
+            if (!Uri.IsHexDigit(text[index])) return null;
+        }
+
+        return text.ToUpperInvariant();
     }
 
     /// <summary>旧配置或手工编辑可能写入未定义的枚举值，回退到自动。</summary>

@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Avalonia.Media;
 using Avalonia.Threading;
 using NextCraftLauncher.Core.Auth;
 using NextCraftLauncher.Core.Java;
@@ -23,6 +24,7 @@ using NextCraftLauncher.Download.Loaders;
 using NextCraftLauncher.Download.Minecraft;
 using NextCraftLauncher.Download.Mods;
 using NextCraftLauncher.Icons;
+using NextCraftLauncher.Theme;
 
 namespace NextCraftLauncher.ViewModels;
 
@@ -101,6 +103,64 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _lastVersionSaveTimer.Stop();
             _settings.Save();
         };
+
+        LoadAccentOptions();
+    }
+
+    /// <summary>主题可选颜色（外观页）。</summary>
+    public ObservableCollection<AccentOptionViewModel> AccentOptions { get; } = new();
+
+    /// <summary>「跟随系统」选项：单独一行显示，圆形色块里是系统强调色。</summary>
+    public AccentOptionViewModel SystemAccentOption { get; private set; } = null!;
+
+    private static readonly (string Name, string Hex)[] AccentPresets =
+    {
+        ("蓝", "#0078D4"),
+        ("青", "#00B7C3"),
+        ("绿", "#107C10"),
+        ("橄榄", "#498205"),
+        ("金", "#C77B00"),
+        ("橙", "#CA5010"),
+        ("红", "#D13438"),
+        ("紫", "#8764B8"),
+        ("品红", "#B146C2"),
+        ("玫红", "#E3008C"),
+    };
+
+    /// <summary>建好可选项，并按保存的主题色标记选中项。</summary>
+    private void LoadAccentOptions()
+    {
+        foreach (var (name, hex) in AccentPresets)
+            AccentOptions.Add(new AccentOptionViewModel(name, Color.Parse(hex), SetAccent));
+
+        SystemAccentOption = new AccentOptionViewModel("跟随系统", Palette.SystemAccent, SetAccent, isSystem: true);
+
+        var saved = _settings.ThemeAccent;
+        var selected = AccentOptions.FirstOrDefault(option =>
+            string.Equals("#" + (option.Color.ToUInt32() & 0xFFFFFF).ToString("X6"), saved, StringComparison.Ordinal));
+
+        if (selected is null)
+        {
+            SystemAccentOption.IsSelected = true;
+            return;
+        }
+
+        selected.IsSelected = true;
+        Palette.ApplyAccent(selected.Color);
+    }
+
+    /// <summary>外观页选中主题色：标记、写配置、立即换色。</summary>
+    private void SetAccent(AccentOptionViewModel option)
+    {
+        foreach (var item in AccentOptions) item.IsSelected = ReferenceEquals(item, option);
+        SystemAccentOption.IsSelected = option.IsSystem;
+
+        _settings.ThemeAccent = option.IsSystem
+            ? null
+            : "#" + (option.Color.ToUInt32() & 0xFFFFFF).ToString("X6");
+        _settings.Save();
+
+        Palette.ApplyAccent(option.IsSystem ? null : option.Color);
     }
 
     /// <summary>

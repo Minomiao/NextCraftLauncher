@@ -8,6 +8,37 @@
              x:Class="NextCraftLauncher.Views.SettingsView"
              x:DataType="vm:MainViewModel">
 
+    <UserControl.Styles>
+        <!-- 分组眉标：比字段标签更小更淡，只用来切分段落 -->
+        <Style Selector="TextBlock.group">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LetterSpacing" Value="0.8" />
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+
+        <!-- 分区之间的细分隔线 -->
+        <Style Selector="Border.divider">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="Margin" Value="0,22" />
+        </Style>
+
+        <!-- 只读值：与下拉框同高同圆角的浅色块，不再是裸文字 -->
+        <Style Selector="Border.readonly">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+        </Style>
+
+        <Style Selector="NumericUpDown">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
     <Grid ColumnDefinitions="176,1,*" ColumnSpacing="16">
 
         <!-- 左侧边栏 -->
@@ -32,154 +63,181 @@
 
             <!-- 启动设置 -->
             <ScrollViewer IsVisible="{Binding IsSettingsLaunchSelected}"
-                          VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="16" MaxWidth="640" HorizontalAlignment="Left">
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Width="460" HorizontalAlignment="Left">
+
                     <TextBlock Text="启动设置" Classes="section" />
 
-                    <Grid ColumnDefinitions="120,*"
-                          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
-                          ColumnSpacing="12"
-                          RowSpacing="12">
+                    <StackPanel Spacing="12" Margin="0,18,0,0">
+                        <TextBlock Text="窗口" Classes="group" />
 
-                        <TextBlock Text="启动器可见性" Classes="fieldLabel" />
-                        <ComboBox Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding LauncherVisibilityOptions}"
-                                  SelectedIndex="{Binding SelectedLauncherVisibilityIndex}" />
-
-                        <TextBlock Grid.Row="1" Text="进程优先级" Classes="fieldLabel" />
-                        <ComboBox Grid.Row="1"
-                                  Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding ProcessPriorityOptions}"
-                                  SelectedIndex="{Binding SelectedProcessPriorityIndex}" />
-
-                        <TextBlock Grid.Row="2" Text="窗口大小" Classes="fieldLabel" />
-                        <ComboBox Grid.Row="2"
-                                  Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding WindowSizeOptions}"
-                                  SelectedIndex="{Binding SelectedWindowSizeIndex}" />
-
-                        <TextBlock Grid.Row="3"
-                                   Text="自定义尺寸"
-                                   Classes="fieldLabel"
-                                   IsVisible="{Binding IsCustomWindowSize}" />
-                        <StackPanel Grid.Row="3"
-                                    Grid.Column="1"
-                                    Orientation="Horizontal"
-                                    Spacing="8"
-                                    IsVisible="{Binding IsCustomWindowSize}">
-                            <NumericUpDown Value="{Binding CustomWindowWidth}"
-                                           Minimum="320"
-                                           Maximum="7680"
-                                           Increment="10"
-                                           FormatString="0"
-                                           Width="140" />
-                            <TextBlock Text="×" VerticalAlignment="Center" Opacity="0.6" />
-                            <NumericUpDown Value="{Binding CustomWindowHeight}"
-                                           Minimum="240"
-                                           Maximum="4320"
-                                           Increment="10"
-                                           FormatString="0"
-                                           Width="140" />
-                        </StackPanel>
-
-                        <TextBlock Grid.Row="4" Text="内存 (MB)" Classes="fieldLabel" />
-                        <ComboBox Grid.Row="4"
-                                  Grid.Column="1"
-                                  Classes="toolbar"
-                                  ItemsSource="{Binding MemoryOptions}"
-                                  SelectedItem="{Binding MemoryMb}"
-                                  HorizontalAlignment="Stretch" />
-
-                        <TextBlock Grid.Row="5" Text="Java" Classes="fieldLabel" />
-                        <Grid Grid.Row="5" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                            <ComboBox Classes="toolbar"
-                                      ItemsSource="{Binding JavaRuntimes}"
-                                      SelectedItem="{Binding SelectedJava}"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="java:JavaRuntime">
-                                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            <Button Grid.Column="1" Classes="toolbar soft" Content="浏览" Click="OnBrowseJavaClick" />
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="启动器可见性" Classes="fieldLabel" />
+                            <ComboBox Grid.Column="1"
+                                      Classes="toolbar"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding LauncherVisibilityOptions}"
+                                      SelectedIndex="{Binding SelectedLauncherVisibilityIndex}" />
                         </Grid>
 
-                        <TextBlock Grid.Row="6" Text="运行目录" Classes="fieldLabel" />
-                        <TextBlock Grid.Row="6"
-                                   Grid.Column="1"
-                                   Text="{Binding EffectiveGameDirectory}"
-                                   FontSize="11"
-                                   Opacity="0.6"
-                                   TextTrimming="CharacterEllipsis"
-                                   VerticalAlignment="Center"
-                                   ToolTip.Tip="{Binding EffectiveGameDirectory}" />
-                    </Grid>
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="进程优先级" Classes="fieldLabel" />
+                            <ComboBox Grid.Column="1"
+                                      Classes="toolbar"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding ProcessPriorityOptions}"
+                                      SelectedIndex="{Binding SelectedProcessPriorityIndex}" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="窗口大小" Classes="fieldLabel" />
+                            <ComboBox Grid.Column="1"
+                                      Classes="toolbar"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding WindowSizeOptions}"
+                                      SelectedIndex="{Binding SelectedWindowSizeIndex}" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14"
+                              IsVisible="{Binding IsCustomWindowSize}">
+                            <TextBlock Text="自定义尺寸" Classes="fieldLabel" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <NumericUpDown Value="{Binding CustomWindowWidth}"
+                                               Minimum="320"
+                                               Maximum="7680"
+                                               Increment="10"
+                                               FormatString="0"
+                                               Width="120" />
+                                <TextBlock Text="×" VerticalAlignment="Center" Opacity="0.6" />
+                                <NumericUpDown Value="{Binding CustomWindowHeight}"
+                                               Minimum="240"
+                                               Maximum="4320"
+                                               Increment="10"
+                                               FormatString="0"
+                                               Width="120" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <Border Classes="divider" />
+
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="内存与 Java" Classes="group" />
+
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="内存 (MB)" Classes="fieldLabel" />
+                            <ComboBox Grid.Column="1"
+                                      Classes="toolbar"
+                                      ItemsSource="{Binding MemoryOptions}"
+                                      SelectedItem="{Binding MemoryMb}"
+                                      HorizontalAlignment="Stretch" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="Java" Classes="fieldLabel" />
+                            <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <ComboBox Classes="toolbar"
+                                          ItemsSource="{Binding JavaRuntimes}"
+                                          SelectedItem="{Binding SelectedJava}"
+                                          HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="java:JavaRuntime">
+                                            <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Grid.Column="1"
+                                        Classes="toolbar soft"
+                                        Content="浏览"
+                                        Click="OnBrowseJavaClick" />
+                            </Grid>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="运行目录" Classes="fieldLabel" />
+                            <Border Grid.Column="1"
+                                    Classes="readonly"
+                                    ToolTip.Tip="{Binding EffectiveGameDirectory}">
+                                <TextBlock Text="{Binding EffectiveGameDirectory}"
+                                           FontSize="11"
+                                           Opacity="0.7"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Border>
+                        </Grid>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
             <!-- 下载设置：各类列表的获取源（当前只影响显示） -->
             <ScrollViewer IsVisible="{Binding IsSettingsDownloadSelected}"
-                          VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="18" MaxWidth="620" HorizontalAlignment="Left">
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Width="550" HorizontalAlignment="Left">
+
                     <TextBlock Text="下载设置" Classes="section" />
-                    <TextBlock Classes="meta"
-                               Text="游戏版本源同时用于版本清单、游戏文件与 Java 的下载；Forge / Fabric / NeoForge 源仅用于各自版本列表的获取。" />
 
-                    <Grid ColumnDefinitions="110,*"
-                          RowDefinitions="Auto,Auto,Auto,Auto"
-                          ColumnSpacing="12"
-                          RowSpacing="12">
-                        <TextBlock Text="游戏版本" Classes="fieldLabel" />
-                        <ComboBox Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding DownloadMirrors}"
-                                  SelectedIndex="{Binding SelectedGameMirrorIndex}" />
+                    <StackPanel Spacing="12" Margin="0,18,0,0">
+                        <TextBlock Text="清单来源"
+                                   Classes="group"
+                                   ToolTip.Tip="游戏版本源同时用于版本清单、游戏文件与 Java；加载器源只用于各自版本列表。" />
 
-                        <TextBlock Grid.Row="1" Text="Forge" Classes="fieldLabel" />
-                        <ComboBox Grid.Row="1" Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding LoaderMirrorOptions}"
-                                  SelectedIndex="{Binding SelectedForgeMirrorIndex}" />
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="游戏版本" Classes="fieldLabel" />
+                            <ComboBox Grid.Column="1"
+                                      Classes="toolbar"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding DownloadMirrors}"
+                                      SelectedIndex="{Binding SelectedGameMirrorIndex}"
+                                      ToolTip.Tip="自动：在 Mojang 官方与镜像之间择快；也可固定为某个源。" />
+                        </Grid>
 
-                        <TextBlock Grid.Row="2" Text="Fabric" Classes="fieldLabel" />
-                        <ComboBox Grid.Row="2" Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding LoaderMirrorOptions}"
-                                  SelectedIndex="{Binding SelectedFabricMirrorIndex}" />
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="Forge" Classes="fieldLabel" />
+                            <ComboBox Grid.Column="1"
+                                      Classes="toolbar"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding LoaderMirrorOptions}"
+                                      SelectedIndex="{Binding SelectedForgeMirrorIndex}"
+                                      ToolTip.Tip="自动：官网立即请求，镜像延迟对冲；也可固定为官网或镜像。" />
+                        </Grid>
 
-                        <TextBlock Grid.Row="3" Text="NeoForge" Classes="fieldLabel" />
-                        <ComboBox Grid.Row="3" Grid.Column="1"
-                                  Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding LoaderMirrorOptions}"
-                                  SelectedIndex="{Binding SelectedNeoForgeMirrorIndex}" />
-                    </Grid>
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="Fabric" Classes="fieldLabel" />
+                            <ComboBox Grid.Column="1"
+                                      Classes="toolbar"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding LoaderMirrorOptions}"
+                                      SelectedIndex="{Binding SelectedFabricMirrorIndex}"
+                                      ToolTip.Tip="自动：官网立即请求，镜像延迟对冲；也可固定为官网或镜像。" />
+                        </Grid>
 
-                    <Border Classes="hline" />
-
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="版本隔离" Classes="fieldLabel" />
-                        <ComboBox Classes="toolbar"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding IsolationOptions}"
-                                  SelectedIndex="{Binding SelectedIsolationIndex}" />
-                        <TextBlock Text="{Binding IsolationDescription}"
-                                   Classes="meta"
-                                   FontSize="11" />
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="NeoForge" Classes="fieldLabel" />
+                            <ComboBox Grid.Column="1"
+                                      Classes="toolbar"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding LoaderMirrorOptions}"
+                                      SelectedIndex="{Binding SelectedNeoForgeMirrorIndex}"
+                                      ToolTip.Tip="自动：官网立即请求，镜像延迟对冲；也可固定为官网或镜像。" />
+                        </Grid>
                     </StackPanel>
 
-                    <TextBlock Classes="meta"
-                               Text="游戏版本：自动 / Mojang 官方 / Mojang CDN / BMCLAPI。加载器：自动（官网立即请求、BMCLAPI 延迟对冲） / 官方（仅加载器官网） / BMCLAPI（优先镜像）。" />
+                    <Border Classes="divider" />
+
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="版本隔离" Classes="group" />
+
+                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                            <TextBlock Text="默认策略" Classes="fieldLabel" />
+                            <ComboBox Grid.Column="1"
+                                      Classes="toolbar"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding IsolationOptions}"
+                                      SelectedIndex="{Binding SelectedIsolationIndex}" />
+                        </Grid>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 

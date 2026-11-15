@@ -172,7 +172,7 @@
 
         <!-- 删除版本确认弹窗 -->
         <Border IsVisible="{Binding IsVersionDeleteDialogOpen}"
-                Background="#33000000">
+                Background="{DynamicResource OverlayMaskBrush}">
             <Border Width="420"
                     Padding="24"
                     CornerRadius="12"

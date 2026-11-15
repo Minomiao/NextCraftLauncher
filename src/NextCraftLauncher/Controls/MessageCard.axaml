@@ -8,7 +8,7 @@
             避免主题把背景覆盖成强调色。
         -->
         <Style Selector="Button.solid">
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="CornerRadius" Value="8" />
@@ -44,22 +44,39 @@
         <Style Selector="Button.solid:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
         </Style>
         <Style Selector="Button.solid:pressed /template/ ContentPresenter">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
         </Style>
         <Style Selector="Button.solid:disabled /template/ ContentPresenter">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
+        </Style>
+
+        <!-- 标题与主按钮的颜色按 Kind 切换，颜色本身来自全局 token -->
+        <Style Selector="TextBlock#TitleText.error">
+            <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock#TitleText.warning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="Button#ExportButton.error">
+            <Setter Property="Background" Value="{DynamicResource ErrorFillBrush}" />
+        </Style>
+        <Style Selector="Button#ExportButton.warning">
+            <Setter Property="Background" Value="{DynamicResource WarningFillBrush}" />
         </Style>
     </UserControl.Styles>
 
     <!-- 通用提示卡片：遮罩 + 卡片。外观由 Kind 预设决定，文字与显隐由属性控制。 -->
-    <Border x:Name="Mask" Background="#66000000" Opacity="0" IsVisible="False">
+    <Border x:Name="Mask"
+            Background="{DynamicResource OverlayMaskBrush}"
+            Opacity="0"
+            IsVisible="False">
         <Border.Transitions>
             <Transitions>
                 <DoubleTransition Property="Opacity" Duration="0:0:0.32" Easing="CubicEaseOut" />

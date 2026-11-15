@@ -30,7 +30,7 @@
 
         <!-- 任务卡片里的失败信息用错误色，与普通进度文字区分 -->
         <Style Selector="TextBlock.meta.failed">
-            <Setter Property="Foreground" Value="#D13438" />
+            <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}" />
             <Setter Property="Opacity" Value="0.9" />
         </Style>
 

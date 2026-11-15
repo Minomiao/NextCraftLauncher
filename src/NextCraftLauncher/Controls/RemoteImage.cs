@@ -31,9 +31,6 @@ public sealed class RemoteImage : Control
 
     private const double CornerRadius = 6;
 
-    private static readonly IBrush PlaceholderBrush =
-        new SolidColorBrush(Color.FromArgb(36, 128, 128, 128));
-
     /// <summary>同一个文件解码失败只记一次日志，避免滚动时刷屏。</summary>
     private static readonly ConcurrentDictionary<string, byte> ReportedFailures = new();
 
@@ -72,7 +69,13 @@ public sealed class RemoteImage : Control
 
         if (Image is not { } image)
         {
-            context.DrawRectangle(PlaceholderBrush, null, new RoundedRect(bounds, CornerRadius));
+            // 占位色来自全局 token，主题切换后自动跟着变。
+            var placeholder =
+                this.TryFindResource("ImagePlaceholderBrush", out var found) && found is IBrush brush
+                    ? brush
+                    : Brushes.Transparent;
+
+            context.DrawRectangle(placeholder, null, new RoundedRect(bounds, CornerRadius));
             return;
         }
 

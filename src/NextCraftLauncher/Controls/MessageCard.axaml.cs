@@ -31,9 +31,6 @@ public partial class MessageCard : UserControl
     public const string DefaultErrorAdvice =
         "如果要寻求帮助，请向他人发送导出的错误报告文件，而不是发送这个窗口的截图。";
 
-    private static readonly IBrush ErrorBrush = new SolidColorBrush(Color.Parse("#D13438"));
-    private static readonly IBrush WarningBrush = new SolidColorBrush(Color.Parse("#C77B00"));
-
     public static readonly StyledProperty<bool> IsOpenProperty =
         AvaloniaProperty.Register<MessageCard, bool>(nameof(IsOpen));
 
@@ -189,21 +186,9 @@ public partial class MessageCard : UserControl
         MessageText.Text = Message ?? string.Empty;
         MessageText.IsVisible = !string.IsNullOrWhiteSpace(Message);
 
-        switch (Kind)
-        {
-            case MessageKind.Error:
-                TitleText.Foreground = ErrorBrush;
-                break;
-
-            case MessageKind.Warning:
-                TitleText.Foreground = WarningBrush;
-                break;
-
-            default:
-                // 中性：交还给主题的默认前景色。
-                TitleText.ClearValue(TextBlock.ForegroundProperty);
-                break;
-        }
+        // 颜色走样式类，取值来自全局 token（见 App.axaml 的视觉规范）。
+        TitleText.Classes.Set("error", Kind == MessageKind.Error);
+        TitleText.Classes.Set("warning", Kind == MessageKind.Warning);
 
         var advice = Advice ?? (Kind == MessageKind.Error ? DefaultErrorAdvice : string.Empty);
         AdviceText.Text = advice;
@@ -215,12 +200,8 @@ public partial class MessageCard : UserControl
         ExportButton.IsVisible = detailed;
 
         // 主按钮底色跟标题一致，而不是主题强调色。
-        ExportButton.Background = Kind switch
-        {
-            MessageKind.Error => ErrorBrush,
-            MessageKind.Warning => WarningBrush,
-            _ => null,
-        };
+        ExportButton.Classes.Set("error", Kind == MessageKind.Error);
+        ExportButton.Classes.Set("warning", Kind == MessageKind.Warning);
 
         CloseButton.Content = CloseText;
     }

@@ -59,6 +59,8 @@
             <Setter Property="Opacity" Value="1" />
         </Style>
         <Style Selector="Button.brandBack">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Opacity" Value="0" />
             <Setter Property="IsHitTestVisible" Value="False" />
         </Style>
@@ -118,7 +120,7 @@
                             Width="0"
                             Height="32"
                             CornerRadius="16"
-                            Background="{DynamicResource PanelFillBrush}"
+                            Background="{DynamicResource SoftButtonBrush}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center"
                             RenderTransformOrigin="50%,50%"

@@ -67,12 +67,14 @@
             <Setter Property="Padding" Value="20,6" />
             <Setter Property="FontSize" Value="13" />
         </Style>
-        <Style Selector="Button.accountTab.selected">
-            <Setter Property="Background" Value="{DynamicResource PanelFillBrush}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
+        <!-- 选中态只由共享高亮表达，按钮自身不出现任何色块（含按下） -->
         <Style Selector="Button.accountTab:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.accountTab:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
         </Style>
 
         <!-- 游戏名输入框：只用一条下划线，不要整个框 -->
@@ -220,21 +222,32 @@
                         </Grid>
                 </StackPanel>
 
-                <!-- 顶部账号切换：叠加在原有布局上方，不影响中间内容的居中 -->
-                <StackPanel VerticalAlignment="Top"
-                            HorizontalAlignment="Center"
-                            Orientation="Horizontal"
-                            Spacing="4"
-                            Margin="0,6,0,0">
-                    <Button Classes="accountTab"
-                            Classes.selected="{Binding IsMicrosoftAccount}"
-                            Content="正版"
-                            Command="{Binding UseMicrosoftAccountCommand}" />
-                    <Button Classes="accountTab"
-                            Classes.selected="{Binding IsOfflineAccount}"
-                            Content="离线"
-                            Command="{Binding UseOfflineAccountCommand}" />
-                </StackPanel>
+                <!-- 顶部账号切换：共享高亮可按住拖动，与顶部导航一致 -->
+                <Panel x:Name="AccountSwitch"
+                       VerticalAlignment="Top"
+                       HorizontalAlignment="Center"
+                       Margin="0,6,0,0">
+                    <!-- 唯一的高亮：位置与宽度由代码驱动 -->
+                    <Border x:Name="AccountPill"
+                            CornerRadius="6"
+                            Background="{DynamicResource SoftButtonBrush}"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            IsHitTestVisible="False" />
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="MicrosoftTab"
+                                Classes="accountTab"
+                                Classes.selected="{Binding IsMicrosoftAccount}"
+                                Content="正版"
+                                Command="{Binding UseMicrosoftAccountCommand}" />
+                        <Button x:Name="OfflineTab"
+                                Classes="accountTab"
+                                Classes.selected="{Binding IsOfflineAccount}"
+                                Content="离线"
+                                Command="{Binding UseOfflineAccountCommand}" />
+                    </StackPanel>
+                </Panel>
 
                 <!-- 正版登录 -->
                 <Border IsVisible="{Binding IsLoginDialogOpen}"

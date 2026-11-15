@@ -62,17 +62,15 @@ public static class Palette
         "PageBackgroundBrush",
         "SoftButtonBrush",
         "SoftButtonHoverBrush",
-        "SoftButtonPressedBrush",
         "PanelFillBrush",
         "PanelFillHoverBrush",
-        "DisabledFillBrush",
     };
 
     private static readonly Dictionary<string, SolidColorBrush> LightBrushes = CreateBrushes();
     private static readonly Dictionary<string, SolidColorBrush> DarkBrushes = CreateBrushes();
 
     /// <summary>缓存格式版本；变种算法变了就改这个值，旧缓存自动失效。</summary>
-    private const int CacheVersion = 6;
+    private const int CacheVersion = 8;
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -304,13 +302,11 @@ public static class Palette
                 ? dark ? Colors.Transparent : Colors.White
                 : dark ? PaleDark(accent) : Pale(accent),
 
-            // 面板层次：灰色按钮与浮层都用莫兰迪色，深色主题用对应的暗色版
+            // 面板层次：浮层用带 alpha 的莫兰迪色，深色主题叠得更重
             ["SoftButtonBrush"] = morandi,
             ["SoftButtonHoverBrush"] = dark ? Lighten(morandi, 0.08) : Darken(morandi, 0.08),
-            ["SoftButtonPressedBrush"] = dark ? Lighten(morandi, 0.16) : Darken(morandi, 0.16),
             ["PanelFillBrush"] = Alpha(morandi, dark ? (byte)0x2E : (byte)0x1A),
             ["PanelFillHoverBrush"] = Alpha(morandi, dark ? (byte)0x3D : (byte)0x24),
-            ["DisabledFillBrush"] = Alpha(morandi, dark ? (byte)0x33 : (byte)0x1F),
 
             // 由种子派生
             ["OverlayMaskBrush"] = Alpha(Colors.Black, 0x66),

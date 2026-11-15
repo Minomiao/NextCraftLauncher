@@ -100,22 +100,27 @@
             <Setter Property="HorizontalContentAlignment" Value="Left" />
         </Style>
         <Style Selector="Button.side.selected">
-            <Setter Property="Background" Value="{DynamicResource PanelFillBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SoftButtonBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <Style Selector="Button.side:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />
         </Style>
 
+        <!-- 次按钮：沿用主题自带的灰底，无边框 -->
         <Style Selector="Button.soft">
-            <Setter Property="Background" Value="{DynamicResource SoftButtonBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
         <Style Selector="Button.soft:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Opacity" Value="0.9" />
         </Style>
         <Style Selector="Button.soft:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SoftButtonPressedBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Opacity" Value="0.78" />
         </Style>
 
         <!-- 下拉按钮与普通按钮保持一致的外观 -->
@@ -125,7 +130,7 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style Selector="DropDownButton.soft">
-            <Setter Property="Background" Value="{DynamicResource SoftButtonBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
 
@@ -168,16 +173,16 @@
 
         <!-- 不能启动时按钮变灰，但仍可点击（点击后用 notice 卡片说明原因） -->
         <Style Selector="Button.primary.disabled">
-            <Setter Property="Background" Value="{DynamicResource DisabledFillBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
         </Style>
         <Style Selector="Button.primary.disabled:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource DisabledFillBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
             <Setter Property="Opacity" Value="0.9" />
         </Style>
         <Style Selector="Button.primary.disabled:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource DisabledFillBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
             <Setter Property="Opacity" Value="0.78" />
         </Style>

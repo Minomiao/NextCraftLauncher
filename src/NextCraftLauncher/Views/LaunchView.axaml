@@ -111,7 +111,7 @@
                             VerticalAlignment="Center">
                         <TextBlock Text="当前版本"
                                    FontSize="12"
-                                   Opacity="0.55"
+                                   Opacity="0.56"
                                    HorizontalAlignment="Center" />
 
                         <!-- 大版本显示：无容器的弧形轮播，一次一页 -->
@@ -129,7 +129,7 @@
                                                    TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding Subtitle}"
                                                    FontSize="13"
-                                                   Opacity="0.6"
+                                                   Opacity="0.72"
                                                    HorizontalAlignment="Center" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -137,7 +137,7 @@
                         </controls:ArcCarousel>
                         <TextBlock Text="{Binding CurrentJavaName}"
                                    FontSize="12"
-                                   Opacity="0.5"
+                                   Opacity="0.56"
                                    HorizontalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" />
 
@@ -165,7 +165,7 @@
                                                TextTrimming="CharacterEllipsis" />
                                     <TextBlock Text="{Binding AccountSubtitle}"
                                                FontSize="11"
-                                               Opacity="0.55"
+                                               Opacity="0.56"
                                                HorizontalAlignment="Center"
                                                IsVisible="{Binding HasMicrosoftAccount}" />
                                 </StackPanel>
@@ -247,7 +247,7 @@
 
                             <TextBlock Text="{Binding LoginStatusText}"
                                        FontSize="13"
-                                       Opacity="0.75"
+                                       Opacity="0.72"
                                        TextWrapping="Wrap" />
 
                             <TextBlock Text="{Binding LoginUserCode}"
@@ -258,7 +258,7 @@
 
                             <TextBlock Text="{Binding LoginVerificationUri}"
                                        FontSize="12"
-                                       Opacity="0.6"
+                                       Opacity="0.56"
                                        HorizontalAlignment="Center" />
 
                             <StackPanel Orientation="Horizontal"
@@ -323,7 +323,7 @@
                         <Grid RowDefinitions="Auto,*" RowSpacing="6">
                             <TextBlock Text="游戏文件夹"
                                        FontSize="11"
-                                       Opacity="0.6"
+                                       Opacity="0.56"
                                        Margin="4,0,0,0" />
                             <ListBox Grid.Row="1"
                                      ItemsSource="{Binding GameFolders}"
@@ -339,7 +339,7 @@
                                                        TextTrimming="CharacterEllipsis" />
                                             <TextBlock Text="{Binding Path}"
                                                        FontSize="10"
-                                                       Opacity="0.55"
+                                                       Opacity="0.56"
                                                        TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
                                     </DataTemplate>
@@ -356,7 +356,7 @@
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding VersionsCountText}"
                                            FontSize="11"
-                                           Opacity="0.6"
+                                           Opacity="0.56"
                                            VerticalAlignment="Center" />
                             </Grid>
                             <ListBox Grid.Row="1"
@@ -381,7 +381,7 @@
                                                            TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{Binding Subtitle}"
                                                            FontSize="11"
-                                                           Opacity="0.6"
+                                                           Opacity="0.56"
                                                            TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
 

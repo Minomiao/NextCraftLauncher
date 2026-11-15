@@ -183,7 +183,7 @@
                     <TextBlock Text="删除版本" FontSize="18" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding VersionDeleteDialogMessage}"
                                FontSize="13"
-                               Opacity="0.75"
+                               Opacity="0.72"
                                TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal"
                                 Spacing="8"

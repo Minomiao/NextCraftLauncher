@@ -20,7 +20,7 @@
                    HorizontalAlignment="Center" />
         <TextBlock Text="Minecraft Launcher"
                    FontSize="13"
-                   Opacity="0.6"
+                   Opacity="0.56"
                    HorizontalAlignment="Center" />
     </StackPanel>
 </Window>

@@ -14,14 +14,14 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="LetterSpacing" Value="0.8" />
-            <Setter Property="Opacity" Value="0.5" />
+            <Setter Property="Opacity" Value="0.56" />
         </Style>
 
         <!-- 分区之间的细分隔线 -->
         <Style Selector="Border.divider">
             <Setter Property="Height" Value="1" />
             <Setter Property="Background" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
-            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="Opacity" Value="0.56" />
             <Setter Property="Margin" Value="0,22" />
         </Style>
 
@@ -109,7 +109,7 @@
                                                Increment="10"
                                                FormatString="0"
                                                Width="120" />
-                                <TextBlock Text="×" VerticalAlignment="Center" Opacity="0.6" />
+                                <TextBlock Text="×" VerticalAlignment="Center" Opacity="0.4" />
                                 <NumericUpDown Value="{Binding CustomWindowHeight}"
                                                Minimum="240"
                                                Maximum="4320"
@@ -161,7 +161,7 @@
                                     ToolTip.Tip="{Binding EffectiveGameDirectory}">
                                 <TextBlock Text="{Binding EffectiveGameDirectory}"
                                            FontSize="11"
-                                           Opacity="0.7"
+                                           Opacity="0.56"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis" />
                             </Border>

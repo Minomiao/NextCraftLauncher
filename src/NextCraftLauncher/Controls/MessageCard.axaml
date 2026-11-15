@@ -104,13 +104,13 @@
 
                 <TextBlock x:Name="MessageText"
                            FontSize="12.5"
-                           Opacity="0.75"
+                           Opacity="0.72"
                            TextWrapping="Wrap"
                            IsVisible="False" />
 
                 <TextBlock x:Name="AdviceText"
                            FontSize="12"
-                           Opacity="0.55"
+                           Opacity="0.56"
                            TextWrapping="Wrap"
                            IsVisible="False" />
 

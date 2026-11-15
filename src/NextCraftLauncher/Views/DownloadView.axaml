@@ -20,7 +20,13 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
         <Style Selector="Button.versionRow.selected">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillBrush}" />
+        </Style>
+        <Style Selector="Button.versionRow:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
+        </Style>
+        <Style Selector="Button.versionRow:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PanelFillBrush}" />
         </Style>
 
         <!-- 加载器分组行只有图标和一行标题，内边距取 8 才能上/左/下等距 -->
@@ -615,12 +621,12 @@
                 <StackPanel VerticalAlignment="Center" Spacing="32">
                     <StackPanel Spacing="6">
                         <TextBlock Text="总进度"
-                                   Foreground="{DynamicResource SystemAccentColor}"
+                                   Foreground="{DynamicResource AccentTextBrush}"
                                    FontSize="12"
                                    HorizontalAlignment="Center" />
                         <Border Height="2"
                                 Margin="6,0"
-                                Background="{DynamicResource SystemAccentColor}" />
+                                Background="{DynamicResource AccentFillBrush}" />
                         <TextBlock Text="{Binding OverallDownloadPercentText}"
                                    FontSize="22"
                                    HorizontalAlignment="Center" />
@@ -628,12 +634,12 @@
 
                     <StackPanel Spacing="6">
                         <TextBlock Text="下载速度"
-                                   Foreground="{DynamicResource SystemAccentColor}"
+                                   Foreground="{DynamicResource AccentTextBrush}"
                                    FontSize="12"
                                    HorizontalAlignment="Center" />
                         <Border Height="2"
                                 Margin="6,0"
-                                Background="{DynamicResource SystemAccentColor}" />
+                                Background="{DynamicResource AccentFillBrush}" />
                         <TextBlock Text="{Binding CurrentDownloadSpeedText}"
                                    FontSize="22"
                                    HorizontalAlignment="Center" />
@@ -641,12 +647,12 @@
 
                     <StackPanel Spacing="6">
                         <TextBlock Text="剩余文件"
-                                   Foreground="{DynamicResource SystemAccentColor}"
+                                   Foreground="{DynamicResource AccentTextBrush}"
                                    FontSize="12"
                                    HorizontalAlignment="Center" />
                         <Border Height="2"
                                 Margin="6,0"
-                                Background="{DynamicResource SystemAccentColor}" />
+                                Background="{DynamicResource AccentFillBrush}" />
                         <TextBlock Text="{Binding RemainingFilesCount}"
                                    FontSize="22"
                                    HorizontalAlignment="Center" />
@@ -701,11 +707,11 @@
                                                 <DataTemplate x:DataType="vm:DownloadTaskStepViewModel">
                                                     <Grid ColumnDefinitions="44,*">
                                                         <TextBlock Text="✓"
-                                                                   Foreground="{DynamicResource SystemAccentColor}"
+                                                                   Foreground="{DynamicResource AccentTextBrush}"
                                                                    IsVisible="{Binding IsDone}" />
                                                         <TextBlock Text="{Binding Detail}"
                                                                    FontSize="12"
-                                                                   Foreground="{DynamicResource SystemAccentColor}"
+                                                                   Foreground="{DynamicResource AccentTextBrush}"
                                                                    IsVisible="{Binding IsActive}" />
                                                         <TextBlock Text="·"
                                                                    Opacity="0.4"

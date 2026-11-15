@@ -46,11 +46,11 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style Selector="Button.caption:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
             <Setter Property="CornerRadius" Value="14" />
         </Style>
         <Style Selector="Button.caption:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
             <Setter Property="CornerRadius" Value="14" />
         </Style>
 
@@ -65,7 +65,8 @@
     </Window.Styles>
 
     <Panel>
-        <Grid x:Name="ContentRoot" RowDefinitions="Auto,*">
+        <Grid x:Name="ContentRoot" RowDefinitions="Auto,*"
+              Background="{DynamicResource PageBackgroundBrush}">
 
         <!-- 沉浸式标题栏：左侧品牌、居中导航，可拖动 -->
         <Grid Grid.Row="0"
@@ -117,7 +118,7 @@
                             Width="0"
                             Height="32"
                             CornerRadius="16"
-                            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
+                            Background="{DynamicResource PanelFillBrush}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center"
                             RenderTransformOrigin="50%,50%"

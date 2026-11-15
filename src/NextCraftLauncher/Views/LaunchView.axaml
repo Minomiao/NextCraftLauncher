@@ -68,8 +68,11 @@
             <Setter Property="FontSize" Value="13" />
         </Style>
         <Style Selector="Button.accountTab.selected">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.accountTab:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
         </Style>
 
         <!-- 游戏名输入框：只用一条下划线，不要整个框 -->
@@ -96,7 +99,7 @@
         <Style Selector="TextBox.nameInput:focus /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
         </Style>
     </UserControl.Styles>
 

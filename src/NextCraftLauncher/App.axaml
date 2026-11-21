@@ -99,8 +99,13 @@
         <Style Selector="Button.side.selected">
             <Setter Property="Background" Value="{DynamicResource SoftButtonBrush}" />
         </Style>
-        <Style Selector="Button.side:pointerover /template/ ContentPresenter">
+        <!-- 悬浮只在未选中项上生效：选中项悬停时保持选中色，选中身份不会丢 -->
+        <Style Selector="Button.side:pointerover:not(.selected) /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />
+        </Style>
+        <!-- 选中项悬停时也要显式挡住主题自己的悬停底色 -->
+        <Style Selector="Button.side.selected:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonBrush}" />
         </Style>
         <Style Selector="Button.side:pressed /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SoftButtonPressedBrush}" />

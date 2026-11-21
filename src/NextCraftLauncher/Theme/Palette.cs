@@ -94,7 +94,7 @@ public static class Palette
     private static readonly Dictionary<string, SolidColorBrush> DarkBrushes = CreateBrushes();
 
     /// <summary>缓存格式版本；变种算法或 token 集合变了就改这个值，旧缓存自动失效。</summary>
-    private const int CacheVersion = 11;
+    private const int CacheVersion = 12;
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -330,10 +330,10 @@ public static class Palette
                 ? dark ? Colors.Transparent : Colors.White
                 : dark ? PaleDark(accent) : Pale(accent),
 
-            // 胶囊：实底，hover / pressed 按明度走
+            // 胶囊：实底，hover / pressed 按明度走（两档拉开到能一眼分辨）
             ["SoftButtonBrush"] = capsule,
-            ["SoftButtonHoverBrush"] = dark ? Lighten(capsule, 0.08) : Darken(capsule, 0.08),
-            ["SoftButtonPressedBrush"] = dark ? Lighten(capsule, 0.14) : Darken(capsule, 0.14),
+            ["SoftButtonHoverBrush"] = dark ? Lighten(capsule, 0.10) : Darken(capsule, 0.12),
+            ["SoftButtonPressedBrush"] = dark ? Lighten(capsule, 0.18) : Darken(capsule, 0.22),
 
             // 面板层次：浮层用带 alpha 的莫兰迪色，深色主题叠得更重
             ["PanelFillBrush"] = Alpha(morandi, dark ? (byte)0x2E : (byte)0x1A),

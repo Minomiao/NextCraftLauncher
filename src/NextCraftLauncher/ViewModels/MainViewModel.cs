@@ -1337,7 +1337,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     private void RebuildModVersionFilters()
     {
-        var lines = ModDetailSource()
+        // 版本条始终从全部文件生成：推荐只收窄列表，不应该把其他版本格吞掉。
+        var lines = _allModVersions
             .SelectMany(item => item.Version.GameVersions)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .GroupBy(value => MinecraftVersionOrder.Line(value), StringComparer.OrdinalIgnoreCase)
@@ -1502,7 +1503,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             "beta" => ("Beta", 1),
             "alpha" => ("Alpha", 2),
-            null or "" => ("正式版", 0),
+            null or "" or "release" => ("正式版", 0),
             var other => (other, 3),
         };
 

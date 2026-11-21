@@ -66,6 +66,7 @@
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="20,6" />
             <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="Bold" />
         </Style>
         <!-- 选中态只由共享高亮表达，按钮自身不出现任何色块（含按下） -->
         <Style Selector="Button.accountTab:pointerover /template/ ContentPresenter">

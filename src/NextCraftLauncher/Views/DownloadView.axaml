@@ -498,40 +498,26 @@
                                        Classes="meta" />
 
                             <!-- 版本条：推荐 + 全部 + 该模组支持过的游戏版本，横向滚动 -->
-                            <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                <ScrollViewer HorizontalScrollBarVisibility="Hidden"
-                                              VerticalScrollBarVisibility="Disabled"
-                                              IsVisible="{Binding ShowModVersionFilters}">
-                                    <ItemsControl ItemsSource="{Binding ModVersionFilters}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Horizontal" Spacing="4" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:ModVersionFilterViewModel">
-                                                <Button Classes="chip"
-                                                        Classes.selected="{Binding IsSelected}"
-                                                        Content="{Binding Name}"
-                                                        Command="{Binding SelectCommand}" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
-
-                                <!-- 选中「推荐」时，右侧选择按哪个已安装版本匹配 -->
-                                <ComboBox Grid.Column="1"
-                                          Classes="toolbar"
-                                          Width="180"
-                                          ItemsSource="{Binding ModRecommendVersions}"
-                                          SelectedIndex="{Binding SelectedModRecommendVersionIndex}"
-                                          IsVisible="{Binding ShowModRecommendPicker}" />
-                                <TextBlock Grid.Column="1"
-                                           Text="尚未安装游戏版本"
-                                           Classes="meta"
-                                           VerticalAlignment="Center"
-                                           IsVisible="{Binding ShowModRecommendHint}" />
-                            </Grid>
+                            <ScrollViewer Grid.Row="3"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Disabled"
+                                          IsVisible="{Binding ShowModVersionFilters}">
+                                <ItemsControl ItemsSource="{Binding ModVersionFilters}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="4" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ModVersionFilterViewModel">
+                                            <Button Classes="chip"
+                                                    Classes.selected="{Binding IsSelected}"
+                                                    Content="{Binding Name}"
+                                                    Command="{Binding SelectCommand}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
 
                             <ListBox Grid.Row="4"
                                      Classes="versionList"

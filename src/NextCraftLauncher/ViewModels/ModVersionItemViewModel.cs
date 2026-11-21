@@ -43,7 +43,12 @@ public partial class ModVersionItemViewModel : ObservableObject
     }
 
     /// <summary>前置 Mod 的名字；加载完成后由 ViewModel 填入。</summary>
-    [ObservableProperty] private string _dependencyText = string.Empty;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDependency))]
+    private string _dependencyText = string.Empty;
+
+    /// <summary>有前置时才占一行，避免空行把行高拉大。</summary>
+    public bool HasDependency => !string.IsNullOrEmpty(DependencyText);
 
     public IRelayCommand DownloadCommand { get; }
 

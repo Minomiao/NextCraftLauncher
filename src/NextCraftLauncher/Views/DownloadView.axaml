@@ -53,6 +53,39 @@
             <Setter Property="Background" Value="Transparent" />
         </Style>
 
+        <!-- 模组详情页展开后的文件行：与分组标题共用悬停反馈 -->
+        <Style Selector="Border.modRow">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBoxItem:pointerover Border.modRow">
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
+        </Style>
+
+        <!-- 版本条：一格一条游戏版本，选中时用胶囊色 -->
+        <Style Selector="Button.chip">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.chip.selected">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonBrush}" />
+        </Style>
+        <Style Selector="Button.chip:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />
+            <Setter Property="CornerRadius" Value="12" />
+        </Style>
+        <Style Selector="Button.chip.selected:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonBrush}" />
+            <Setter Property="CornerRadius" Value="12" />
+        </Style>
+
         <!-- 翻页按钮：无边框、无底色，只保留图标 -->
         <Style Selector="Button.pager">
             <Setter Property="Background" Value="Transparent" />
@@ -444,7 +477,7 @@
                         </Grid>
 
                         <!-- 项目详情：版本列表 -->
-                        <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10"
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="10"
                               IsVisible="{Binding IsModDetailOpen}">
 
                             <TextBlock Text="{Binding ModDetailTitle}"
@@ -464,32 +497,101 @@
                                        Text="{Binding ModDetailStatus}"
                                        Classes="meta" />
 
-                            <ListBox Grid.Row="3"
+                            <!-- 版本条：推荐 + 全部 + 该模组支持过的游戏版本，横向滚动 -->
+                            <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <ScrollViewer HorizontalScrollBarVisibility="Hidden"
+                                              VerticalScrollBarVisibility="Disabled"
+                                              IsVisible="{Binding ShowModVersionFilters}">
+                                    <ItemsControl ItemsSource="{Binding ModVersionFilters}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="4" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ModVersionFilterViewModel">
+                                                <Button Classes="chip"
+                                                        Classes.selected="{Binding IsSelected}"
+                                                        Content="{Binding Name}"
+                                                        Command="{Binding SelectCommand}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+
+                                <!-- 选中「推荐」时，右侧选择按哪个已安装版本匹配 -->
+                                <ComboBox Grid.Column="1"
+                                          Classes="toolbar"
+                                          Width="180"
+                                          ItemsSource="{Binding ModRecommendVersions}"
+                                          SelectedIndex="{Binding SelectedModRecommendVersionIndex}"
+                                          IsVisible="{Binding ShowModRecommendPicker}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="尚未安装游戏版本"
+                                           Classes="meta"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding ShowModRecommendHint}" />
+                            </Grid>
+
+                            <ListBox Grid.Row="4"
                                      Classes="versionList"
-                                     ItemsSource="{Binding ModVersions}"
+                                     ItemsSource="{Binding ModVersionRows}"
                                      Background="Transparent"
                                      Padding="0,0,14,0">
                                 <ListBox.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:ModVersionItemViewModel">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Title}"
-                                                           TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Subtitle}"
-                                                           FontSize="11"
-                                                           Opacity="0.56"
-                                                           TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding DependencyText}"
-                                                           FontSize="11"
-                                                           Opacity="0.56"
-                                                           TextTrimming="CharacterEllipsis" />
-                                            </StackPanel>
-                                            <Button Grid.Column="1"
-                                                    Classes="soft"
-                                                    Content="下载"
-                                                    Height="28"
-                                                    Padding="14,0"
-                                                    Command="{Binding DownloadCommand}" />
+                                    <DataTemplate x:DataType="vm:ModVersionListRowViewModel">
+                                        <Grid>
+                                            <!-- 分组标题：加载器 · 发布类型，点击展开/收起 -->
+                                            <Button IsVisible="{Binding IsHeader}"
+                                                    Classes="versionRow loaderHeader"
+                                                    Command="{Binding ToggleCommand}">
+                                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                                                    <TextBlock Text="{Binding Chevron}"
+                                                               FontSize="10"
+                                                               Width="10"
+                                                               Opacity="0.4"
+                                                               VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Title}"
+                                                               Classes="section"
+                                                               FontSize="13"
+                                                               VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding CountText}"
+                                                               FontSize="11"
+                                                               Opacity="0.56"
+                                                               VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Button>
+
+                                            <!-- 文件行：缩进与分组标题对齐（16 外边距 + 8 内边距 = 标题左边） -->
+                                            <Border IsVisible="{Binding IsVersion}"
+                                                    Classes="modRow"
+                                                    Margin="16,0,0,0">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Version.Title}"
+                                                                   FontSize="13"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Version.Subtitle}"
+                                                                   FontSize="11"
+                                                                   Opacity="0.56"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Version.DependencyText}"
+                                                                   FontSize="11"
+                                                                   Opacity="0.56"
+                                                                   IsVisible="{Binding Version.HasDependency}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <Button Grid.Column="1"
+                                                            Classes="soft"
+                                                            Content="下载"
+                                                            Height="28"
+                                                            Padding="14,0"
+                                                            VerticalAlignment="Center"
+                                                            Command="{Binding Version.DownloadCommand}" />
+                                                </Grid>
+                                            </Border>
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>

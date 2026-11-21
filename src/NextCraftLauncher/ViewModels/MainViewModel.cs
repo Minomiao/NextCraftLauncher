@@ -366,6 +366,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public RangeObservableCollection<RemoteVersionListRowViewModel> RemoteVersionRows { get; } = new();
 
+    /// <summary>模组详情页顶部的版本条：全部 + 该模组支持过的各游戏版本。</summary>
+    public RangeObservableCollection<ModVersionFilterViewModel> ModVersionFilters { get; } = new();
+
+    public bool ShowModVersionFilters => ModVersionFilters.Count > 1;
+
+    /// <summary>版本条「推荐」的标识值，与普通版本线区分。</summary>
+    private const string RecommendFilter = "\u0001recommend";
+
+    private readonly List<ModVersionItemViewModel> _allModVersions = new();
+    private string? _selectedModVersionFilter;
+
     /// <summary>版本详情页里的加载器分组（Forge / Fabric / NeoForge）。</summary>
     public ObservableCollection<LoaderVersionGroupViewModel> LoaderGroups { get; } = new();
 
@@ -956,12 +967,28 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public RangeObservableCollection<ModProjectItemViewModel> ModProjects { get; } = new();
 
-    public ObservableCollection<ModVersionItemViewModel> ModVersions { get; } = new();
+    /// <summary>模组详情页的扁平行：可折叠分组标题 + 文件行。</summary>
+    public RangeObservableCollection<ModVersionListRowViewModel> ModVersionRows { get; } = new();
+
+    /// <summary>当前展开的分组（加载器 + 发布类型），跨筛选保留。</summary>
+    private readonly HashSet<string> _expandedModVersionGroups = new(StringComparer.Ordinal);
 
     /// <summary>搜索时可选的原版版本；在打开 Mod 页时用本地版本填充。</summary>
     public ObservableCollection<string> ModGameVersions { get; } = new();
 
     public IReadOnlyList<string> ModSources { get; } = new[] { "全部", "CurseForge", "Modrinth" };
+
+    /// <summary>「推荐」里可选的目标：已安装版本的游戏版本号（去重、从新到旧）。</summary>
+    public ObservableCollection<string> ModRecommendVersions { get; } = new();
+
+    [ObservableProperty] private int _selectedModRecommendVersionIndex = -1;
+
+    /// <summary>版本条当前是否选中「推荐」（按已安装版本匹配）。</summary>
+    [ObservableProperty] private bool _isModRecommendSelected;
+
+    public bool ShowModRecommendPicker => IsModRecommendSelected && ModRecommendVersions.Count > 0;
+
+    public bool ShowModRecommendHint => IsModRecommendSelected && ModRecommendVersions.Count == 0;
 
     public IReadOnlyList<string> ModLoaderOptions { get; } = new[] { "全部", "Forge", "Fabric", "NeoForge", "Quilt" };
 
@@ -1020,6 +1047,45 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ? ModLoaderOptions[SelectedModLoaderIndex]
             : null;
 
+    /// <summary>「推荐」选中的目标游戏版本。</summary>
+    private string? RecommendedGameVersion =>
+        SelectedModRecommendVersionIndex >= 0 && SelectedModRecommendVersionIndex < ModRecommendVersions.Count
+            ? ModRecommendVersions[SelectedModRecommendVersionIndex]
+            : null;
+
+    /// <summary>已安装版本中与目标游戏版本对应的加载器标签（可能多个）。</summary>
+    private List<string> RecommendedLoaderTags()
+    {
+        var gameVersion = RecommendedGameVersion;
+        if (string.IsNullOrWhiteSpace(gameVersion)) return new List<string>();
+
+        var tags = new List<string>();
+
+        foreach (var version in Versions)
+        {
+            if (!string.Equals(version.Summary.ClientVersion, gameVersion, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            foreach (var tag in ModCatalog.LoaderTags(version.Summary.Loader))
+            {
+                if (!tags.Contains(tag, StringComparer.OrdinalIgnoreCase)) tags.Add(tag);
+            }
+        }
+
+        return tags;
+    }
+
+    partial void OnSelectedModRecommendVersionIndexChanged(int value)
+    {
+        if (IsModRecommendSelected) ApplyModVersionFilter();
+    }
+
+    partial void OnIsModRecommendSelectedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowModRecommendPicker));
+        OnPropertyChanged(nameof(ShowModRecommendHint));
+    }
+
     /// <summary>用本地版本填充搜索筛选，并默认跟随当前选中的版本（与 PCL2 一致）。</summary>
     private void UpdateModFiltersFromSelection()
     {
@@ -1056,6 +1122,36 @@ public partial class MainViewModel : ObservableObject, IDisposable
             "Quilt" => 4,
             _ => 0,
         };
+
+        ModRecommendVersions.Clear();
+        foreach (var clientVersion in Versions
+                     .Select(version => version.Summary.ClientVersion)
+                     .Where(value => !string.IsNullOrWhiteSpace(value))
+                     .Select(value => value!)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderByDescending(value => value, MinecraftVersionOrder.Comparer))
+        {
+            ModRecommendVersions.Add(clientVersion);
+        }
+
+        var currentGameVersion = SelectedVersion?.Summary.ClientVersion;
+        var recommendIndex = 0;
+        if (!string.IsNullOrWhiteSpace(currentGameVersion))
+        {
+            for (var i = 0; i < ModRecommendVersions.Count; i++)
+            {
+                if (!string.Equals(ModRecommendVersions[i], currentGameVersion, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                recommendIndex = i;
+                break;
+            }
+        }
+
+        SelectedModRecommendVersionIndex = ModRecommendVersions.Count == 0 ? -1 : recommendIndex;
+
+        OnPropertyChanged(nameof(ShowModRecommendPicker));
+        OnPropertyChanged(nameof(ShowModRecommendHint));
     }
 
     [RelayCommand]
@@ -1156,7 +1252,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsModDetailOpen = true;
         ModDetailTitle = item.Name;
         ModDetailDescription = item.Description;
-        ModVersions.Clear();
+        ModVersionRows.Clear();
+        _allModVersions.Clear();
+        ModVersionFilters.Clear();
+        _expandedModVersionGroups.Clear();
+        _selectedModVersionFilter = null;
+        OnPropertyChanged(nameof(ShowModVersionFilters));
         _ = LoadModVersionsAsync(item);
     }
 
@@ -1184,25 +1285,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             if (cts.IsCancellationRequested) return;
 
-            var ordered = versions
-                .OrderByDescending(version => version.Published ?? DateTimeOffset.MinValue)
-                .ToList();
-
-            var items = new List<ModVersionItemViewModel>(ordered.Count);
-            foreach (var version in ordered)
+            _allModVersions.Clear();
+            foreach (var version in versions)
             {
                 var vm = new ModVersionItemViewModel(version, item => _ = DownloadModVersionAsync(item));
                 if (version.Dependencies.Count > 0)
                     vm.DependencyText = $"{version.Dependencies.Count} 项前置";
-                ModVersions.Add(vm);
-                items.Add(vm);
+
+                _allModVersions.Add(vm);
             }
 
-            ModDetailStatus = items.Count == 0
-                ? "该 Mod 没有可用文件"
-                : $"共 {items.Count} 个文件";
+            RebuildModVersionFilters();
+            ApplyModVersionFilter();
 
-            _ = FillDependencyTextAsync(item.Project.Platform, items, cts.Token);
+            _ = FillDependencyTextAsync(item.Project.Platform, _allModVersions.ToList(), cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -1211,6 +1307,234 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             ModDetailStatus = "获取版本失败：" + exception.Message;
         }
+    }
+
+    /// <summary>
+    /// 详情页可选的文件集：推荐模式下先按目标版本的版本号 + 加载器筛选，
+    /// 其余模式就是全部文件。
+    /// </summary>
+    private List<ModVersionItemViewModel> ModDetailSource()
+    {
+        if (!IsModRecommendSelected) return _allModVersions;
+
+        var gameVersion = RecommendedGameVersion;
+        var tags = RecommendedLoaderTags();
+
+        return _allModVersions
+            .Where(item =>
+                (string.IsNullOrWhiteSpace(gameVersion) ||
+                 item.Version.GameVersions.Any(value =>
+                     string.Equals(value, gameVersion, StringComparison.OrdinalIgnoreCase))) &&
+                (tags.Count == 0 ||
+                 item.Version.Loaders.Any(value =>
+                     tags.Any(tag => string.Equals(tag, value, StringComparison.OrdinalIgnoreCase)))))
+            .ToList();
+    }
+
+    /// <summary>
+    /// 重建模组版本条：把同一个大版本的文件并成一格（<c>1.21</c> 涵盖 1.21 / 1.21.1 …），
+    /// 再按该线下的最高版本从新到旧排列。
+    /// </summary>
+    private void RebuildModVersionFilters()
+    {
+        var lines = ModDetailSource()
+            .SelectMany(item => item.Version.GameVersions)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .GroupBy(value => MinecraftVersionOrder.Line(value), StringComparer.OrdinalIgnoreCase)
+            .Select(group => new
+            {
+                Line = group.Key,
+                Newest = group.OrderByDescending(value => value, MinecraftVersionOrder.Comparer).First(),
+            })
+            .Where(entry => entry.Line.Length > 0)
+            .OrderByDescending(entry => entry.Newest, MinecraftVersionOrder.Comparer)
+            .Select(entry => entry.Line)
+            .ToList();
+
+        if (_selectedModVersionFilter is { Length: > 0 } selected &&
+            !lines.Contains(selected, StringComparer.OrdinalIgnoreCase))
+        {
+            _selectedModVersionFilter = null;
+        }
+
+        var filters = new List<ModVersionFilterViewModel>(lines.Count + 2)
+        {
+            new(RecommendFilter, "推荐", SelectModVersionFilter)
+            {
+                IsRecommend = true,
+                IsSelected = IsModRecommendSelected,
+            },
+            new(null, "全部", SelectModVersionFilter)
+            {
+                IsSelected = !IsModRecommendSelected && _selectedModVersionFilter is null,
+            },
+        };
+
+        foreach (var line in lines)
+        {
+            filters.Add(new ModVersionFilterViewModel(line, line, SelectModVersionFilter)
+            {
+                IsSelected = !IsModRecommendSelected &&
+                             string.Equals(line, _selectedModVersionFilter, StringComparison.OrdinalIgnoreCase),
+            });
+        }
+
+        ModVersionFilters.ReplaceAll(filters);
+        OnPropertyChanged(nameof(ShowModVersionFilters));
+    }
+
+    /// <summary>按选中的游戏版本过滤，再按「加载器 × 发布类型」分组，组内按版本从新到旧。</summary>
+    private void ApplyModVersionFilter()
+    {
+        ModVersionRows.Clear();
+
+        var source = ModDetailSource();
+        var filtered = !IsModRecommendSelected && _selectedModVersionFilter is { Length: > 0 } line
+            ? source.Where(item => item.Version.GameVersions.Any(value =>
+                string.Equals(MinecraftVersionOrder.Line(value), line, StringComparison.OrdinalIgnoreCase)))
+            : source;
+
+        var ordered = filtered
+            .OrderByDescending(item => NewestGameVersion(item.Version), MinecraftVersionOrder.Comparer)
+            .ThenByDescending(item => item.Version.Published ?? DateTimeOffset.MinValue)
+            .ToList();
+
+        foreach (var group in ordered
+                     .GroupBy(item =>
+                     {
+                         var (loader, loaderOrder) = LoaderOf(item.Version);
+                         var (release, releaseOrder) = ReleaseTypeOf(item.Version.ReleaseType);
+                         return (Loader: loader, LoaderOrder: loaderOrder,
+                                 Release: release, ReleaseOrder: releaseOrder);
+                     })
+                     .OrderBy(group => group.Key.LoaderOrder)
+                     .ThenBy(group => group.Key.ReleaseOrder))
+        {
+            var items = group.ToList();
+            var key = $"{group.Key.Loader}|{group.Key.Release}";
+            var expanded = _expandedModVersionGroups.Contains(key);
+
+            ModVersionRows.Add(ModVersionListRowViewModel.CreateHeader(
+                key, $"{group.Key.Loader} · {group.Key.Release}", items, expanded, ToggleModVersionGroup));
+
+            if (!expanded) continue;
+
+            foreach (var item in items)
+                ModVersionRows.Add(ModVersionListRowViewModel.CreateVersion(item));
+        }
+
+        if (source.Count == 0)
+        {
+            ModDetailStatus = IsModRecommendSelected
+                ? "该 Mod 没有适配此版本的文件"
+                : "该 Mod 没有可用文件";
+        }
+        else if (_selectedModVersionFilter is null)
+        {
+            ModDetailStatus = $"共 {source.Count} 个文件";
+        }
+        else
+        {
+            ModDetailStatus = $"显示 {ordered.Count} / {source.Count} 个文件";
+        }
+    }
+
+    private void ToggleModVersionGroup(string key)
+    {
+        var index = -1;
+        for (var i = 0; i < ModVersionRows.Count; i++)
+        {
+            if (ModVersionRows[i].IsHeader && string.Equals(ModVersionRows[i].Key, key, StringComparison.Ordinal))
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0) return;
+
+        var header = ModVersionRows[index];
+        var expanded = !header.IsExpanded;
+        header.IsExpanded = expanded;
+
+        if (expanded)
+        {
+            _expandedModVersionGroups.Add(key);
+            for (var i = 0; i < header.Items.Count; i++)
+                ModVersionRows.Insert(index + 1 + i, ModVersionListRowViewModel.CreateVersion(header.Items[i]));
+        }
+        else
+        {
+            _expandedModVersionGroups.Remove(key);
+            while (index + 1 < ModVersionRows.Count && !ModVersionRows[index + 1].IsHeader)
+                ModVersionRows.RemoveAt(index + 1);
+        }
+    }
+
+    /// <summary>文件所属加载器：多个加载器时取第一个认识的，未知时用原值，未标注时单独一组。</summary>
+    private static (string Label, int Order) LoaderOf(ModVersion version)
+    {
+        foreach (var raw in version.Loaders)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+
+            switch (raw.Trim().ToLowerInvariant())
+            {
+                case "fabric": return ("Fabric", 0);
+                case "quilt": return ("Quilt", 1);
+                case "neoforge": return ("NeoForge", 2);
+                case "forge": return ("Forge", 3);
+                case "liteloader": return ("LiteLoader", 4);
+            }
+        }
+
+        if (version.Loaders.Count == 0) return ("未标注加载器", 6);
+
+        var first = version.Loaders[0].Trim();
+        return (first.Length == 0
+            ? "未标注加载器"
+            : char.ToUpperInvariant(first[0]) + first[1..], 5);
+    }
+
+    /// <summary>发布类型：正式版 / Beta / Alpha，未知类型用原值排在最后。</summary>
+    private static (string Label, int Order) ReleaseTypeOf(string? releaseType) =>
+        releaseType?.Trim().ToLowerInvariant() switch
+        {
+            "beta" => ("Beta", 1),
+            "alpha" => ("Alpha", 2),
+            null or "" => ("正式版", 0),
+            var other => (other, 3),
+        };
+
+    private void SelectModVersionFilter(string? line)
+    {
+        var recommend = string.Equals(line, RecommendFilter, StringComparison.Ordinal);
+        IsModRecommendSelected = recommend;
+        _selectedModVersionFilter = recommend || string.IsNullOrWhiteSpace(line) ? null : line;
+
+        foreach (var filter in ModVersionFilters)
+        {
+            filter.IsSelected = recommend
+                ? filter.IsRecommend
+                : !filter.IsRecommend && string.Equals(filter.Line, _selectedModVersionFilter,
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        ApplyModVersionFilter();
+    }
+
+    /// <summary>该文件支持的最高游戏版本；没有标注时返回空串（排序时落到底部）。</summary>
+    private static string NewestGameVersion(ModVersion version)
+    {
+        var newest = string.Empty;
+
+        foreach (var value in version.GameVersions)
+        {
+            if (string.IsNullOrWhiteSpace(value)) continue;
+            if (newest.Length == 0 || MinecraftVersionOrder.Compare(value, newest) > 0) newest = value;
+        }
+
+        return newest;
     }
 
     /// <summary>把前置 Mod 的 ID 换成名字，仅用于展示（PCL2 也不会自动下载单个 Mod 的前置）。</summary>

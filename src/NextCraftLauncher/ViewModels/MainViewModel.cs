@@ -1384,7 +1384,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowModVersionFilters));
     }
 
-    /// <summary>按选中的游戏版本过滤，再按「加载器 × 发布类型」分组，组内按版本从新到旧。</summary>
+    /// <summary>
+    /// 按选中的游戏版本过滤，再按「游戏版本线 × 加载器 × 正式/预览」分组；
+    /// 组标题形如 <c>NeoForge 26.3</c>、<c>Fabric 26.3 预览版</c>，组内按版本从新到旧。
+    /// </summary>
     private void ApplyModVersionFilter()
     {
         ModVersionRows.Clear();
@@ -1404,19 +1407,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
                      .GroupBy(item =>
                      {
                          var (loader, loaderOrder) = LoaderOf(item.Version);
-                         var (release, releaseOrder) = ReleaseTypeOf(item.Version.ReleaseType);
-                         return (Loader: loader, LoaderOrder: loaderOrder,
-                                 Release: release, ReleaseOrder: releaseOrder);
+                         return (Line: VersionLineOf(item.Version), Loader: loader, LoaderOrder: loaderOrder,
+                                 Preview: IsPreviewRelease(item.Version.ReleaseType));
                      })
-                     .OrderBy(group => group.Key.LoaderOrder)
-                     .ThenBy(group => group.Key.ReleaseOrder))
+                     .OrderByDescending(group => group.Key.Line, MinecraftVersionOrder.Comparer)
+                     .ThenBy(group => group.Key.Preview)
+                     .ThenBy(group => group.Key.LoaderOrder))
         {
             var items = group.ToList();
-            var key = $"{group.Key.Loader}|{group.Key.Release}";
+            var key = $"{group.Key.Line}|{group.Key.Loader}|{group.Key.Preview}";
             var expanded = _expandedModVersionGroups.Contains(key);
 
+            var title = group.Key.Line.Length == 0
+                ? group.Key.Loader
+                : $"{group.Key.Loader} {group.Key.Line}";
+            if (group.Key.Preview) title += " 预览版";
+
             ModVersionRows.Add(ModVersionListRowViewModel.CreateHeader(
-                key, $"{group.Key.Loader} · {group.Key.Release}", items, expanded, ToggleModVersionGroup));
+                key, title, items, expanded, ToggleModVersionGroup));
 
             if (!expanded) continue;
 
@@ -1472,6 +1480,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>该文件所属的版本线（支持的最新游戏版本所属的线）。</summary>
+    private static string VersionLineOf(ModVersion version)
+    {
+        var newest = NewestGameVersion(version);
+        return newest.Length == 0 ? string.Empty : MinecraftVersionOrder.Line(newest);
+    }
+
+    /// <summary>Beta / Alpha 统一归到「预览版」。</summary>
+    private static bool IsPreviewRelease(string? releaseType) =>
+        releaseType?.Trim().ToLowerInvariant() is "beta" or "alpha";
+
     /// <summary>文件所属加载器：多个加载器时取第一个认识的，未知时用原值，未标注时单独一组。</summary>
     private static (string Label, int Order) LoaderOf(ModVersion version)
     {
@@ -1481,10 +1500,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             switch (raw.Trim().ToLowerInvariant())
             {
-                case "fabric": return ("Fabric", 0);
-                case "quilt": return ("Quilt", 1);
-                case "neoforge": return ("NeoForge", 2);
-                case "forge": return ("Forge", 3);
+                case "neoforge": return ("NeoForge", 0);
+                case "fabric": return ("Fabric", 1);
+                case "forge": return ("Forge", 2);
+                case "quilt": return ("Quilt", 3);
                 case "liteloader": return ("LiteLoader", 4);
             }
         }
@@ -1496,16 +1515,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ? "未标注加载器"
             : char.ToUpperInvariant(first[0]) + first[1..], 5);
     }
-
-    /// <summary>发布类型：正式版 / Beta / Alpha，未知类型用原值排在最后。</summary>
-    private static (string Label, int Order) ReleaseTypeOf(string? releaseType) =>
-        releaseType?.Trim().ToLowerInvariant() switch
-        {
-            "beta" => ("Beta", 1),
-            "alpha" => ("Alpha", 2),
-            null or "" or "release" => ("正式版", 0),
-            var other => (other, 3),
-        };
 
     private void SelectModVersionFilter(string? line)
     {

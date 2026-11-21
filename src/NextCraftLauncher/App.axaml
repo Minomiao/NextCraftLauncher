@@ -21,7 +21,7 @@
         <!-- 极细分割线，替代卡片边框 -->
         <Style Selector="Border.hline">
             <Setter Property="Height" Value="1" />
-            <Setter Property="Background" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="Background" Value="{DynamicResource DividerBrush}" />
         </Style>
 
         <!-- 任务卡片：任务页里每个下载任务一张，后续新增任务沿用同一外观 -->
@@ -102,6 +102,9 @@
         <Style Selector="Button.side:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />
         </Style>
+        <Style Selector="Button.side:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonPressedBrush}" />
+        </Style>
 
         <!-- 次按钮：沿用主题自带的灰底，无边框 -->
         <Style Selector="Button.soft">
@@ -138,14 +141,12 @@
             <Setter Property="CornerRadius" Value="8" />
         </Style>
         <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource AccentFillBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillHoverBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
-            <Setter Property="Opacity" Value="0.9" />
         </Style>
         <Style Selector="Button.primary:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource AccentFillBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillPressedBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
-            <Setter Property="Opacity" Value="0.78" />
         </Style>
 
         <!-- 强调色描边按钮：透明底 + 强调色边框与文字 -->
@@ -157,30 +158,26 @@
             <Setter Property="CornerRadius" Value="8" />
         </Style>
         <Style Selector="Button.outline:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource AccentFillBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillHoverBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
-            <Setter Property="Opacity" Value="0.9" />
         </Style>
         <Style Selector="Button.outline:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource AccentFillBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillPressedBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource OnFillTextBrush}" />
-            <Setter Property="Opacity" Value="0.78" />
         </Style>
 
         <!-- 不能启动时按钮变灰，但仍可点击（点击后用 notice 卡片说明原因） -->
         <Style Selector="Button.primary.disabled">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <Setter Property="Background" Value="{DynamicResource MutedFillBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
         </Style>
         <Style Selector="Button.primary.disabled:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-            <Setter Property="Opacity" Value="0.9" />
+            <Setter Property="Background" Value="{DynamicResource MutedFillHoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
         </Style>
         <Style Selector="Button.primary.disabled:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-            <Setter Property="Opacity" Value="0.78" />
+            <Setter Property="Background" Value="{DynamicResource MutedFillPressedBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
         </Style>
 
         <Style Selector="Button.danger">

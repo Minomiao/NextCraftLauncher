@@ -162,7 +162,7 @@
 
             <Border Height="1"
                     VerticalAlignment="Bottom"
-                    Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+                    Background="{DynamicResource DividerBrush}" />
         </Grid>
 
         <!-- 主体 -->

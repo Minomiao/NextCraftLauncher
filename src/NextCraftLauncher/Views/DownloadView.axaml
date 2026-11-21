@@ -26,7 +26,7 @@
             <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
         </Style>
         <Style Selector="Button.versionRow:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource PanelFillBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillPressedBrush}" />
         </Style>
 
         <!-- 加载器分组行只有图标和一行标题，内边距取 8 才能上/左/下等距 -->

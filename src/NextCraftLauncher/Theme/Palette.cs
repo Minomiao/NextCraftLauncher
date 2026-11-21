@@ -42,6 +42,7 @@ public static class Palette
     /// <summary>所有资源键；每个键对应一个长期存在的画刷实例。</summary>
     private static readonly string[] Keys =
     {
+        // 固定色
         "ErrorFillBrush",
         "ErrorFillHoverBrush",
         "ErrorFillPressedBrush",
@@ -49,28 +50,51 @@ public static class Palette
         "WarningFillBrush",
         "WarningTextBrush",
         "OnFillTextBrush",
+
+        // 中性工具色
         "OverlayMaskBrush",
         "ImagePlaceholderBrush",
+        "DividerBrush",
         "TaskCardBackgroundBrush",
         "TaskCardBorderBrush",
+
+        // 不可用（完整的实底家族）
+        "MutedFillBrush",
+        "MutedFillHoverBrush",
+        "MutedFillPressedBrush",
+        "MutedTextBrush",
+
+        // 行内按钮高亮
         "RowActionBackgroundBrush",
         "RowActionBackgroundHoverBrush",
         "RowActionBackgroundPressedBrush",
+
+        // 强调色
         "AccentFillBrush",
+        "AccentFillHoverBrush",
+        "AccentFillPressedBrush",
         "AccentTextBrush",
         "AccentBorderBrush",
+
+        // 页面
         "PageBackgroundBrush",
+
+        // 胶囊
         "SoftButtonBrush",
         "SoftButtonHoverBrush",
+        "SoftButtonPressedBrush",
+
+        // 面板层次
         "PanelFillBrush",
         "PanelFillHoverBrush",
+        "PanelFillPressedBrush",
     };
 
     private static readonly Dictionary<string, SolidColorBrush> LightBrushes = CreateBrushes();
     private static readonly Dictionary<string, SolidColorBrush> DarkBrushes = CreateBrushes();
 
-    /// <summary>缓存格式版本；变种算法变了就改这个值，旧缓存自动失效。</summary>
-    private const int CacheVersion = 8;
+    /// <summary>缓存格式版本；变种算法或 token 集合变了就改这个值，旧缓存自动失效。</summary>
+    private const int CacheVersion = 11;
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -280,6 +304,8 @@ public static class Palette
     private static Dictionary<string, Color> Compute(PaletteSeed seed, bool dark, Color accent)
     {
         var morandi = dark ? MorandiDark(accent) : Morandi(accent);
+        var capsule = Capsule(accent, dark);
+        var muted = MutedBase(seed.Neutral, dark);
 
         return new Dictionary<string, Color>
         {
@@ -292,8 +318,10 @@ public static class Palette
             ["WarningTextBrush"] = WarningFill,
             ["OnFillTextBrush"] = OnFillText,
 
-            // 强调色：三个角色同色，将来要分别调时只改这里
+            // 强调色：填充带 hover / pressed 两档，文字与描边同色
             ["AccentFillBrush"] = accent,
+            ["AccentFillHoverBrush"] = dark ? Lighten(accent, 0.10) : Darken(accent, 0.10),
+            ["AccentFillPressedBrush"] = dark ? Lighten(accent, 0.18) : Darken(accent, 0.18),
             ["AccentTextBrush"] = accent,
             ["AccentBorderBrush"] = accent,
 
@@ -302,21 +330,39 @@ public static class Palette
                 ? dark ? Colors.Transparent : Colors.White
                 : dark ? PaleDark(accent) : Pale(accent),
 
+            // 胶囊：实底，hover / pressed 按明度走
+            ["SoftButtonBrush"] = capsule,
+            ["SoftButtonHoverBrush"] = dark ? Lighten(capsule, 0.08) : Darken(capsule, 0.08),
+            ["SoftButtonPressedBrush"] = dark ? Lighten(capsule, 0.14) : Darken(capsule, 0.14),
+
             // 面板层次：浮层用带 alpha 的莫兰迪色，深色主题叠得更重
-            ["SoftButtonBrush"] = morandi,
-            ["SoftButtonHoverBrush"] = dark ? Lighten(morandi, 0.08) : Darken(morandi, 0.08),
             ["PanelFillBrush"] = Alpha(morandi, dark ? (byte)0x2E : (byte)0x1A),
             ["PanelFillHoverBrush"] = Alpha(morandi, dark ? (byte)0x3D : (byte)0x24),
+            ["PanelFillPressedBrush"] = Alpha(morandi, dark ? (byte)0x4B : (byte)0x2E),
+
+            // 不可用：中性灰实底家族，与主题色无关
+            ["MutedFillBrush"] = muted,
+            ["MutedFillHoverBrush"] = dark ? Lighten(muted, 0.05) : Darken(muted, 0.05),
+            ["MutedFillPressedBrush"] = dark ? Lighten(muted, 0.09) : Darken(muted, 0.09),
+            ["MutedTextBrush"] = Lighten(Grayscale(seed.Neutral), dark ? 0.10 : 0.35),
 
             // 由种子派生
             ["OverlayMaskBrush"] = Alpha(Colors.Black, 0x66),
             ["ImagePlaceholderBrush"] = Alpha(Grayscale(seed.Neutral), 0x24),
+            ["DividerBrush"] = Alpha(dark ? Colors.White : Colors.Black, dark ? (byte)0x38 : (byte)0x2A),
             ["TaskCardBackgroundBrush"] = dark ? Alpha(Colors.White, 0x2A) : seed.CardSurface,
             ["TaskCardBorderBrush"] = dark ? Alpha(Colors.White, 0x33) : seed.CardBorder,
             ["RowActionBackgroundBrush"] = Alpha(morandi, dark ? (byte)0x2E : (byte)0x14),
             ["RowActionBackgroundHoverBrush"] = Alpha(morandi, dark ? (byte)0x40 : (byte)0x1F),
             ["RowActionBackgroundPressedBrush"] = Alpha(morandi, dark ? (byte)0x52 : (byte)0x29),
         };
+    }
+
+    /// <summary>不可用实底：从中性种子去饱和得到，深浅两套各自落在一个可用的明度区间。</summary>
+    private static Color MutedBase(Color neutral, bool dark)
+    {
+        var gray = Grayscale(neutral);
+        return dark ? Darken(gray, 0.70) : Lighten(gray, 0.86);
     }
 
     private static Dictionary<string, SolidColorBrush> CreateBrushes()
@@ -378,6 +424,18 @@ public static class Palette
     {
         var (hue, saturation, value) = ToHsv(color);
         return FromHsv(hue, saturation * 0.35, 0.30 + value * 0.25, color.A);
+    }
+
+    /// <summary>
+    /// 胶囊实底（导航 / 侧栏 / 切页选中）：比莫兰迪实一点、但保持轻。
+    /// H 不变，S 保留 45%，V 取 0.60 + 0.18·V（上限 0.74）；深色取 0.32 + 0.26·V（上限 0.54）。
+    /// </summary>
+    public static Color Capsule(Color color, bool dark)
+    {
+        var (hue, saturation, value) = ToHsv(color);
+        return dark
+            ? FromHsv(hue, saturation * 0.45, Math.Min(0.32 + value * 0.26, 0.54), color.A)
+            : FromHsv(hue, saturation * 0.45, Math.Min(value * 0.18 + 0.60, 0.74), color.A);
     }
 
     /// <summary>暗色变种：向黑色靠拢。</summary>

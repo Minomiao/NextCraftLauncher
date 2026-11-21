@@ -91,12 +91,12 @@
         <Style Selector="TextBox.nameInput /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
             <Setter Property="CornerRadius" Value="0" />
         </Style>
         <Style Selector="TextBox.nameInput:pointerover /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
         </Style>
         <Style Selector="TextBox.nameInput:focus /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="Transparent" />

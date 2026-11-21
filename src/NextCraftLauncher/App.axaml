@@ -91,13 +91,13 @@
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="12,9" />
             <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
         </Style>
         <Style Selector="Button.side.selected">
             <Setter Property="Background" Value="{DynamicResource SoftButtonBrush}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <Style Selector="Button.side:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />

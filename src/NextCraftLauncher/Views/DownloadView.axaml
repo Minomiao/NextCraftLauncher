@@ -688,10 +688,11 @@
                                                        TextTrimming="CharacterEllipsis" />
                                             <Button Grid.Column="1"
                                                     Classes="caption"
-                                                    Content="✕"
                                                     ToolTip.Tip="取消"
                                                     IsVisible="{Binding IsRunning}"
-                                                    Command="{Binding CancelCommand}" />
+                                                    Command="{Binding CancelCommand}">
+                                                <controls:IconView Icon="close" />
+                                            </Button>
                                         </Grid>
 
                                         <ItemsControl ItemsSource="{Binding Steps}" IsVisible="{Binding HasSteps}">

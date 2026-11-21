@@ -42,7 +42,6 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="CornerRadius" Value="14" />
-            <Setter Property="FontSize" Value="11" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
@@ -100,15 +99,8 @@
                             CornerRadius="16"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center">
-                        <!-- 退出/返回图标：SVG 路径描边绘制，不依赖字体 -->
-                        <Path Width="12"
-                              Height="12"
-                              Data="M21 12 H5 M12 5 L5 12 L12 19"
-                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}"
-                              StrokeThickness="1.8"
-                              StrokeLineCap="Round"
-                              StrokeJoin="Round"
-                              Stretch="Uniform" />
+                        <!-- 退出/返回图标：形状来自 Assets/Icons/Ui/back.svg -->
+                        <controls:IconView Icon="back" />
                     </Button>
                 </Panel>
 
@@ -151,13 +143,15 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
                     <Button Classes="caption"
-                            Content="—"
                             ToolTip.Tip="最小化"
-                            Click="OnMinimizeClick" />
+                            Click="OnMinimizeClick">
+                        <controls:IconView Icon="minimize" />
+                    </Button>
                     <Button Classes="caption"
-                            Content="✕"
                             ToolTip.Tip="关闭"
-                            Click="OnCloseClick" />
+                            Click="OnCloseClick">
+                        <controls:IconView Icon="close" />
+                    </Button>
                 </StackPanel>
             </Grid>
 

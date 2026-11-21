@@ -53,16 +53,6 @@
             <Setter Property="Background" Value="Transparent" />
         </Style>
 
-        <!-- 模组详情页展开后的文件行：与分组标题共用悬停反馈 -->
-        <Style Selector="Border.modRow">
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="8,3" />
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <Style Selector="ListBoxItem:pointerover Border.modRow">
-            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
-        </Style>
-
         <!-- 版本条：一格一条游戏版本，选中时用胶囊色 -->
         <Style Selector="Button.chip">
             <Setter Property="Background" Value="Transparent" />
@@ -477,7 +467,7 @@
                         </Grid>
 
                         <!-- 项目详情：版本列表 -->
-                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="10"
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="10"
                               IsVisible="{Binding IsModDetailOpen}">
 
                             <TextBlock Text="{Binding ModDetailTitle}"
@@ -550,38 +540,53 @@
                                                 </Grid>
                                             </Button>
 
-                                            <!-- 文件行：缩进与分组标题对齐（16 外边距 + 8 内边距 = 标题左边） -->
-                                            <Border IsVisible="{Binding IsVersion}"
-                                                    Classes="modRow"
-                                                    Margin="16,0,0,0">
-                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                                    <StackPanel Spacing="2" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding Version.Title}"
-                                                                   FontSize="13"
-                                                                   TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{Binding Version.Subtitle}"
-                                                                   FontSize="11"
-                                                                   Opacity="0.56"
-                                                                   TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{Binding Version.DependencyText}"
-                                                                   FontSize="11"
-                                                                   Opacity="0.56"
-                                                                   IsVisible="{Binding Version.HasDependency}"
-                                                                   TextTrimming="CharacterEllipsis" />
-                                                    </StackPanel>
-                                                    <Button Grid.Column="1"
-                                                            Classes="soft"
-                                                            Content="下载"
-                                                            Height="28"
-                                                            Padding="14,0"
-                                                            VerticalAlignment="Center"
-                                                            Command="{Binding Version.DownloadCommand}" />
+                                            <!-- 文件行：一行，左侧版本名、右侧日期；点击选中后底部出现下载按钮 -->
+                                            <Button IsVisible="{Binding IsVersion}"
+                                                    Classes="versionRow"
+                                                    Classes.selected="{Binding IsSelected}"
+                                                    Margin="16,0,0,0"
+                                                    Command="{Binding SelectCommand}"
+                                                    ToolTip.Tip="{Binding Version.Subtitle}">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                    <TextBlock Text="{Binding Version.Title}"
+                                                               FontSize="13"
+                                                               VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Version.DateText}"
+                                                               FontSize="11"
+                                                               Opacity="0.56"
+                                                               VerticalAlignment="Center" />
                                                 </Grid>
-                                            </Border>
+                                            </Button>
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
+
+                            <!-- 底部的下载栏：未选中时也显示，按钮置灰 -->
+                            <Grid Grid.Row="5"
+                                  ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="8"
+                                  Margin="16,2,14,0">
+                                <StackPanel Spacing="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding SelectedModFileTitle}"
+                                               FontSize="13"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding SelectedModFileFolder}"
+                                               FontSize="11"
+                                               Opacity="0.56"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip.Tip="{Binding SelectedModFileFolder}" />
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Classes="primary"
+                                        Content="下载"
+                                        Height="32"
+                                        Padding="18,0"
+                                        IsEnabled="{Binding HasSelectedModFile}"
+                                        Command="{Binding DownloadSelectedModFileCommand}" />
+                            </Grid>
                         </Grid>
                     </Grid>
 

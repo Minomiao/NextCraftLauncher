@@ -973,6 +973,59 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>当前展开的分组（加载器 + 发布类型），跨筛选保留。</summary>
     private readonly HashSet<string> _expandedModVersionGroups = new(StringComparer.Ordinal);
 
+    /// <summary>模组详情页当前选中的文件；选中后底部出现下载按钮。</summary>
+    [ObservableProperty] private ModVersionItemViewModel? _selectedModFile;
+
+    /// <summary>选中行所属的目标版本（推荐页才有，其它页面为 null）。</summary>
+    [ObservableProperty] private VersionItemViewModel? _selectedModFileTarget;
+
+    public bool HasSelectedModFile => SelectedModFile is not null;
+
+    public string SelectedModFileTitle => SelectedModFile?.Title ?? string.Empty;
+
+    /// <summary>选中文件将落入的目录：带目标版本时给游戏版本的 mods，否则给本机的 mod 库。</summary>
+    public string SelectedModFileFolder
+    {
+        get
+        {
+            if (SelectedModFile is not { } file) return string.Empty;
+
+            if (SelectedModFileTarget is { } target)
+            {
+                return ResolveModsDirectory(target.Summary, file.Version)
+                       ?? "当前版本不兼容，下载时选择位置";
+            }
+
+            return UserModDirectory();
+        }
+    }
+
+    partial void OnSelectedModFileChanged(ModVersionItemViewModel? value)
+    {
+        OnPropertyChanged(nameof(HasSelectedModFile));
+        OnPropertyChanged(nameof(SelectedModFileTitle));
+        OnPropertyChanged(nameof(SelectedModFileFolder));
+    }
+
+    partial void OnSelectedModFileTargetChanged(VersionItemViewModel? value)
+        => OnPropertyChanged(nameof(SelectedModFileFolder));
+
+    /// <summary>选中一行：只高亮这一行，并记住它携带的目标版本。</summary>
+    private void SelectModFileRow(ModVersionListRowViewModel row)
+    {
+        foreach (var item in ModVersionRows)
+            item.IsSelected = ReferenceEquals(item, row);
+
+        SelectedModFile = row.Version;
+        SelectedModFileTarget = row.Target;
+    }
+
+    [RelayCommand]
+    private Task DownloadSelectedModFileAsync()
+        => SelectedModFile is { } file
+            ? DownloadModVersionAsync(file, SelectedModFileTarget)
+            : Task.CompletedTask;
+
     /// <summary>搜索时可选的原版版本；在打开 Mod 页时用本地版本填充。</summary>
     public ObservableCollection<string> ModGameVersions { get; } = new();
 
@@ -1166,6 +1219,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ModVersionFilters.Clear();
         _expandedModVersionGroups.Clear();
         _selectedModVersionFilter = null;
+        SelectedModFile = null;
+        SelectedModFileTarget = null;
         OnPropertyChanged(nameof(ShowModVersionFilters));
         _ = LoadModVersionsAsync(item);
     }
@@ -1197,7 +1252,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _allModVersions.Clear();
             foreach (var version in versions)
             {
-                var vm = new ModVersionItemViewModel(version, item => _ = DownloadModVersionAsync(item));
+                var vm = new ModVersionItemViewModel(version);
                 if (version.Dependencies.Count > 0)
                     vm.DependencyText = $"{version.Dependencies.Count} 项前置";
 
@@ -1222,7 +1277,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// 推荐页的匹配目标：每个已安装版本一组，标题用它在本地列表里的名字。
     /// 没有加载器的原版实例不参与。
     /// </summary>
-    private sealed record RecommendTarget(string Name, string GameVersion, List<string> Loaders);
+    private sealed record RecommendTarget(
+        string Name,
+        string GameVersion,
+        List<string> Loaders,
+        VersionItemViewModel Version);
 
     private List<RecommendTarget> RecommendTargets()
     {
@@ -1236,7 +1295,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var loaders = ModCatalog.LoaderTags(version.Summary.Loader);
             if (loaders.Count == 0) continue;
 
-            targets.Add(new RecommendTarget(version.Id, gameVersion!, loaders));
+            targets.Add(new RecommendTarget(version.Id, gameVersion!, loaders, version));
         }
 
         targets.Sort((left, right) =>
@@ -1316,6 +1375,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ApplyModVersionFilter()
     {
         ModVersionRows.Clear();
+        SelectedModFile = null;
+        SelectedModFileTarget = null;
 
         if (IsModRecommendSelected)
         {
@@ -1360,7 +1421,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             if (!expanded) continue;
 
             foreach (var item in items)
-                ModVersionRows.Add(ModVersionListRowViewModel.CreateVersion(item));
+                ModVersionRows.Add(ModVersionListRowViewModel.CreateVersion(item, null, SelectModFileRow));
         }
 
         if (source.Count == 0)
@@ -1403,12 +1464,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var expanded = _expandedModVersionGroups.Contains(key);
 
             ModVersionRows.Add(ModVersionListRowViewModel.CreateHeader(
-                key, target.Name, items, expanded, ToggleModVersionGroup));
+                key, target.Version.Id, items, expanded, ToggleModVersionGroup, target.Version));
 
             if (!expanded) continue;
 
             foreach (var item in items)
-                ModVersionRows.Add(ModVersionListRowViewModel.CreateVersion(item));
+                ModVersionRows.Add(ModVersionListRowViewModel.CreateVersion(item, target.Version, SelectModFileRow));
         }
 
         ModDetailStatus = matched.Count == 0
@@ -1438,7 +1499,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             _expandedModVersionGroups.Add(key);
             for (var i = 0; i < header.Items.Count; i++)
-                ModVersionRows.Insert(index + 1 + i, ModVersionListRowViewModel.CreateVersion(header.Items[i]));
+                ModVersionRows.Insert(index + 1 + i,
+                    ModVersionListRowViewModel.CreateVersion(header.Items[i], header.Target, SelectModFileRow));
         }
         else
         {
@@ -1546,10 +1608,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async Task DownloadModVersionAsync(ModVersionItemViewModel item)
+    private async Task DownloadModVersionAsync(ModVersionItemViewModel item, VersionItemViewModel? targetVersion)
     {
         var version = item.Version;
-        var target = ResolveModTargetPath(version);
+
+        // 推荐页：落到该行的目标版本；其余页面：存进 NCL/user/mods/<mod 名>/
+        var target = targetVersion is not null
+            ? ResolveModTargetPath(targetVersion.Summary, version)
+            : ResolveUserModPath(version);
 
         if (target is null)
         {
@@ -1614,36 +1680,67 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>
-    /// 计算下载目标：当前选中版本兼容时直接放进它的 mods 目录（已隔离则放版本目录），
-    /// 否则返回 null，由调用方让用户选择位置。兼容性判断与 PCL2 一致：
-    /// 游戏版本匹配，且 Mod 支持当前加载器。
-    /// </summary>
-    private string? ResolveModTargetPath(ModVersion version)
+    /// <summary>本机的 mod 库：NCL/user/mods/&lt;mod 名&gt;/，各版本放在同一文件夹。</summary>
+    private string UserModDirectory()
     {
-        if (SelectedVersion is not { } selected) return null;
+        var name = string.IsNullOrWhiteSpace(ModDetailTitle) ? "unknown" : ModDetailTitle.Trim();
+        return Path.Combine(AppSettings.UserDirectory, "mods", SanitizeModFileName(name));
+    }
 
-        var gameVersion = selected.Summary.ClientVersion;
+    private string ResolveUserModPath(ModVersion version)
+    {
+        var directory = UserModDirectory();
+        Directory.CreateDirectory(directory);
+        return Path.Combine(directory, SanitizeModFileName(version.FileName));
+    }
+
+    /// <summary>
+    /// 文件应落入的 mods 目录；版本不兼容或未指定目标时返回 null。
+    /// 只算路径，不建目录，供界面展示和下载前解析共用。
+    /// </summary>
+    private string? ResolveModsDirectory(VersionSummary? target, ModVersion version)
+    {
+        if (target is null) return null;
+
+        var gameVersion = target.ClientVersion;
         if (!string.IsNullOrWhiteSpace(gameVersion) && version.GameVersions.Count > 0 &&
             !version.GameVersions.Any(value => string.Equals(value, gameVersion, StringComparison.OrdinalIgnoreCase)))
         {
             return null;
         }
 
-        var loaderTags = ModCatalog.LoaderTags(selected.Summary.Loader);
+        var loaderTags = ModCatalog.LoaderTags(target.Loader);
         if (version.Loaders.Count > 0 &&
-            !version.Loaders.Any(loader => loaderTags.Contains(loader, StringComparer.OrdinalIgnoreCase)))
+            !version.Loaders.Any(loader => loaderTags.Any(tag =>
+                string.Equals(tag, loader, StringComparison.OrdinalIgnoreCase))))
         {
             return null;
         }
 
-        var gameDirectory = IsVersionIsolated && _resolved is not null
-            ? _resolved.VersionDirectory
-            : MinecraftDirectory;
+        var versionDirectory = Path.GetDirectoryName(target.JsonPath) ?? string.Empty;
+        if (string.IsNullOrEmpty(versionDirectory)) return null;
 
-        var modsDirectory = Path.Combine(gameDirectory, "mods");
+        var isolated = VersionIsolationDetector.Detect(
+            MinecraftDirectory,
+            target.Id,
+            target.Type,
+            modable: true,
+            _settings.DefaultIsolation).IsIsolated;
+
+        var gameDirectory = isolated ? versionDirectory : MinecraftDirectory;
+        return Path.Combine(gameDirectory, "mods");
+    }
+
+    /// <summary>
+    /// 计算文件该写入哪个路径：目标版本由调用方传入，不依赖“当前选中版本”。
+    /// 版本不兼容（游戏版本或加载器对不上）、或未指定目标时返回 null，由调用方让用户选位置。
+    /// </summary>
+    private string? ResolveModTargetPath(VersionSummary? target, ModVersion version)
+    {
+        var modsDirectory = ResolveModsDirectory(target, version);
+        if (modsDirectory is null) return null;
+
         Directory.CreateDirectory(modsDirectory);
-
         return Path.Combine(modsDirectory, SanitizeModFileName(version.FileName));
     }
 

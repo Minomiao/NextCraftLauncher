@@ -9,15 +9,19 @@ namespace NextCraftLauncher.ViewModels;
 /// <summary>Mod 项目的一个可下载版本。</summary>
 public partial class ModVersionItemViewModel : ObservableObject
 {
-    public ModVersionItemViewModel(ModVersion version, Action<ModVersionItemViewModel>? download = null)
+    public ModVersionItemViewModel(ModVersion version)
     {
         Version = version;
-        DownloadCommand = new RelayCommand(() => download?.Invoke(this));
     }
 
     public ModVersion Version { get; }
 
     public string Title => Version.DisplayName;
+
+    /// <summary>列表右侧显示的发布日期。</summary>
+    public string DateText => Version.Published is { } published
+        ? published.LocalDateTime.ToString("yyyy-MM-dd")
+        : string.Empty;
 
     public string Subtitle
     {
@@ -49,8 +53,6 @@ public partial class ModVersionItemViewModel : ObservableObject
 
     /// <summary>有前置时才占一行，避免空行把行高拉大。</summary>
     public bool HasDependency => !string.IsNullOrEmpty(DependencyText);
-
-    public IRelayCommand DownloadCommand { get; }
 
     private static string Capitalize(string value) => value.Length == 0
         ? value

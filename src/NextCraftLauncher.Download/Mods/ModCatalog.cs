@@ -311,8 +311,27 @@ public static class ModCatalog
             if (!entry.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array) continue;
             if (files.GetArrayLength() == 0) continue;
 
+            // 一个版本可能带多个文件（jar / sources / javadoc），优先取接口标记的 primary，
+            // 否则退回第一个有地址的文件。
             var file = files[0];
             var fileUrl = String(file, "url");
+
+            foreach (var candidate in files.EnumerateArray())
+            {
+                if (!candidate.TryGetProperty("primary", out var primary) ||
+                    primary.ValueKind != JsonValueKind.True)
+                {
+                    continue;
+                }
+
+                var candidateUrl = String(candidate, "url");
+                if (string.IsNullOrWhiteSpace(candidateUrl)) continue;
+
+                file = candidate;
+                fileUrl = candidateUrl;
+                break;
+            }
+
             if (string.IsNullOrWhiteSpace(fileUrl)) continue;
 
             var dependencies = new List<string>();

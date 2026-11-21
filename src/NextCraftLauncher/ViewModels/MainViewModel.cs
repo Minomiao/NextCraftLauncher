@@ -1038,7 +1038,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ? ModLoaderOptions[SelectedModLoaderIndex]
             : null;
 
-    /// <summary>用本地版本填充搜索筛选，并默认跟随当前选中的版本（与 PCL2 一致）。</summary>
+    /// <summary>用本地版本填充搜索筛选；默认停在「全部」，不自动套用当前选中版本。</summary>
     private void UpdateModFiltersFromSelection()
     {
         var versions = Versions
@@ -1048,32 +1048,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        // 清空集合会让 ComboBox 把选中项抬成 -1；而属性的默认值是 0，
+        // 直接再赋 0 不会产生变更通知，界面就会停在“无选择”的空白状态。
+        // 先打到 -1，填完再回 0，强制刷新一次。
+        SelectedModGameVersionIndex = -1;
+        SelectedModLoaderIndex = -1;
+
         ModGameVersions.Clear();
         ModGameVersions.Add("全部");
         foreach (var value in versions)
             ModGameVersions.Add(value);
 
-        var target = SelectedVersion?.Summary.ClientVersion;
-        var index = 0;
-        if (!string.IsNullOrWhiteSpace(target))
-        {
-            for (var i = 1; i < ModGameVersions.Count; i++)
-            {
-                if (!string.Equals(ModGameVersions[i], target, StringComparison.OrdinalIgnoreCase)) continue;
-                index = i;
-                break;
-            }
-        }
-
-        SelectedModGameVersionIndex = index;
-        SelectedModLoaderIndex = SelectedVersion?.Summary.Loader switch
-        {
-            "Forge" => 1,
-            "Fabric" => 2,
-            "NeoForge" => 3,
-            "Quilt" => 4,
-            _ => 0,
-        };
+        SelectedModGameVersionIndex = 0;
+        SelectedModLoaderIndex = 0;
     }
 
     [RelayCommand]

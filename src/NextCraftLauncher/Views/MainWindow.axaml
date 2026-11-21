@@ -24,6 +24,7 @@
             <Setter Property="Padding" Value="18,0" />
             <Setter Property="CornerRadius" Value="16" />
             <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <!-- 选中态只由共享指示器表达，按钮自身不再出现悬停/按下色块 -->

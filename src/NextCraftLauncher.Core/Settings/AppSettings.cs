@@ -68,7 +68,26 @@ public sealed class AppSettings
     /// <summary>启动器数据目录，固定位于启动器 exe 同级的 NCL 文件夹。</summary>
     public static string DataDirectory => Path.Combine(AppContext.BaseDirectory, "NCL");
 
+    /// <summary>
+    /// 玩家自备文件的目录：启动器只在这里读写，从不清理。
+    /// 缓存都在 <c>NCL/cache</c>，那里可以被整体删除。
+    /// </summary>
+    public static string UserDirectory => Path.Combine(DataDirectory, "user");
+
     public static string SettingsFilePath => Path.Combine(DataDirectory, "settings.json");
+
+    /// <summary>确保 <see cref="UserDirectory"/> 存在；失败只影响该目录的使用，不影响启动。</summary>
+    public static void EnsureUserDirectory()
+    {
+        try
+        {
+            Directory.CreateDirectory(UserDirectory);
+        }
+        catch (Exception)
+        {
+            // 建不出来不影响启动；真正用到时再报错。
+        }
+    }
 
     public static string GetDefaultMinecraftDirectory() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

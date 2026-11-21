@@ -6,6 +6,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using NextCraftLauncher.Core.Logging;
+using NextCraftLauncher.Core.Settings;
 using NextCraftLauncher.Theme;
 using NextCraftLauncher.ViewModels;
 using NextCraftLauncher.Views;
@@ -22,6 +23,7 @@ public partial class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         LauncherLog.Initialize();
+        AppSettings.EnsureUserDirectory();
 
         // 颜色资源必须在创建窗口之前注册，窗口与样式里的 DynamicResource 才能解析到。
         try

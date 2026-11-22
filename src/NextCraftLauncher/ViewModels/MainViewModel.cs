@@ -534,7 +534,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _launchWarning;
     [ObservableProperty] private bool _isVersionIsolated;
     [ObservableProperty] private string _remoteVersionSearch = string.Empty;
-    [ObservableProperty] private string _remoteVersionType = "全部";
+    [ObservableProperty] private string _remoteVersionType = "正式版";
     [ObservableProperty] private string _remoteVersionsStatus = "尚未加载版本清单";
     [ObservableProperty] private bool _isRemoteVersionsLoading;
     [ObservableProperty] private RemoteVersionItemViewModel? _selectedRemoteVersion;

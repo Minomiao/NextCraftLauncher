@@ -467,28 +467,34 @@
                         </Grid>
 
                         <!-- 项目详情：版本列表 -->
-                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="10"
+                        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="10"
                               IsVisible="{Binding IsModDetailOpen}">
 
-                            <TextBlock Text="{Binding ModDetailTitle}"
-                                       FontSize="16"
-                                       FontWeight="SemiBold"
-                                       VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis" />
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                <controls:RemoteImage Width="48"
+                                                      Height="48"
+                                                      VerticalAlignment="Top"
+                                                      SourceUrl="{Binding SelectedModProject.IconUrl}"
+                                                      CacheKey="{Binding SelectedModProject.IconKey}" />
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="{Binding ModDetailTitle}"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding ModDetailDescription}"
+                                               Classes="meta"
+                                               MaxHeight="54"
+                                               TextWrapping="Wrap"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Grid>
 
                             <TextBlock Grid.Row="1"
-                                       Text="{Binding ModDetailDescription}"
-                                       Classes="meta"
-                                       MaxHeight="54"
-                                       TextWrapping="Wrap"
-                                       TextTrimming="CharacterEllipsis" />
-
-                            <TextBlock Grid.Row="2"
                                        Text="{Binding ModDetailStatus}"
                                        Classes="meta" />
 
                             <!-- 版本条：推荐 + 全部 + 该模组支持过的游戏版本，横向滚动 -->
-                            <ScrollViewer Grid.Row="3"
+                            <ScrollViewer Grid.Row="2"
                                           HorizontalScrollBarVisibility="Hidden"
                                           VerticalScrollBarVisibility="Disabled"
                                           IsVisible="{Binding ShowModVersionFilters}">
@@ -509,7 +515,7 @@
                                 </ItemsControl>
                             </ScrollViewer>
 
-                            <ListBox Grid.Row="4"
+                            <ListBox Grid.Row="3"
                                      Classes="versionList"
                                      ItemsSource="{Binding ModVersionRows}"
                                      Background="Transparent"
@@ -565,7 +571,7 @@
                             </ListBox>
 
                             <!-- 底部的下载栏：未选中时也显示，按钮置灰 -->
-                            <Grid Grid.Row="5"
+                            <Grid Grid.Row="4"
                                   ColumnDefinitions="*,Auto"
                                   ColumnSpacing="8"
                                   Margin="16,2,14,0">

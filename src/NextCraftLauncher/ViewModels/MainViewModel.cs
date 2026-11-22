@@ -372,6 +372,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public RangeObservableCollection<RemoteVersionListRowViewModel> RemoteVersionRows { get; } = new();
 
+    /// <summary>版本详情页顶部的邻近版本（最多 6 个，不含当前版本）。</summary>
+    public RangeObservableCollection<RemoteVersionItemViewModel> RelatedRemoteVersions { get; } = new();
+
+    public bool HasRelatedRemoteVersions => RelatedRemoteVersions.Count > 0;
+
     /// <summary>模组详情页顶部的版本条：全部 + 该模组支持过的各游戏版本。</summary>
     public RangeObservableCollection<ModVersionFilterViewModel> ModVersionFilters { get; } = new();
 
@@ -405,6 +410,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public IReadOnlyList<string> RemoteVersionTypes { get; } = new[] { "全部", "正式版", "快照", "远古" };
 
     private readonly List<RemoteVersionItemViewModel> _allRemoteVersions = new();
+
+    /// <summary>列表当前实际显示的版本（类型 + 搜索过滤后），侧栏的邻近版本也从这里取。</summary>
+    private readonly List<RemoteVersionItemViewModel> _filteredRemoteVersions = new();
     private readonly List<RemoteJavaRuntimeItemViewModel> _allJavaRuntimes = new();
     private bool _remoteManifestLoaded;
     private int _gameMirrorGeneration;
@@ -1018,6 +1026,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public RangeObservableCollection<ModProjectItemViewModel> ModProjects { get; } = new();
 
+    /// <summary>项目详情页顶部的同批搜索结果（最多 6 个，不含当前项目）。</summary>
+    public RangeObservableCollection<ModProjectItemViewModel> RelatedModProjects { get; } = new();
+
+    public bool HasRelatedModProjects => RelatedModProjects.Count > 0;
+
     /// <summary>模组详情页的扁平行：可折叠分组标题 + 文件行。</summary>
     public RangeObservableCollection<ModVersionListRowViewModel> ModVersionRows { get; } = new();
 
@@ -1331,6 +1344,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         SelectedModFileTarget = null;
         OnPropertyChanged(nameof(ShowModVersionFilters));
         _ = LoadModVersionsAsync(item);
+        UpdateRelatedModProjects();
     }
 
     [RelayCommand]
@@ -1339,6 +1353,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _modDetailCts?.Cancel();
         IsModDetailOpen = false;
         SelectedModProject = null;
+        UpdateRelatedModProjects();
     }
 
     private async Task LoadModVersionsAsync(ModProjectItemViewModel item)
@@ -2105,6 +2120,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         foreach (var item in _allRemoteVersions)
             item.IsSelected = ReferenceEquals(item, value);
 
+        UpdateRelatedRemoteVersions();
+
         OnPropertyChanged(nameof(CanDownloadSelectedVersion));
         OnPropertyChanged(nameof(CanDownloadSelected));
         OnPropertyChanged(nameof(DownloadIconName));
@@ -2861,10 +2878,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         await LoadRemoteVersionsAsync();
     }
 
-    private void ApplyRemoteVersionFilter()
+    /// <summary>当前类型 / 搜索条件下会显示的版本（与列表同一套过滤）。</summary>
+    private List<RemoteVersionItemViewModel> FilteredRemoteVersions()
     {
-        var rows = new List<RemoteVersionListRowViewModel>();
-
         var search = RemoteVersionSearch.Trim();
         var filtered = new List<RemoteVersionItemViewModel>();
 
@@ -2875,7 +2891,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
             filtered.Add(item);
         }
 
+        return filtered;
+    }
+
+    private void ApplyRemoteVersionFilter()
+    {
+        var rows = new List<RemoteVersionListRowViewModel>();
+
+        var filtered = FilteredRemoteVersions();
         _filteredRemoteVersionCount = filtered.Count;
+
+        _filteredRemoteVersions.Clear();
+        _filteredRemoteVersions.AddRange(filtered);
 
         foreach (var group in filtered
                      .GroupBy(item => item.Type)
@@ -2897,6 +2924,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         RemoteVersionRows.ReplaceAll(rows);
         OnPropertyChanged(nameof(ShowRemoteVersionsLoading));
         UpdateRemoteVersionsStatus();
+        UpdateRelatedRemoteVersions();
     }
 
     private RemoteVersionListRowViewModel GetRemoteVersionRow(RemoteVersionItemViewModel item)
@@ -2920,6 +2948,55 @@ public partial class MainViewModel : ObservableObject, IDisposable
         SetVersionName(VersionNaming.BuildDefault(item.Id, null, null));
 
         _ = LoadLoaderVersionsAsync(item);
+    }
+
+    /// <summary>取 index 前后各若干项，凑够 6 个（不含 index 自己）。</summary>
+    private static List<T> RelatedItems<T>(IReadOnlyList<T> source, int index)
+    {
+        const int count = 6;
+        var related = new List<T>(count);
+        if (index < 0 || source.Count <= 1) return related;
+
+        var start = index - count / 2;
+        var end = index + count / 2;
+
+        if (start < 0)
+        {
+            end -= start;
+            start = 0;
+        }
+
+        if (end >= source.Count)
+        {
+            start -= end - (source.Count - 1);
+            start = Math.Max(0, start);
+            end = source.Count - 1;
+        }
+
+        for (var position = start; position <= end && related.Count < count; position++)
+        {
+            if (position != index) related.Add(source[position]);
+        }
+
+        return related;
+    }
+
+    private void UpdateRelatedRemoteVersions()
+    {
+        var selected = SelectedRemoteVersion;
+        var index = selected is null ? -1 : _filteredRemoteVersions.IndexOf(selected);
+
+        RelatedRemoteVersions.ReplaceAll(RelatedItems(_filteredRemoteVersions, index));
+        OnPropertyChanged(nameof(HasRelatedRemoteVersions));
+    }
+
+    private void UpdateRelatedModProjects()
+    {
+        var selected = SelectedModProject;
+        var index = selected is null ? -1 : ModProjects.IndexOf(selected);
+
+        RelatedModProjects.ReplaceAll(RelatedItems(ModProjects, index));
+        OnPropertyChanged(nameof(HasRelatedModProjects));
     }
 
     [RelayCommand]

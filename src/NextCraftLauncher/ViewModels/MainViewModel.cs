@@ -1642,6 +1642,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var task = TryCreateTask($"Mod · {item.Title}", DownloadTaskKind.Generic, $"mod:{version.Platform}:{version.Id}");
         if (task is null) return;
 
+        // 失败时不留下这次新建的空目录；原本就存在的 mods 目录不动。
+        var targetDirectory = Path.GetDirectoryName(target);
+        var directoryExisted = targetDirectory is not null && Directory.Exists(targetDirectory);
+
         task.StatusText = "正在下载…";
         Status = $"正在下载 Mod：{item.Title}";
         LauncherLog.Info($"下载 Mod {item.Title} → {target}");
@@ -1679,12 +1683,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException)
         {
             FinishTask(task, DownloadTaskState.Canceled, "下载已取消");
+            TryRemoveCreatedEmptyDirectory(target, directoryExisted);
         }
         catch (Exception exception)
         {
             LauncherLog.Error($"下载 Mod 失败：{version.FileName}", exception);
             ShowDownloadError("下载 Mod", exception);
             FinishTask(task, DownloadTaskState.Failed, "下载失败");
+            TryRemoveCreatedEmptyDirectory(target, directoryExisted);
         }
     }
 
@@ -1697,9 +1703,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private string ResolveUserModPath(ModVersion version)
     {
-        var directory = UserModDirectory();
-        Directory.CreateDirectory(directory);
-        return Path.Combine(directory, SanitizeModFileName(version.FileName));
+        // 不在下载前建目录：目录由下载器真正写文件时创建，失败时不会留下空文件夹。
+        return Path.Combine(UserModDirectory(), SanitizeModFileName(version.FileName));
     }
 
     /// <summary>
@@ -1748,8 +1753,29 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var modsDirectory = ResolveModsDirectory(target, version);
         if (modsDirectory is null) return null;
 
-        Directory.CreateDirectory(modsDirectory);
+        // 目录由下载器真正写文件时创建；失败时不会在这里留下空文件夹。
         return Path.Combine(modsDirectory, SanitizeModFileName(version.FileName));
+    }
+
+    /// <summary>
+    /// 下载失败或取消时，删掉这次新建的空目录（mods 目录原本就存在时不动）。
+    /// </summary>
+    private static void TryRemoveCreatedEmptyDirectory(string filePath, bool existed)
+    {
+        if (existed) return;
+
+        try
+        {
+            var directory = Path.GetDirectoryName(filePath);
+            if (directory is null || !Directory.Exists(directory)) return;
+
+            if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                Directory.Delete(directory);
+        }
+        catch (Exception)
+        {
+            // 目录被占用或还有其它内容时保持原样。
+        }
     }
 
     private static string SanitizeModFileName(string fileName)

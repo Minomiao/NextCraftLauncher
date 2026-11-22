@@ -1658,6 +1658,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var task = TryCreateTask($"Mod · {item.Title}", DownloadTaskKind.Generic, $"mod:{version.Platform}:{version.Id}");
         if (task is null) return;
 
+        // 下载已经进了任务队列，退出详情页直接看进度；返回时回到模组列表。
+        CloseModDetail();
+        EnterTaskSection();
+
         // 失败时不留下这次新建的空目录；原本就存在的 mods 目录不动。
         var targetDirectory = Path.GetDirectoryName(target);
         var directoryExisted = targetDirectory is not null && Directory.Exists(targetDirectory);

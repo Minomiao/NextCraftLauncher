@@ -146,6 +146,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:RemoteVersionItemViewModel">
                                     <Button Classes="related"
+                                            AttachedToVisualTree="OnRelatedItemAttached"
                                             Command="{Binding SelectCommand}"
                                             ToolTip.Tip="{Binding Subtitle}">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -167,6 +168,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ModProjectItemViewModel">
                                     <Button Classes="related"
+                                            AttachedToVisualTree="OnRelatedItemAttached"
                                             Command="{Binding SelectCommand}"
                                             ToolTip.Tip="{Binding Name}">
                                         <StackPanel Orientation="Horizontal" Spacing="8">

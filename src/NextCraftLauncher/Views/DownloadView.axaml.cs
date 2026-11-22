@@ -1,12 +1,16 @@
 using System;
+using System.Collections;
 using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using NextCraftLauncher.ViewModels;
 
 namespace NextCraftLauncher.Views;
@@ -45,6 +49,48 @@ public partial class DownloadView : UserControl
 
         var scroll = ModResultsScroll;
         if (scroll is not null) scroll.Offset = new Vector(scroll.Offset.X, 0);
+    }
+
+    /// <summary>侧栏结果条目从左侧依次滑入；按条目顺序错开一点时间。</summary>
+    private void OnRelatedItemAttached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        if (sender is not Control control) return;
+
+        var index = 0;
+        if (control.FindAncestorOfType<ItemsControl>() is { ItemsSource: IList items } &&
+            control.DataContext is { } item)
+        {
+            index = Math.Max(0, items.IndexOf(item));
+        }
+
+        var delay = TimeSpan.FromMilliseconds(index * 55);
+
+        control.Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = OpacityProperty,
+                Duration = TimeSpan.FromMilliseconds(160),
+                Delay = delay,
+            },
+            new ThicknessTransition
+            {
+                Property = MarginProperty,
+                Duration = TimeSpan.FromMilliseconds(220),
+                Delay = delay,
+            },
+        };
+
+        control.Opacity = 0;
+        control.Margin = new Thickness(-18, 0, 0, 0);
+
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                control.Opacity = 1;
+                control.Margin = new Thickness(0);
+            },
+            DispatcherPriority.Background);
     }
 
     private void OnModSearchKeyDown(object? sender, KeyEventArgs e)

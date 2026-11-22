@@ -382,7 +382,7 @@
                                              PlaceholderText="{Binding ModSearchPlaceholder}"
                                              KeyDown="OnModSearchKeyDown" />
                                     <Button Grid.Column="1"
-                                            Classes="toolbar soft"
+                                            Classes="toolbar primary"
                                             Content="搜索"
                                             Command="{Binding SearchModsCommand}"
                                             IsEnabled="{Binding !IsModsLoading}" />

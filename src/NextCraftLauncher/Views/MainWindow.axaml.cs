@@ -237,6 +237,10 @@ public partial class MainWindow : Window
         BrandBackButton.Opacity = inProgress;
         _backTransform.X = TitleBarSlide * (1 - inProgress);
         BrandBackButton.IsHitTestVisible = inProgress > 0.5;
+
+        // 进入次级页面时顶部导航一并收起，和返回按钮的进场共用同一进度。
+        NavBar.Opacity = 1 - outProgress;
+        NavBar.IsHitTestVisible = outProgress <= 0.5;
     }
 
     private static double Ease(double t) => 1 - Math.Pow(1 - t, 3);

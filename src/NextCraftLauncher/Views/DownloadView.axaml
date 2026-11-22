@@ -663,6 +663,7 @@
 
                             <TextBlock Grid.Row="1"
                                        Text="{Binding JavaRuntimeCatalogStatus}"
+                                       IsVisible="{Binding !IsJavaRuntimeCatalogFailed}"
                                        Classes="meta" />
 
                             <Grid Grid.Row="2">
@@ -693,7 +694,12 @@
                                     </ListBox.ItemTemplate>
                                 </ListBox>
                                 <TextBlock Text="正在获取 Java 运行时列表..."
-                                           IsVisible="{Binding IsJavaRuntimeCatalogLoading}"
+                                           IsVisible="{Binding ShowJavaRuntimeCatalogLoading}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Opacity="0.56" />
+                                <TextBlock Text="无法获取 Java 运行时列表"
+                                           IsVisible="{Binding IsJavaRuntimeCatalogFailed}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            Opacity="0.56" />

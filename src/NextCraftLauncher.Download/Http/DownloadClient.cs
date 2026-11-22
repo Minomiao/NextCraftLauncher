@@ -500,7 +500,7 @@ public sealed class DownloadClient : IDisposable
         var remaining = attempts.ToList();
         byte[]? result = null;
         Exception? lastError = null;
-        var lastErrorUrl = candidates[0];
+        var failures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         try
         {
@@ -523,7 +523,10 @@ public sealed class DownloadClient : IDisposable
                     lastError = exception;
 
                     var index = Array.IndexOf(attempts, finished);
-                    if (index >= 0) lastErrorUrl = candidates[index];
+                    if (index >= 0)
+                    {
+                        failures[candidates[index]] = RootMessage(exception);
+                    }
                 }
             }
         }
@@ -544,7 +547,12 @@ public sealed class DownloadClient : IDisposable
 
         if (result is not null) return result;
 
-        throw new IOException($"下载失败：{lastErrorUrl}（{lastError?.Message}）", lastError);
+        // 对冲时每个源都是独立试的，只报最后一个会让调用方以为只错了一个源。
+        var detail = failures.Count > 0
+            ? string.Join("；", failures.Select(pair => $"{pair.Key}（{pair.Value}）"))
+            : lastError?.Message ?? "未知错误";
+
+        throw new IOException($"下载失败：{detail}", lastError);
     }
 
     private async Task<byte[]> DownloadBytesAfterDelayAsync(

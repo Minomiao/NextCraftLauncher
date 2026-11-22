@@ -516,6 +516,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private double _customWindowHeight = 720;
     [ObservableProperty] private string _versionName = string.Empty;
     [ObservableProperty] private bool _isJavaRuntimeCatalogLoading;
+    [ObservableProperty] private bool _isJavaRuntimeCatalogFailed;
     [ObservableProperty] private string _javaRuntimeCatalogStatus = "尚未加载 Java 运行时列表";
     [ObservableProperty] private AppPage _currentPage = AppPage.Launch;
     [ObservableProperty] private int _selectedGameMirrorIndex;
@@ -717,6 +718,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public bool HasActiveDownloads => DownloadTasks.Any(task => task.IsRunning);
 
     public bool ShowRemoteVersionsLoading => IsRemoteVersionsLoading && RemoteVersionRows.Count == 0;
+
+    /// <summary>列表为空时才显示加载提示；有缓存内容时不打扰。</summary>
+    public bool ShowJavaRuntimeCatalogLoading
+        => IsJavaRuntimeCatalogLoading && _allJavaRuntimes.Count == 0;
+
+    partial void OnIsJavaRuntimeCatalogLoadingChanged(bool value)
+        => OnPropertyChanged(nameof(ShowJavaRuntimeCatalogLoading));
 
     public string CurrentVersionName => SelectedVersion?.Id ?? "未选择版本";
 
@@ -3681,6 +3689,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (IsJavaRuntimeCatalogLoading) return;
 
         IsJavaRuntimeCatalogLoading = true;
+        IsJavaRuntimeCatalogFailed = false;
         JavaRuntimeCatalogStatus = "正在获取 Mojang Java 运行时列表...";
         var clock = Stopwatch.StartNew();
 
@@ -3691,13 +3700,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 mirror: mirror,
                 cancellationToken: _lifetime.Token);
 
-            _allJavaRuntimes.Clear();
-            foreach (var entry in result.Runtimes)
-                _allJavaRuntimes.Add(new RemoteJavaRuntimeItemViewModel(entry, DownloadCatalogJavaAsync));
-
-            AvailableJavaRuntimes.Clear();
-            foreach (var item in _allJavaRuntimes)
-                AvailableJavaRuntimes.Add(item);
+            FillJavaRuntimes(result);
 
             _javaRuntimeCatalogLoaded = true;
             UpdateJavaRuntimeInstalledStatus();
@@ -3712,7 +3715,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            JavaRuntimeCatalogStatus = "获取 Java 运行时列表失败：" + exception.Message;
+            // 源不可用时用户只需要知道拿不到，具体原因写进日志。
+            LauncherLog.Warn($"获取 Java 运行时列表失败：{exception.Message}");
+
+            if (_allJavaRuntimes.Count == 0)
+            {
+                IsJavaRuntimeCatalogFailed = true;
+                JavaRuntimeCatalogStatus = string.Empty;
+            }
+            else
+            {
+                // 缓存里还有一份，继续展示，不把错误顶到界面上。
+                UpdateJavaRuntimeCatalogStatus();
+            }
         }
         finally
         {
@@ -3720,10 +3735,38 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>把清单填进两个列表（全部 + 可安装），界面上出现的都是同一批实例。</summary>
+    private void FillJavaRuntimes(JavaRuntimeCatalogResult result)
+    {
+        _allJavaRuntimes.Clear();
+        foreach (var entry in result.Runtimes)
+            _allJavaRuntimes.Add(new RemoteJavaRuntimeItemViewModel(entry, DownloadCatalogJavaAsync));
+
+        AvailableJavaRuntimes.Clear();
+        foreach (var item in _allJavaRuntimes)
+            AvailableJavaRuntimes.Add(item);
+
+        OnPropertyChanged(nameof(ShowJavaRuntimeCatalogLoading));
+    }
+
     private async Task EnsureJavaRuntimesLoadedAsync()
     {
         if (_javaRuntimeCatalogLoaded || IsJavaRuntimeCatalogLoading) return;
+
+        // 先用上次的缓存填表：网络慢或不通时 Java 页也不至于空白。
+        if (_allJavaRuntimes.Count == 0) ApplyCachedJavaRuntimes();
+
         await LoadJavaRuntimesAsync();
+    }
+
+    /// <summary>读取上次成功获取的 Java 运行时清单；没有缓存时什么也不做。</summary>
+    private void ApplyCachedJavaRuntimes()
+    {
+        var cached = JavaRuntimeCatalog.TryLoadCached();
+        if (cached is null || cached.Runtimes.Count == 0) return;
+
+        FillJavaRuntimes(cached);
+        UpdateJavaRuntimeInstalledStatus();
     }
 
     private async Task DownloadCatalogJavaAsync(RemoteJavaRuntimeItemViewModel item)

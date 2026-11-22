@@ -205,41 +205,41 @@
                                    Classes="group"
                                    ToolTip.Tip="游戏版本源同时用于版本清单、游戏文件与 Java；加载器源只用于各自版本列表。" />
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="游戏版本" Classes="fieldLabel" />
                             <ComboBox Grid.Column="1"
                                       Classes="toolbar"
-                                      HorizontalAlignment="Stretch"
+                                      Width="280"
                                       ItemsSource="{Binding DownloadMirrors}"
                                       SelectedIndex="{Binding SelectedGameMirrorIndex}"
                                       ToolTip.Tip="自动：在 Mojang 官方与镜像之间择快；也可固定为某个源。" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="Forge" Classes="fieldLabel" />
                             <ComboBox Grid.Column="1"
                                       Classes="toolbar"
-                                      HorizontalAlignment="Stretch"
+                                      Width="280"
                                       ItemsSource="{Binding LoaderMirrorOptions}"
                                       SelectedIndex="{Binding SelectedForgeMirrorIndex}"
                                       ToolTip.Tip="自动：官网立即请求，镜像延迟对冲；也可固定为官网或镜像。" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="Fabric" Classes="fieldLabel" />
                             <ComboBox Grid.Column="1"
                                       Classes="toolbar"
-                                      HorizontalAlignment="Stretch"
+                                      Width="280"
                                       ItemsSource="{Binding LoaderMirrorOptions}"
                                       SelectedIndex="{Binding SelectedFabricMirrorIndex}"
                                       ToolTip.Tip="自动：官网立即请求，镜像延迟对冲；也可固定为官网或镜像。" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="NeoForge" Classes="fieldLabel" />
                             <ComboBox Grid.Column="1"
                                       Classes="toolbar"
-                                      HorizontalAlignment="Stretch"
+                                      Width="280"
                                       ItemsSource="{Binding LoaderMirrorOptions}"
                                       SelectedIndex="{Binding SelectedNeoForgeMirrorIndex}"
                                       ToolTip.Tip="自动：官网立即请求，镜像延迟对冲；也可固定为官网或镜像。" />
@@ -251,11 +251,11 @@
                     <StackPanel Spacing="12">
                         <TextBlock Text="版本隔离" Classes="group" />
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="默认策略" Classes="fieldLabel" />
                             <ComboBox Grid.Column="1"
                                       Classes="toolbar"
-                                      HorizontalAlignment="Stretch"
+                                      Width="280"
                                       ItemsSource="{Binding IsolationOptions}"
                                       SelectedIndex="{Binding SelectedIsolationIndex}" />
                         </Grid>
@@ -272,7 +272,7 @@
                                        VerticalAlignment="Center" />
                             <ComboBox Grid.Column="1"
                                       Classes="toolbar"
-                                      Width="140"
+                                      Width="280"
                                       ItemsSource="{Binding ModDefaultFilterOptions}"
                                       SelectedIndex="{Binding SelectedModDefaultFilterIndex}" />
                         </Grid>

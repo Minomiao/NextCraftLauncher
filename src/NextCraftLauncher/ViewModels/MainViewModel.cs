@@ -2566,6 +2566,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (SameManifest(result.Versions))
         {
             UpdateRemoteInstalledStatus();
+
+            // 缓存清单先到、网络清单后到时内容一般一致，但可见行可能还是空的
+            // （启动时只填了源数据）；这里补一次筛选，避免列表一直空白。
+            if (RemoteVersionRows.Count == 0 && _allRemoteVersions.Count > 0)
+                ApplyRemoteVersionFilter();
+
             return;
         }
 
@@ -2593,6 +2599,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         UpdateRemoteInstalledStatus();
+        ApplyRemoteVersionFilter();
         LauncherLog.Info($"版本清单已重建：{_allRemoteVersions.Count} 个版本（{clock.ElapsedMilliseconds} ms）");
     }
 

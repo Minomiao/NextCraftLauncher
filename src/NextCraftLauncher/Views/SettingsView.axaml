@@ -267,6 +267,17 @@
                         <TextBlock Text="Mod" Classes="group" />
 
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                            <TextBlock Text="进入时默认显示"
+                                       Classes="fieldLabel"
+                                       VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="1"
+                                      Classes="toolbar"
+                                      Width="140"
+                                      ItemsSource="{Binding ModDefaultFilterOptions}"
+                                      SelectedIndex="{Binding SelectedModDefaultFilterIndex}" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="下载后自动打开文件夹"
                                        Classes="fieldLabel"
                                        VerticalAlignment="Center" />

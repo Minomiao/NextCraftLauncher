@@ -64,6 +64,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ApplyAccount();
         _memoryMb = MemoryOptions.Contains(_settings.MemoryMb) ? _settings.MemoryMb : 4096;
         _openFolderAfterModDownload = _settings.OpenFolderAfterModDownload;
+        _selectedModDefaultFilterIndex = _settings.ModDetailStartsWithRecommend ? 1 : 0;
         _selectedGameMirrorIndex = (int)_settings.GameMirror;
         _selectedForgeMirrorIndex = LoaderMirrorIndexFrom(_settings.ForgeMirror);
         _selectedFabricMirrorIndex = LoaderMirrorIndexFrom(_settings.FabricMirror);
@@ -479,6 +480,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
         "BMCLAPI",
     };
 
+    /// <summary>Mod 详情页进入时的默认版本筛选。</summary>
+    public IReadOnlyList<string> ModDefaultFilterOptions { get; } = new[]
+    {
+        "全部",
+        "推荐",
+    };
+
     [ObservableProperty] private string _minecraftDirectory = string.Empty;
     [ObservableProperty] private VersionItemViewModel? _selectedVersion;
     [ObservableProperty] private GameFolderItemViewModel? _selectedGameFolder;
@@ -497,6 +505,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>Mod 下载完成后自动打开所在文件夹。</summary>
     [ObservableProperty] private bool _openFolderAfterModDownload;
+
+    /// <summary>进入 Mod 详情页时默认选中的版本筛选（0 = 全部，1 = 推荐）。</summary>
+    [ObservableProperty] private int _selectedModDefaultFilterIndex;
     [ObservableProperty] private string _status = "就绪";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _isLaunching;
@@ -1231,6 +1242,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ModVersionFilters.Clear();
         _expandedModVersionGroups.Clear();
         _selectedModVersionFilter = null;
+        IsModRecommendSelected = _settings.ModDetailStartsWithRecommend;
         SelectedModFile = null;
         SelectedModFileTarget = null;
         OnPropertyChanged(nameof(ShowModVersionFilters));
@@ -2284,6 +2296,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
     partial void OnOpenFolderAfterModDownloadChanged(bool value)
     {
         _settings.OpenFolderAfterModDownload = value;
+        _settings.Save();
+    }
+
+    partial void OnSelectedModDefaultFilterIndexChanged(int value)
+    {
+        if (value is < 0 or > 1) return;
+
+        _settings.ModDetailStartsWithRecommend = value == 1;
         _settings.Save();
     }
 

@@ -87,41 +87,41 @@
             <ScrollViewer IsVisible="{Binding IsSettingsLaunchSelected}"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Width="460" HorizontalAlignment="Left">
+                <StackPanel Width="550" HorizontalAlignment="Left">
 
                     <TextBlock Text="启动设置" Classes="section" />
 
                     <StackPanel Spacing="12" Margin="0,18,0,0">
                         <TextBlock Text="窗口" Classes="group" />
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="启动器可见性" Classes="fieldLabel" />
                             <ComboBox Grid.Column="1"
                                       Classes="toolbar"
-                                      HorizontalAlignment="Stretch"
+                                      Width="280"
                                       ItemsSource="{Binding LauncherVisibilityOptions}"
                                       SelectedIndex="{Binding SelectedLauncherVisibilityIndex}" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="进程优先级" Classes="fieldLabel" />
                             <ComboBox Grid.Column="1"
                                       Classes="toolbar"
-                                      HorizontalAlignment="Stretch"
+                                      Width="280"
                                       ItemsSource="{Binding ProcessPriorityOptions}"
                                       SelectedIndex="{Binding SelectedProcessPriorityIndex}" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="窗口大小" Classes="fieldLabel" />
                             <ComboBox Grid.Column="1"
                                       Classes="toolbar"
-                                      HorizontalAlignment="Stretch"
+                                      Width="280"
                                       ItemsSource="{Binding WindowSizeOptions}"
                                       SelectedIndex="{Binding SelectedWindowSizeIndex}" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14"
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14"
                               IsVisible="{Binding IsCustomWindowSize}">
                             <TextBlock Text="自定义尺寸" Classes="fieldLabel" />
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
@@ -147,18 +147,18 @@
                     <StackPanel Spacing="12">
                         <TextBlock Text="内存与 Java" Classes="group" />
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="内存 (MB)" Classes="fieldLabel" />
                             <ComboBox Grid.Column="1"
                                       Classes="toolbar"
+                                      Width="280"
                                       ItemsSource="{Binding MemoryOptions}"
-                                      SelectedItem="{Binding MemoryMb}"
-                                      HorizontalAlignment="Stretch" />
+                                      SelectedItem="{Binding MemoryMb}" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="Java" Classes="fieldLabel" />
-                            <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8" Width="280">
                                 <ComboBox Classes="toolbar"
                                           ItemsSource="{Binding JavaRuntimes}"
                                           SelectedItem="{Binding SelectedJava}"
@@ -176,10 +176,11 @@
                             </Grid>
                         </Grid>
 
-                        <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                             <TextBlock Text="运行目录" Classes="fieldLabel" />
                             <Border Grid.Column="1"
                                     Classes="readonly"
+                                    Width="280"
                                     ToolTip.Tip="{Binding EffectiveGameDirectory}">
                                 <TextBlock Text="{Binding EffectiveGameDirectory}"
                                            FontSize="11"

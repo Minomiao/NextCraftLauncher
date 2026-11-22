@@ -18,6 +18,9 @@ public sealed class AppSettings
     public string AccountType { get; set; } = "offline";
     public int MemoryMb { get; set; } = 4096;
 
+    /// <summary>Mod 下载完成后自动在文件管理器里打开所在文件夹并选中文件。</summary>
+    public bool OpenFolderAfterModDownload { get; set; } = true;
+
     /// <summary>游戏版本列表 / 清单的获取源，同时用于游戏文件与 Java 下载（默认自动）。</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public DownloadMirror GameMirror { get; set; } = DownloadMirror.Automatic;

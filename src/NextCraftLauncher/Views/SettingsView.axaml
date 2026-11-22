@@ -260,6 +260,24 @@
                                       SelectedIndex="{Binding SelectedIsolationIndex}" />
                         </Grid>
                     </StackPanel>
+
+                    <Border Classes="divider" />
+
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Mod" Classes="group" />
+
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                            <TextBlock Text="下载后自动打开文件夹"
+                                       Classes="fieldLabel"
+                                       VerticalAlignment="Center" />
+                            <ToggleSwitch Grid.Column="1"
+                                          OnContent=""
+                                          OffContent=""
+                                          IsChecked="{Binding OpenFolderAfterModDownload}"
+                                          VerticalAlignment="Center"
+                                          ToolTip.Tip="Mod 下载完成后，在文件管理器中打开并选中该文件。" />
+                        </Grid>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 

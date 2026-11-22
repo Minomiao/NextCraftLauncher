@@ -63,6 +63,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _isMicrosoftAccount = string.Equals(_settings.AccountType, "microsoft", StringComparison.OrdinalIgnoreCase);
         ApplyAccount();
         _memoryMb = MemoryOptions.Contains(_settings.MemoryMb) ? _settings.MemoryMb : 4096;
+        _openFolderAfterModDownload = _settings.OpenFolderAfterModDownload;
         _selectedGameMirrorIndex = (int)_settings.GameMirror;
         _selectedForgeMirrorIndex = LoaderMirrorIndexFrom(_settings.ForgeMirror);
         _selectedFabricMirrorIndex = LoaderMirrorIndexFrom(_settings.FabricMirror);
@@ -493,6 +494,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _loginVerificationUri = string.Empty;
     [ObservableProperty] private string _loginStatusText = string.Empty;
     [ObservableProperty] private int _memoryMb = 4096;
+
+    /// <summary>Mod 下载完成后自动打开所在文件夹。</summary>
+    [ObservableProperty] private bool _openFolderAfterModDownload;
     [ObservableProperty] private string _status = "就绪";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _isLaunching;
@@ -1679,6 +1683,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
             FinishTask(task, DownloadTaskState.Completed, $"已下载到 {Path.GetDirectoryName(target)}");
             ModDetailStatus = $"已下载：{fileName}";
             Status = $"Mod 已下载：{fileName}";
+
+            if (OpenFolderAfterModDownload)
+                RevealFile(target);
         }
         catch (OperationCanceledException)
         {
@@ -1775,6 +1782,38 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch (Exception)
         {
             // 目录被占用或还有其它内容时保持原样。
+        }
+    }
+
+    /// <summary>在文件管理器里打开目录并选中刚下载的文件；失败只记日志。</summary>
+    private static void RevealFile(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
+
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                // explorer 的 /select 会打开所在目录并高亮该文件。
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{filePath}\"",
+                    UseShellExecute = true,
+                });
+            }
+            else
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = Path.GetDirectoryName(filePath) ?? string.Empty,
+                    UseShellExecute = true,
+                });
+            }
+        }
+        catch (Exception exception)
+        {
+            LauncherLog.Warn($"打开文件夹失败：{filePath}（{exception.Message}）");
         }
     }
 
@@ -2239,6 +2278,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     partial void OnMemoryMbChanged(int value)
     {
         _settings.MemoryMb = value;
+        _settings.Save();
+    }
+
+    partial void OnOpenFolderAfterModDownloadChanged(bool value)
+    {
+        _settings.OpenFolderAfterModDownload = value;
         _settings.Save();
     }
 

@@ -6,6 +6,13 @@ public enum ModPlatform
     Modrinth,
 }
 
+/// <summary>内容类型：Mod 与材质包（资源包）。</summary>
+public enum ModProjectType
+{
+    Mod,
+    ResourcePack,
+}
+
 /// <summary>社区 Mod 项目（Modrinth / CurseForge）。</summary>
 public sealed record ModProject(
     string Id,
@@ -15,7 +22,8 @@ public sealed record ModProject(
     string? Description,
     long Downloads,
     DateTimeOffset? Updated,
-    string? IconUrl)
+    string? IconUrl,
+    ModProjectType Type = ModProjectType.Mod)
 {
     public string PlatformName => Platform == ModPlatform.Modrinth ? "Modrinth" : "CurseForge";
 }

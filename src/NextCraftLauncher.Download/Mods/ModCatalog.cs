@@ -54,6 +54,7 @@ public static class ModCatalog
     /// 两个平台各自取一半再合并去重；结果会缓存到 <c>NCL/cache/mods/search</c>。
     /// </summary>
     public static async Task<ModSearchPage> SearchAsync(
+        ModProjectType type,
         ModPlatform? platform,
         string query,
         string? gameVersion,
@@ -88,7 +89,7 @@ public static class ModCatalog
         }
 
         if (!ignoreCache &&
-            ModSearchCache.TryGet(platform, rawQuery, gameVersion, loader, page, out var cached))
+            ModSearchCache.TryGet(type, platform, rawQuery, gameVersion, loader, page, out var cached))
         {
             LauncherLog.Info($"Mod 搜索命中缓存：「{rawQuery}」第 {page} 页");
             return cached;
@@ -103,10 +104,10 @@ public static class ModCatalog
         var offset = (page - 1) * limit;
 
         var modrinthTask = includeModrinth
-            ? SearchModrinthAsync(searchQuery, gameVersion, loader, offset, limit, cancellationToken)
+            ? SearchModrinthAsync(type, searchQuery, gameVersion, loader, offset, limit, cancellationToken)
             : Task.FromResult(SourcePage.Empty);
         var curseForgeTask = includeCurseForge
-            ? SearchCurseForgeAsync(searchQuery, gameVersion, loader, offset, limit, cancellationToken)
+            ? SearchCurseForgeAsync(type, searchQuery, gameVersion, loader, offset, limit, cancellationToken)
             : Task.FromResult(SourcePage.Empty);
 
         var results = await Task.WhenAll(modrinthTask, curseForgeTask);
@@ -122,7 +123,7 @@ public static class ModCatalog
             PageSize,
             total);
 
-        ModSearchCache.Store(platform, rawQuery, gameVersion, loader, result);
+        ModSearchCache.Store(type, platform, rawQuery, gameVersion, loader, result);
         return result;
     }
 
@@ -146,6 +147,7 @@ public static class ModCatalog
     }
 
     private static async Task<SourcePage> SearchModrinthAsync(
+        ModProjectType type,
         string query,
         string? gameVersion,
         string? loader,
@@ -153,9 +155,10 @@ public static class ModCatalog
         int limit,
         CancellationToken cancellationToken)
     {
-        var facets = new List<string> { "[\"project_type:mod\"]" };
+        var projectType = type == ModProjectType.ResourcePack ? "resourcepack" : "mod";
+        var facets = new List<string> { $"[\"project_type:{projectType}\"]" };
 
-        if (!string.IsNullOrWhiteSpace(loader))
+        if (type == ModProjectType.Mod && !string.IsNullOrWhiteSpace(loader))
         {
             var tags = LoaderTags(loader);
             if (tags.Count > 0)
@@ -193,7 +196,8 @@ public static class ModCatalog
                     String(hit, "description"),
                     Long(hit, "downloads"),
                     Date(hit, "date_modified"),
-                    String(hit, "icon_url")));
+                    String(hit, "icon_url"),
+                    type));
             }
         }
 
@@ -201,6 +205,7 @@ public static class ModCatalog
     }
 
     private static async Task<SourcePage> SearchCurseForgeAsync(
+        ModProjectType type,
         string query,
         string? gameVersion,
         string? loader,
@@ -208,10 +213,11 @@ public static class ModCatalog
         int limit,
         CancellationToken cancellationToken)
     {
-        var url = $"{CurseForgeApi}/mods/search?gameId=432&classId=6&sortField=2&sortOrder=desc" +
+        var classId = type == ModProjectType.ResourcePack ? 12 : 6;
+        var url = $"{CurseForgeApi}/mods/search?gameId=432&classId={classId}&sortField=2&sortOrder=desc" +
                   $"&pageSize={limit}&index={offset}";
 
-        var loaderType = CurseForgeLoaderType(loader);
+        var loaderType = type == ModProjectType.Mod ? CurseForgeLoaderType(loader) : null;
         if (loaderType is not null) url += $"&modLoaderType={loaderType}";
         if (!string.IsNullOrWhiteSpace(gameVersion)) url += "&gameVersion=" + Uri.EscapeDataString(gameVersion);
         if (!string.IsNullOrWhiteSpace(query)) url += "&searchFilter=" + Uri.EscapeDataString(query);
@@ -235,7 +241,8 @@ public static class ModCatalog
                     String(entry, "summary"),
                     Long(entry, "downloadCount"),
                     Date(entry, "dateModified"),
-                    CurseForgeLogo(entry)));
+                    CurseForgeLogo(entry),
+                    type));
             }
         }
 
@@ -298,7 +305,9 @@ public static class ModCatalog
         if (!string.IsNullOrWhiteSpace(gameVersion))
             filters.Add("game_versions=" + Uri.EscapeDataString($"[\"{gameVersion}\"]"));
 
-        var tags = string.IsNullOrWhiteSpace(loader) ? new List<string>() : LoaderTags(loader);
+        var tags = project.Type == ModProjectType.Mod && !string.IsNullOrWhiteSpace(loader)
+            ? LoaderTags(loader)
+            : new List<string>();
         if (tags.Count > 0)
             filters.Add("loaders=" + Uri.EscapeDataString("[" + string.Join(",", tags.Select(tag => $"\"{tag}\"")) + "]"));
 
@@ -379,7 +388,7 @@ public static class ModCatalog
         CancellationToken cancellationToken)
     {
         var url = $"{CurseForgeApi}/mods/{Uri.EscapeDataString(project.Id)}/files?pageSize=50";
-        var loaderType = CurseForgeLoaderType(loader);
+        var loaderType = project.Type == ModProjectType.Mod ? CurseForgeLoaderType(loader) : null;
         if (loaderType is not null) url += $"&modLoaderType={loaderType}";
         if (!string.IsNullOrWhiteSpace(gameVersion)) url += "&gameVersion=" + Uri.EscapeDataString(gameVersion);
 

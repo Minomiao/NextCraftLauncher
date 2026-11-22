@@ -36,6 +36,7 @@ public static class ModSearchCache
     public static string RootDirectory => Path.Combine(AppSettings.DataDirectory, "cache", "mods", "search");
 
     public static string GetPath(
+        ModProjectType type,
         ModPlatform? platform,
         string query,
         string? gameVersion,
@@ -49,7 +50,8 @@ public static class ModSearchCache
             _ => "all",
         };
 
-        var name = Sanitize(gameVersion) + "_" + Sanitize(loader) + "_" + Sanitize(query);
+        var prefix = type == ModProjectType.ResourcePack ? "resourcepack_" : string.Empty;
+        var name = prefix + Sanitize(gameVersion) + "_" + Sanitize(loader) + "_" + Sanitize(query);
         if (name.Length > 60)
             name = name[..40] + "-" + Hash(name);
 
@@ -57,6 +59,7 @@ public static class ModSearchCache
     }
 
     public static bool TryGet(
+        ModProjectType type,
         ModPlatform? platform,
         string query,
         string? gameVersion,
@@ -68,7 +71,7 @@ public static class ModSearchCache
 
         try
         {
-            var path = GetPath(platform, query, gameVersion, loader, page);
+            var path = GetPath(type, platform, query, gameVersion, loader, page);
             if (!File.Exists(path)) return false;
 
             var file = JsonSerializer.Deserialize<CachedPageFile>(File.ReadAllBytes(path), JsonOptions);
@@ -87,7 +90,8 @@ public static class ModSearchCache
                     item.Description,
                     item.Downloads,
                     item.Updated,
-                    item.IconUrl));
+                    item.IconUrl,
+                    type));
             }
 
             result = new ModSearchPage(
@@ -105,6 +109,7 @@ public static class ModSearchCache
     }
 
     public static void Store(
+        ModProjectType type,
         ModPlatform? platform,
         string query,
         string? gameVersion,
@@ -115,7 +120,7 @@ public static class ModSearchCache
         {
             try
             {
-                var path = GetPath(platform, query, gameVersion, loader, page.Page);
+                var path = GetPath(type, platform, query, gameVersion, loader, page.Page);
                 var directory = Path.GetDirectoryName(path);
                 if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 

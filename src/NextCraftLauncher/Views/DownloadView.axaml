@@ -109,6 +109,10 @@
                             Content="Mod"
                             Command="{Binding ShowDownloadModsCommand}" />
                     <Button Classes="side"
+                            Classes.selected="{Binding IsDownloadResourcePacksSelected}"
+                            Content="材质包"
+                            Command="{Binding ShowDownloadResourcePacksCommand}" />
+                    <Button Classes="side"
                             Classes.selected="{Binding IsDownloadJavaSelected}"
                             Content="Java"
                             Command="{Binding ShowDownloadJavaCommand}" />
@@ -364,8 +368,8 @@
                         </Grid>
                     </Grid>
 
-                    <!-- Mod 下载 -->
-                    <Grid IsVisible="{Binding IsDownloadModsSelected}">
+                    <!-- Mod / 材质包下载 -->
+                    <Grid IsVisible="{Binding IsDownloadContentSelected}">
 
                         <!-- 搜索结果 -->
                         <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10"
@@ -375,7 +379,7 @@
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                     <TextBox Classes="toolbar"
                                              Text="{Binding ModSearchText}"
-                                             PlaceholderText="搜索 Mod…"
+                                             PlaceholderText="{Binding ModSearchPlaceholder}"
                                              KeyDown="OnModSearchKeyDown" />
                                     <Button Grid.Column="1"
                                             Classes="toolbar soft"
@@ -385,7 +389,7 @@
                                 </Grid>
 
                                 <Grid Grid.Row="1"
-                                      ColumnDefinitions="Auto,*,Auto,*,Auto,*"
+                                      ColumnDefinitions="Auto,*,Auto,*,Auto,Auto"
                                       ColumnSpacing="8">
                                     <TextBlock Text="来源" Classes="fieldLabel" />
                                     <ComboBox Grid.Column="1"
@@ -399,12 +403,16 @@
                                               ItemsSource="{Binding ModGameVersions}"
                                               SelectedIndex="{Binding SelectedModGameVersionIndex}"
                                               HorizontalAlignment="Stretch" />
-                                    <TextBlock Grid.Column="4" Text="加载器" Classes="fieldLabel" />
+                                    <TextBlock Grid.Column="4"
+                                               Text="加载器"
+                                               Classes="fieldLabel"
+                                               IsVisible="{Binding IsModSearchLoaderVisible}" />
                                     <ComboBox Grid.Column="5"
                                               Classes="toolbar"
+                                              Width="140"
                                               ItemsSource="{Binding ModLoaderOptions}"
                                               SelectedIndex="{Binding SelectedModLoaderIndex}"
-                                              HorizontalAlignment="Stretch" />
+                                              IsVisible="{Binding IsModSearchLoaderVisible}" />
                                 </Grid>
                             </Grid>
 

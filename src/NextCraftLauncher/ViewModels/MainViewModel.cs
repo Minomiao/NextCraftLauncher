@@ -239,6 +239,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (_modPageInitialized) return;
         _modPageInitialized = true;
+        _modPageType = ModProjectType.Mod;
 
         try
         {
@@ -717,6 +718,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public bool IsDownloadModsSelected => CurrentDownloadSection == DownloadSection.Mods;
 
+    public bool IsDownloadResourcePacksSelected => CurrentDownloadSection == DownloadSection.ResourcePacks;
+
+    /// <summary>Mod 与材质包共用同一个页面。</summary>
+    public bool IsDownloadContentSelected =>
+        CurrentDownloadSection is DownloadSection.Mods or DownloadSection.ResourcePacks;
+
+    /// <summary>当前内容页是 Mod 还是材质包（不在内容页时按 Mod 处理）。</summary>
+    private ModProjectType CurrentContentType =>
+        CurrentDownloadSection == DownloadSection.ResourcePacks
+            ? ModProjectType.ResourcePack
+            : ModProjectType.Mod;
+
+    public bool IsModSearchLoaderVisible => CurrentContentType == ModProjectType.Mod;
+
+    public string ModSearchPlaceholder => CurrentContentType == ModProjectType.ResourcePack
+        ? "搜索材质包…"
+        : "搜索 Mod…";
+
     public bool IsDownloadJavaSelected => CurrentDownloadSection == DownloadSection.Java;
 
     public bool IsDownloadRunningSelected => CurrentDownloadSection == DownloadSection.Running;
@@ -928,24 +947,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(IsDownloadVersionsSelected));
         OnPropertyChanged(nameof(IsDownloadModsSelected));
+        OnPropertyChanged(nameof(IsDownloadResourcePacksSelected));
+        OnPropertyChanged(nameof(IsDownloadContentSelected));
+        OnPropertyChanged(nameof(IsModSearchLoaderVisible));
+        OnPropertyChanged(nameof(ModSearchPlaceholder));
         OnPropertyChanged(nameof(IsDownloadJavaSelected));
         OnPropertyChanged(nameof(IsDownloadRunningSelected));
         OnPropertyChanged(nameof(IsSubPageOpen));
 
-        if (value == DownloadSection.Mods)
+        if (value is DownloadSection.Mods or DownloadSection.ResourcePacks)
         {
-            if (!_modPageInitialized)
-            {
-                // 没预取过（例如启动时预取被取消）：进页面时补一次。
-                _modPageInitialized = true;
-                UpdateModFiltersFromSelection();
-                _ = ShowModsAsync();
-            }
-            else if (ModProjects.Count == 0 && !IsModsLoading)
-            {
-                // 预取失败时列表为空，进页面再试一次（优先用缓存）。
-                _ = ShowModsAsync();
-            }
+            EnterContentSection(value == DownloadSection.ResourcePacks
+                ? ModProjectType.ResourcePack
+                : ModProjectType.Mod);
         }
 
         if (value == DownloadSection.Java)
@@ -983,10 +997,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private CancellationTokenSource? _modSearchCts;
     private CancellationTokenSource? _modDetailCts;
-    // 只在第一次进入 Mod 页时套用当前版本的筛选并自动搜索，之后保留用户的搜索状态。
+    // 只在第一次进入内容页时套用当前版本的筛选并自动搜索，之后保留用户的搜索状态。
     private bool _modPageInitialized;
+    // 当前内容页实际展示的类型（Mod / 材质包）。
+    private ModProjectType _modPageType = ModProjectType.Mod;
+    // 当前打开的详情页属于哪种类型，决定下载落点与推荐匹配规则。
+    private ModProjectType _modDetailType = ModProjectType.Mod;
     // 当前结果列表对应的搜索条件，翻页时沿用这一组，避免筛选未生效时错位。
-    private (ModPlatform? Platform, string Query, string? GameVersion, string? Loader)? _modActiveQuery;
+    private (ModProjectType Type, ModPlatform? Platform, string Query, string? GameVersion, string? Loader)?
+        _modActiveQuery;
 
     public RangeObservableCollection<ModProjectItemViewModel> ModProjects { get; } = new();
 
@@ -1015,11 +1034,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             if (SelectedModFileTarget is { } target)
             {
-                return ResolveModsDirectory(target.Summary, file.Version)
+                return ResolveModsDirectory(target.Summary, file.Version, _modDetailType)
                        ?? "当前版本不兼容，下载时选择位置";
             }
 
-            return UserModDirectory();
+            return UserContentDirectory(_modDetailType);
         }
     }
 
@@ -1139,6 +1158,55 @@ public partial class MainViewModel : ObservableObject, IDisposable
         SelectedModLoaderIndex = 0;
     }
 
+    /// <summary>
+    /// 进入 Mod / 材质包页：类型变了就清空上一个类型的状态，否则保留上次的搜索结果。
+    /// </summary>
+    private void EnterContentSection(ModProjectType type)
+    {
+        if (_modPageType != type)
+        {
+            _modPageType = type;
+
+            _modSearchCts?.Cancel();
+            _modActiveQuery = null;
+            _modPageInitialized = false;
+
+            ModSearchText = string.Empty;
+            ModProjects.Clear();
+            ModVersionRows.Clear();
+            _allModVersions.Clear();
+            ModVersionFilters.Clear();
+            _expandedModVersionGroups.Clear();
+            _selectedModVersionFilter = null;
+            IsModDetailOpen = false;
+            SelectedModProject = null;
+            SelectedModFile = null;
+            SelectedModFileTarget = null;
+            ModPage = 1;
+            ModTotalPages = 1;
+            ModStatus = type == ModProjectType.ResourcePack
+                ? "输入关键字搜索材质包"
+                : "输入关键字搜索 Mod";
+
+            OnPropertyChanged(nameof(ShowModVersionFilters));
+            OnPropertyChanged(nameof(IsModSearchLoaderVisible));
+            OnPropertyChanged(nameof(ModSearchPlaceholder));
+        }
+
+        if (!_modPageInitialized)
+        {
+            // 没预取过（例如启动时预取被取消）：进页面时补一次。
+            _modPageInitialized = true;
+            UpdateModFiltersFromSelection();
+            _ = ShowModsAsync();
+        }
+        else if (ModProjects.Count == 0 && !IsModsLoading)
+        {
+            // 预取失败时列表为空，进页面再试一次（优先用缓存）。
+            _ = ShowModsAsync();
+        }
+    }
+
     [RelayCommand]
     private Task SearchModsAsync() => FetchModPageAsync(1, newSearch: true, ignoreCache: true);
 
@@ -1164,10 +1232,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (newSearch)
         {
             _modActiveQuery = (
+                _modPageType,
                 SelectedModPlatform,
                 ModSearchText.Trim(),
                 SelectedModGameVersionFilter,
-                SelectedModLoaderFilter);
+                _modPageType == ModProjectType.Mod ? SelectedModLoaderFilter : null);
 
             ModStatus = "正在搜索…";
             ModProjects.Clear();
@@ -1186,6 +1255,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             var result = await Task.Run(
                 () => ModCatalog.SearchAsync(
+                    request.Type,
                     request.Platform,
                     request.Query,
                     request.GameVersion,
@@ -1203,13 +1273,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ModProjects.ReplaceAll(
                 result.Projects.Select(project => new ModProjectItemViewModel(project, SelectModProject)));
 
-            ModStatus = ModProjects.Count == 0 ? "没有找到 Mod" : string.Empty;
+            ModStatus = ModProjects.Count == 0
+                ? request.Type == ModProjectType.ResourcePack ? "没有找到材质包" : "没有找到 Mod"
+                : string.Empty;
 
             // 后台静默把后续页面和每个工程的文件列表准备好（低优先级线程）。
             if (newSearch)
             {
                 ModPrefetcher.Start(
-                    request.Platform, request.Query, request.GameVersion, request.Loader, _lifetime.Token);
+                    request.Type, request.Platform, request.Query, request.GameVersion, request.Loader, _lifetime.Token);
             }
 
             LauncherLog.Info(
@@ -1234,6 +1306,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void SelectModProject(ModProjectItemViewModel item)
     {
         SelectedModProject = item;
+        _modDetailType = item.Project.Type;
         IsModDetailOpen = true;
         ModDetailTitle = item.Name;
         ModDetailDescription = item.Description;
@@ -1307,7 +1380,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         List<string> Loaders,
         VersionItemViewModel Version);
 
-    private List<RecommendTarget> RecommendTargets()
+    private List<RecommendTarget> RecommendTargets(ModProjectType type)
     {
         var targets = new List<RecommendTarget>();
 
@@ -1316,8 +1389,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var gameVersion = version.Summary.ClientVersion;
             if (string.IsNullOrWhiteSpace(gameVersion)) continue;
 
-            var loaders = ModCatalog.LoaderTags(version.Summary.Loader);
-            if (loaders.Count == 0) continue;
+            // 材质包不需要加载器，原版实例也能用。
+            var loaders = type == ModProjectType.Mod
+                ? ModCatalog.LoaderTags(version.Summary.Loader)
+                : new List<string>();
+            if (type == ModProjectType.Mod && loaders.Count == 0) continue;
 
             targets.Add(new RecommendTarget(version.Id, gameVersion!, loaders, version));
         }
@@ -1333,11 +1409,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return targets;
     }
 
-    /// <summary>文件是否适配某个目标版本：游戏版本要对上，加载器也要相交。</summary>
-    private static bool MatchesTarget(ModVersionItemViewModel item, RecommendTarget target)
+    /// <summary>文件是否适配某个目标版本：游戏版本要对上；Mod 还要求加载器相交。</summary>
+    private static bool MatchesTarget(ModVersionItemViewModel item, RecommendTarget target, ModProjectType type)
         => item.Version.GameVersions.Contains(target.GameVersion, StringComparer.OrdinalIgnoreCase) &&
-           item.Version.Loaders.Any(loader => target.Loaders.Any(tag =>
-               string.Equals(tag, loader, StringComparison.OrdinalIgnoreCase)));
+           (type != ModProjectType.Mod ||
+            item.Version.Loaders.Any(loader => target.Loaders.Any(tag =>
+                string.Equals(tag, loader, StringComparison.OrdinalIgnoreCase))));
 
     /// <summary>
     /// 重建模组版本条：把同一个大版本的文件并成一格（<c>1.21</c> 涵盖 1.21 / 1.21.1 …），
@@ -1422,7 +1499,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         foreach (var group in ordered
                      .GroupBy(item =>
                      {
-                         var (loader, loaderOrder) = LoaderOf(item.Version);
+                         var loader = string.Empty;
+                         var loaderOrder = 0;
+                         if (_modDetailType == ModProjectType.Mod)
+                             (loader, loaderOrder) = LoaderOf(item.Version);
+
                          return (Line: VersionLineOf(item.Version), Loader: loader, LoaderOrder: loaderOrder,
                                  Preview: IsPreviewRelease(item.Version.ReleaseType));
                      })
@@ -1434,9 +1515,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var key = $"{group.Key.Line}|{group.Key.Loader}|{group.Key.Preview}";
             var expanded = _expandedModVersionGroups.Contains(key);
 
-            var title = group.Key.Line.Length == 0
-                ? group.Key.Loader
-                : $"{group.Key.Loader} {group.Key.Line}";
+            var title = group.Key.Loader.Length == 0
+                ? group.Key.Line
+                : group.Key.Line.Length == 0
+                    ? group.Key.Loader
+                    : $"{group.Key.Loader} {group.Key.Line}";
             if (group.Key.Preview) title += " 预览版";
 
             ModVersionRows.Add(ModVersionListRowViewModel.CreateHeader(
@@ -1450,7 +1533,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (source.Count == 0)
         {
-            ModDetailStatus = "该 Mod 没有可用文件";
+            ModDetailStatus = _modDetailType == ModProjectType.ResourcePack
+                ? "该材质包没有可用文件"
+                : "该 Mod 没有可用文件";
         }
         else if (_selectedModVersionFilter is null)
         {
@@ -1468,7 +1553,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     private void ApplyRecommendRows()
     {
-        var targets = RecommendTargets();
+        var targets = RecommendTargets(_modDetailType);
 
         var ordered = _allModVersions
             .OrderByDescending(item => NewestGameVersion(item.Version), MinecraftVersionOrder.Comparer)
@@ -1479,7 +1564,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         foreach (var target in targets)
         {
-            var items = ordered.Where(item => MatchesTarget(item, target)).ToList();
+            var items = ordered.Where(item => MatchesTarget(item, target, _modDetailType)).ToList();
             if (items.Count == 0) continue;
 
             foreach (var item in items) matched.Add(item);
@@ -1635,11 +1720,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private async Task DownloadModVersionAsync(ModVersionItemViewModel item, VersionItemViewModel? targetVersion)
     {
         var version = item.Version;
+        var type = _modDetailType;
+        var typeLabel = type == ModProjectType.ResourcePack ? "材质包" : "Mod";
 
-        // 推荐页：落到该行的目标版本；其余页面：存进 NCL/user/mods/<mod 名>/
+        // 推荐页：落到该行的目标版本；其余页面：存进 NCL/user/mods 或 NCL/user/resourcepacks。
         var target = targetVersion is not null
-            ? ResolveModTargetPath(targetVersion.Summary, version)
-            : ResolveUserModPath(version);
+            ? ResolveModTargetPath(targetVersion.Summary, version, type)
+            : ResolveUserModPath(version, type);
 
         if (target is null)
         {
@@ -1650,25 +1737,29 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            var defaultDirectory = Path.Combine(MinecraftDirectory, "mods");
+            var defaultFolder = type == ModProjectType.ResourcePack ? "resourcepacks" : "mods";
+            var defaultDirectory = Path.Combine(MinecraftDirectory, defaultFolder);
             target = await ModSaveFilePicker(version.FileName, defaultDirectory);
             if (string.IsNullOrWhiteSpace(target)) return;
         }
 
-        var task = TryCreateTask($"Mod · {item.Title}", DownloadTaskKind.Generic, $"mod:{version.Platform}:{version.Id}");
+        var task = TryCreateTask(
+            $"{typeLabel} · {item.Title}",
+            DownloadTaskKind.Generic,
+            $"mod:{version.Platform}:{version.Id}");
         if (task is null) return;
 
         // 下载已经进了任务队列，退出详情页直接看进度；返回时回到模组列表。
         CloseModDetail();
         EnterTaskSection();
 
-        // 失败时不留下这次新建的空目录；原本就存在的 mods 目录不动。
+        // 失败时不留下这次新建的空目录；原本就存在的资源目录不动。
         var targetDirectory = Path.GetDirectoryName(target);
         var directoryExisted = targetDirectory is not null && Directory.Exists(targetDirectory);
 
         task.StatusText = "正在下载…";
-        Status = $"正在下载 Mod：{item.Title}";
-        LauncherLog.Info($"下载 Mod {item.Title} → {target}");
+        Status = $"正在下载{typeLabel}：{item.Title}";
+        LauncherLog.Info($"下载{typeLabel} {item.Title} → {target}");
 
         try
         {
@@ -1698,7 +1789,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var fileName = Path.GetFileName(target);
             FinishTask(task, DownloadTaskState.Completed, $"已下载到 {Path.GetDirectoryName(target)}");
             ModDetailStatus = $"已下载：{fileName}";
-            Status = $"Mod 已下载：{fileName}";
+            Status = $"{typeLabel} 已下载：{fileName}";
 
             if (OpenFolderAfterModDownload)
                 RevealFile(target);
@@ -1710,31 +1801,32 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            LauncherLog.Error($"下载 Mod 失败：{version.FileName}", exception);
-            ShowDownloadError("下载 Mod", exception);
+            LauncherLog.Error($"下载{typeLabel}失败：{version.FileName}", exception);
+            ShowDownloadError($"下载{typeLabel}", exception);
             FinishTask(task, DownloadTaskState.Failed, "下载失败");
             TryRemoveCreatedEmptyDirectory(target, directoryExisted);
         }
     }
 
-    /// <summary>本机的 mod 库：NCL/user/mods/&lt;mod 名&gt;/，各版本放在同一文件夹。</summary>
-    private string UserModDirectory()
+    /// <summary>本机的资源库：NCL/user/mods 或 NCL/user/resourcepacks，按名字分文件夹。</summary>
+    private string UserContentDirectory(ModProjectType type)
     {
         var name = string.IsNullOrWhiteSpace(ModDetailTitle) ? "unknown" : ModDetailTitle.Trim();
-        return Path.Combine(AppSettings.UserDirectory, "mods", SanitizeModFileName(name));
+        var folder = type == ModProjectType.ResourcePack ? "resourcepacks" : "mods";
+        return Path.Combine(AppSettings.UserDirectory, folder, SanitizeModFileName(name));
     }
 
-    private string ResolveUserModPath(ModVersion version)
+    private string ResolveUserModPath(ModVersion version, ModProjectType type)
     {
         // 不在下载前建目录：目录由下载器真正写文件时创建，失败时不会留下空文件夹。
-        return Path.Combine(UserModDirectory(), SanitizeModFileName(version.FileName));
+        return Path.Combine(UserContentDirectory(type), SanitizeModFileName(version.FileName));
     }
 
     /// <summary>
-    /// 文件应落入的 mods 目录；版本不兼容或未指定目标时返回 null。
+    /// 文件应落入的资源目录（mods / resourcepacks）；版本不兼容或未指定目标时返回 null。
     /// 只算路径，不建目录，供界面展示和下载前解析共用。
     /// </summary>
-    private string? ResolveModsDirectory(VersionSummary? target, ModVersion version)
+    private string? ResolveModsDirectory(VersionSummary? target, ModVersion version, ModProjectType type)
     {
         if (target is null) return null;
 
@@ -1745,12 +1837,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return null;
         }
 
-        var loaderTags = ModCatalog.LoaderTags(target.Loader);
-        if (version.Loaders.Count > 0 &&
-            !version.Loaders.Any(loader => loaderTags.Any(tag =>
-                string.Equals(tag, loader, StringComparison.OrdinalIgnoreCase))))
+        // 材质包不区分加载器。
+        if (type == ModProjectType.Mod)
         {
-            return null;
+            var loaderTags = ModCatalog.LoaderTags(target.Loader);
+            if (version.Loaders.Count > 0 &&
+                !version.Loaders.Any(loader => loaderTags.Any(tag =>
+                    string.Equals(tag, loader, StringComparison.OrdinalIgnoreCase))))
+            {
+                return null;
+            }
         }
 
         var versionDirectory = Path.GetDirectoryName(target.JsonPath) ?? string.Empty;
@@ -1764,20 +1860,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _settings.DefaultIsolation).IsIsolated;
 
         var gameDirectory = isolated ? versionDirectory : MinecraftDirectory;
-        return Path.Combine(gameDirectory, "mods");
+        var contentFolder = type == ModProjectType.ResourcePack ? "resourcepacks" : "mods";
+        return Path.Combine(gameDirectory, contentFolder);
     }
 
     /// <summary>
     /// 计算文件该写入哪个路径：目标版本由调用方传入，不依赖“当前选中版本”。
     /// 版本不兼容（游戏版本或加载器对不上）、或未指定目标时返回 null，由调用方让用户选位置。
     /// </summary>
-    private string? ResolveModTargetPath(VersionSummary? target, ModVersion version)
+    private string? ResolveModTargetPath(VersionSummary? target, ModVersion version, ModProjectType type)
     {
-        var modsDirectory = ResolveModsDirectory(target, version);
-        if (modsDirectory is null) return null;
+        var directory = ResolveModsDirectory(target, version, type);
+        if (directory is null) return null;
 
         // 目录由下载器真正写文件时创建；失败时不会在这里留下空文件夹。
-        return Path.Combine(modsDirectory, SanitizeModFileName(version.FileName));
+        return Path.Combine(directory, SanitizeModFileName(version.FileName));
     }
 
     /// <summary>
@@ -2034,6 +2131,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowDownloadMods() => CurrentDownloadSection = DownloadSection.Mods;
+
+    [RelayCommand]
+    private void ShowDownloadResourcePacks() => CurrentDownloadSection = DownloadSection.ResourcePacks;
 
     [RelayCommand]
     private void ShowDownloadJava() => CurrentDownloadSection = DownloadSection.Java;

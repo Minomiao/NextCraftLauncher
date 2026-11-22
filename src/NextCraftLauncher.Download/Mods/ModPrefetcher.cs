@@ -22,6 +22,7 @@ public static class ModPrefetcher
     /// 为指定搜索条件启动预取；重复调用会取消上一轮。
     /// </summary>
     public static void Start(
+        ModProjectType type,
         ModPlatform? platform,
         string query,
         string? gameVersion,
@@ -39,7 +40,7 @@ public static class ModPrefetcher
             token = cts.Token;
         }
 
-        var thread = new Thread(() => Run(platform, query, gameVersion, loader, token))
+        var thread = new Thread(() => Run(type, platform, query, gameVersion, loader, token))
         {
             IsBackground = true,
             Priority = ThreadPriority.BelowNormal,
@@ -50,6 +51,7 @@ public static class ModPrefetcher
     }
 
     private static void Run(
+        ModProjectType type,
         ModPlatform? platform,
         string query,
         string? gameVersion,
@@ -58,7 +60,7 @@ public static class ModPrefetcher
     {
         try
         {
-            RunAsync(platform, query, gameVersion, loader, cancellationToken).GetAwaiter().GetResult();
+            RunAsync(type, platform, query, gameVersion, loader, cancellationToken).GetAwaiter().GetResult();
         }
         catch (OperationCanceledException)
         {
@@ -70,6 +72,7 @@ public static class ModPrefetcher
     }
 
     private static async Task RunAsync(
+        ModProjectType type,
         ModPlatform? platform,
         string query,
         string? gameVersion,
@@ -93,7 +96,7 @@ public static class ModPrefetcher
             try
             {
                 result = await ModCatalog.SearchAsync(
-                    platform, query, gameVersion, loader, page, ignoreCache: false, cancellationToken);
+                    type, platform, query, gameVersion, loader, page, ignoreCache: false, cancellationToken);
             }
             catch (OperationCanceledException)
             {

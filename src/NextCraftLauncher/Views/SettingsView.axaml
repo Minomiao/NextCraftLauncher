@@ -289,6 +289,18 @@
                                           VerticalAlignment="Center"
                                           ToolTip.Tip="Mod 下载完成后，在文件管理器中打开并选中该文件。" />
                         </Grid>
+
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                            <TextBlock Text="下载后进入任务页"
+                                       Classes="fieldLabel"
+                                       VerticalAlignment="Center" />
+                            <ToggleSwitch Grid.Column="1"
+                                          OnContent=""
+                                          OffContent=""
+                                          IsChecked="{Binding JumpToTasksAfterModDownload}"
+                                          VerticalAlignment="Center"
+                                          ToolTip.Tip="Mod 下载开始后关闭详情页并切到下载任务页；关闭时留在当前页面。" />
+                        </Grid>
                     </StackPanel>
 
                     <Border Classes="divider" />
@@ -317,6 +329,18 @@
                                           IsChecked="{Binding OpenFolderAfterResourcePackDownload}"
                                           VerticalAlignment="Center"
                                           ToolTip.Tip="材质包下载完成后，在文件管理器中打开并选中该文件。" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                            <TextBlock Text="下载后进入任务页"
+                                       Classes="fieldLabel"
+                                       VerticalAlignment="Center" />
+                            <ToggleSwitch Grid.Column="1"
+                                          OnContent=""
+                                          OffContent=""
+                                          IsChecked="{Binding JumpToTasksAfterResourcePackDownload}"
+                                          VerticalAlignment="Center"
+                                          ToolTip.Tip="材质包下载开始后关闭详情页并切到下载任务页；关闭时留在当前页面。" />
                         </Grid>
                     </StackPanel>
                 </StackPanel>

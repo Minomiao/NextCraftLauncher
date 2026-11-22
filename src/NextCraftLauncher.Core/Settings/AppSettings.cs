@@ -21,11 +21,17 @@ public sealed class AppSettings
     /// <summary>Mod 下载完成后自动在文件管理器里打开所在文件夹并选中文件。</summary>
     public bool OpenFolderAfterModDownload { get; set; } = true;
 
+    /// <summary>Mod 下载开始后切到下载任务页。</summary>
+    public bool JumpToTasksAfterModDownload { get; set; }
+
     /// <summary>打开 Mod 详情页时默认选中「推荐」而不是「全部」。</summary>
     public bool ModDetailStartsWithRecommend { get; set; }
 
     /// <summary>材质包下载完成后自动在文件管理器里打开所在文件夹并选中文件。</summary>
     public bool OpenFolderAfterResourcePackDownload { get; set; } = true;
+
+    /// <summary>材质包下载开始后切到下载任务页。</summary>
+    public bool JumpToTasksAfterResourcePackDownload { get; set; }
 
     /// <summary>打开材质包详情页时默认选中「推荐」而不是「全部」。</summary>
     public bool ResourcePackDetailStartsWithRecommend { get; set; }

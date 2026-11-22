@@ -64,8 +64,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ApplyAccount();
         _memoryMb = MemoryOptions.Contains(_settings.MemoryMb) ? _settings.MemoryMb : 4096;
         _openFolderAfterModDownload = _settings.OpenFolderAfterModDownload;
+        _jumpToTasksAfterModDownload = _settings.JumpToTasksAfterModDownload;
         _selectedModDefaultFilterIndex = _settings.ModDetailStartsWithRecommend ? 1 : 0;
         _openFolderAfterResourcePackDownload = _settings.OpenFolderAfterResourcePackDownload;
+        _jumpToTasksAfterResourcePackDownload = _settings.JumpToTasksAfterResourcePackDownload;
         _selectedResourcePackDefaultFilterIndex =
             _settings.ResourcePackDetailStartsWithRecommend ? 1 : 0;
         _selectedGameMirrorIndex = (int)_settings.GameMirror;
@@ -518,11 +520,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Mod 下载完成后自动打开所在文件夹。</summary>
     [ObservableProperty] private bool _openFolderAfterModDownload;
 
+    /// <summary>Mod 下载开始后切到下载任务页。</summary>
+    [ObservableProperty] private bool _jumpToTasksAfterModDownload;
+
     /// <summary>进入 Mod 详情页时默认选中的版本筛选（0 = 全部，1 = 推荐）。</summary>
     [ObservableProperty] private int _selectedModDefaultFilterIndex;
 
     /// <summary>材质包下载完成后自动打开所在文件夹。</summary>
     [ObservableProperty] private bool _openFolderAfterResourcePackDownload;
+
+    /// <summary>材质包下载开始后切到下载任务页。</summary>
+    [ObservableProperty] private bool _jumpToTasksAfterResourcePackDownload;
 
     /// <summary>进入材质包详情页时默认选中的版本筛选（0 = 全部，1 = 推荐）。</summary>
     [ObservableProperty] private int _selectedResourcePackDefaultFilterIndex;
@@ -1775,9 +1783,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
             $"mod:{version.Platform}:{version.Id}");
         if (task is null) return;
 
-        // 下载已经进了任务队列，退出详情页直接看进度；返回时回到模组列表。
-        CloseModDetail();
-        EnterTaskSection();
+        // 下载已经进了任务队列；根据设置决定是否退出详情页并切到任务页。
+        var jumpToTasks = type == ModProjectType.ResourcePack
+            ? JumpToTasksAfterResourcePackDownload
+            : JumpToTasksAfterModDownload;
+        if (jumpToTasks)
+        {
+            CloseModDetail();
+            EnterTaskSection();
+        }
 
         // 失败时不留下这次新建的空目录；原本就存在的资源目录不动。
         var targetDirectory = Path.GetDirectoryName(target);
@@ -2445,6 +2459,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
     partial void OnOpenFolderAfterResourcePackDownloadChanged(bool value)
     {
         _settings.OpenFolderAfterResourcePackDownload = value;
+        _settings.Save();
+    }
+
+    partial void OnJumpToTasksAfterModDownloadChanged(bool value)
+    {
+        _settings.JumpToTasksAfterModDownload = value;
+        _settings.Save();
+    }
+
+    partial void OnJumpToTasksAfterResourcePackDownloadChanged(bool value)
+    {
+        _settings.JumpToTasksAfterResourcePackDownload = value;
         _settings.Save();
     }
 

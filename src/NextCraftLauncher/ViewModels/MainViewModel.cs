@@ -65,6 +65,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _memoryMb = MemoryOptions.Contains(_settings.MemoryMb) ? _settings.MemoryMb : 4096;
         _openFolderAfterModDownload = _settings.OpenFolderAfterModDownload;
         _selectedModDefaultFilterIndex = _settings.ModDetailStartsWithRecommend ? 1 : 0;
+        _openFolderAfterResourcePackDownload = _settings.OpenFolderAfterResourcePackDownload;
+        _selectedResourcePackDefaultFilterIndex =
+            _settings.ResourcePackDetailStartsWithRecommend ? 1 : 0;
         _selectedGameMirrorIndex = (int)_settings.GameMirror;
         _selectedForgeMirrorIndex = LoaderMirrorIndexFrom(_settings.ForgeMirror);
         _selectedFabricMirrorIndex = LoaderMirrorIndexFrom(_settings.FabricMirror);
@@ -509,6 +512,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>进入 Mod 详情页时默认选中的版本筛选（0 = 全部，1 = 推荐）。</summary>
     [ObservableProperty] private int _selectedModDefaultFilterIndex;
+
+    /// <summary>材质包下载完成后自动打开所在文件夹。</summary>
+    [ObservableProperty] private bool _openFolderAfterResourcePackDownload;
+
+    /// <summary>进入材质包详情页时默认选中的版本筛选（0 = 全部，1 = 推荐）。</summary>
+    [ObservableProperty] private int _selectedResourcePackDefaultFilterIndex;
     [ObservableProperty] private string _status = "就绪";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _isLaunching;
@@ -1315,7 +1324,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ModVersionFilters.Clear();
         _expandedModVersionGroups.Clear();
         _selectedModVersionFilter = null;
-        IsModRecommendSelected = _settings.ModDetailStartsWithRecommend;
+        IsModRecommendSelected = item.Project.Type == ModProjectType.ResourcePack
+            ? _settings.ResourcePackDetailStartsWithRecommend
+            : _settings.ModDetailStartsWithRecommend;
         SelectedModFile = null;
         SelectedModFileTarget = null;
         OnPropertyChanged(nameof(ShowModVersionFilters));
@@ -1791,7 +1802,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ModDetailStatus = $"已下载：{fileName}";
             Status = $"{typeLabel} 已下载：{fileName}";
 
-            if (OpenFolderAfterModDownload)
+            var openFolder = type == ModProjectType.ResourcePack
+                ? OpenFolderAfterResourcePackDownload
+                : OpenFolderAfterModDownload;
+            if (openFolder)
                 RevealFile(target);
         }
         catch (OperationCanceledException)
@@ -2408,6 +2422,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (value is < 0 or > 1) return;
 
         _settings.ModDetailStartsWithRecommend = value == 1;
+        _settings.Save();
+    }
+
+    partial void OnOpenFolderAfterResourcePackDownloadChanged(bool value)
+    {
+        _settings.OpenFolderAfterResourcePackDownload = value;
+        _settings.Save();
+    }
+
+    partial void OnSelectedResourcePackDefaultFilterIndexChanged(int value)
+    {
+        if (value is < 0 or > 1) return;
+
+        _settings.ResourcePackDetailStartsWithRecommend = value == 1;
         _settings.Save();
     }
 

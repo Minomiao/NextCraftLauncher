@@ -94,12 +94,14 @@
         <Grid ColumnDefinitions="Auto,*"
               IsVisible="{Binding !IsDownloadRunningSelected}">
 
-            <!-- 左侧边栏：进入次级页面后收起，把宽度让给内容 -->
+            <!-- 左侧边栏：进入次级页面后只保留底部的任务区，上方入口收起 -->
             <Grid Width="176"
                   Margin="0,0,16,0"
-                  RowDefinitions="*,Auto"
-                  IsVisible="{Binding !IsSubPageOpen}">
-                <StackPanel Spacing="2" VerticalAlignment="Top" Margin="0,2,0,0">
+                  RowDefinitions="*,Auto">
+                <StackPanel Spacing="2"
+                            VerticalAlignment="Top"
+                            Margin="0,2,0,0"
+                            IsVisible="{Binding !IsSubPageOpen}">
                     <Button Classes="side"
                             Classes.selected="{Binding IsDownloadVersionsSelected}"
                             Content="游戏"

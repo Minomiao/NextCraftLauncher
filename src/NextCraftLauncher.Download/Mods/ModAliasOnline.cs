@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using NextCraftLauncher.Core.Logging;
+using NextCraftLauncher.Core.Net;
 using NextCraftLauncher.Core.Settings;
 
 namespace NextCraftLauncher.Download.Mods;
@@ -199,12 +200,14 @@ public static partial class ModAliasOnline
 
     private static HttpClient CreateClient()
     {
-        var client = new HttpClient(new SocketsHttpHandler
+        var handler = HappyEyeballs.Configure(new SocketsHttpHandler
         {
             ConnectTimeout = TimeSpan.FromSeconds(8),
             MaxConnectionsPerServer = 2,
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-        })
+        });
+
+        var client = new HttpClient(handler)
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };

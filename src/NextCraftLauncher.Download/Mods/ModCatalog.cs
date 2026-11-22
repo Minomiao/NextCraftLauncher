@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
 using NextCraftLauncher.Core.Logging;
+using NextCraftLauncher.Core.Net;
 
 namespace NextCraftLauncher.Download.Mods;
 
@@ -28,12 +29,14 @@ public static class ModCatalog
 
     private static HttpClient CreateClient()
     {
-        var client = new HttpClient(new SocketsHttpHandler
+        var handler = HappyEyeballs.Configure(new SocketsHttpHandler
         {
             ConnectTimeout = TimeSpan.FromSeconds(10),
             MaxConnectionsPerServer = 16,
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-        })
+        });
+
+        var client = new HttpClient(handler)
         {
             // 单次尝试的超时由 GetJsonAsync 逐个请求控制。
             Timeout = Timeout.InfiniteTimeSpan,

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
+using NextCraftLauncher.Core.Net;
 using NextCraftLauncher.Core.Settings;
 
 namespace NextCraftLauncher.Download;
@@ -190,14 +191,16 @@ public sealed class DownloadClient : IDisposable
 
     private static HttpClient CreateClient(DecompressionMethods decompression)
     {
-        var client = new HttpClient(new SocketsHttpHandler
+        var handler = HappyEyeballs.Configure(new SocketsHttpHandler
         {
             AllowAutoRedirect = true,
             AutomaticDecompression = decompression,
             ConnectTimeout = ConnectTimeout,
             MaxConnectionsPerServer = 256,
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-        })
+        });
+
+        var client = new HttpClient(handler)
         {
             DefaultRequestVersion = HttpVersion.Version20,
             DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower,

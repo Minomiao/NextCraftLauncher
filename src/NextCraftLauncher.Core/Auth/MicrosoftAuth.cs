@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using NextCraftLauncher.Core.Net;
 
 namespace NextCraftLauncher.Core.Auth;
 
@@ -380,11 +381,13 @@ public static class MicrosoftAuth
 
     private static HttpClient CreateClient()
     {
-        var client = new HttpClient(new SocketsHttpHandler
+        var handler = HappyEyeballs.Configure(new SocketsHttpHandler
         {
             ConnectTimeout = TimeSpan.FromSeconds(15),
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-        })
+        });
+
+        var client = new HttpClient(handler)
         {
             Timeout = TimeSpan.FromSeconds(30),
         };

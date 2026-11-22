@@ -2901,23 +2901,37 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var filtered = FilteredRemoteVersions();
         _filteredRemoteVersionCount = filtered.Count;
 
+        // 侧栏的邻近版本按列表实际显示的顺序取。
         _filteredRemoteVersions.Clear();
-        _filteredRemoteVersions.AddRange(filtered);
 
-        foreach (var group in filtered
-                     .GroupBy(item => item.Type)
-                     .OrderBy(group => VersionTypeOrder(group.Key)))
+        // 「全部」按发布时间新→旧平铺，不分类型组；单一类型仍保留分组标题。
+        if (RemoteVersionType == "全部")
         {
-            var items = group
-                .OrderByDescending(item => item.ReleaseTime ?? DateTimeOffset.MinValue)
-                .ToList();
-
-            if (items.Count == 0) continue;
-
-            rows.Add(RemoteVersionListRowViewModel.CreateHeader(VersionTypeTitle(group.Key), items.Count));
-            foreach (var item in items)
+            foreach (var item in filtered
+                         .OrderByDescending(item => item.ReleaseTime ?? DateTimeOffset.MinValue))
             {
                 rows.Add(GetRemoteVersionRow(item));
+                _filteredRemoteVersions.Add(item);
+            }
+        }
+        else
+        {
+            foreach (var group in filtered
+                         .GroupBy(item => item.Type)
+                         .OrderBy(group => VersionTypeOrder(group.Key)))
+            {
+                var items = group
+                    .OrderByDescending(item => item.ReleaseTime ?? DateTimeOffset.MinValue)
+                    .ToList();
+
+                if (items.Count == 0) continue;
+
+                rows.Add(RemoteVersionListRowViewModel.CreateHeader(VersionTypeTitle(group.Key), items.Count));
+                foreach (var item in items)
+                {
+                    rows.Add(GetRemoteVersionRow(item));
+                    _filteredRemoteVersions.Add(item);
+                }
             }
         }
 

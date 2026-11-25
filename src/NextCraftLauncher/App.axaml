@@ -68,8 +68,9 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
-        <!-- 进度条数值做缓动：大批文件完成时不再突跳 -->
+        <!-- 进度条用主题强调色，和按钮、选中态保持一致；数值变化做缓动 -->
         <Style Selector="ProgressBar">
+            <Setter Property="Foreground" Value="{DynamicResource AccentFillBrush}" />
             <Setter Property="Transitions">
                 <Transitions>
                     <DoubleTransition Property="Value" Duration="0:0:0.35" Easing="CubicEaseOut" />

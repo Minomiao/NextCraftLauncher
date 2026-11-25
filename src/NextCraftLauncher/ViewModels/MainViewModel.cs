@@ -2097,7 +2097,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             var clock = Stopwatch.StartNew();
 
-            if (HasActiveDownloads) EnterTaskSection(leaveVersionDetail: true);
             _ = EnsureRemoteVersionsLoadedAsync();
             _ = EnsureJavaRuntimesLoadedAsync();
 

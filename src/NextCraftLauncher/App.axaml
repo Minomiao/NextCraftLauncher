@@ -36,6 +36,16 @@
             <Setter Property="IconSize" Value="16" />
         </Style>
 
+        <!-- 折叠箭头：右向图标，展开时旋转 90° -->
+        <Style Selector="controls|IconView.chevron">
+            <Setter Property="IconSize" Value="10" />
+            <Setter Property="Opacity" Value="{DynamicResource TextOpacityTertiary}" />
+            <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+        </Style>
+        <Style Selector="controls|IconView.chevron.expanded">
+            <Setter Property="RenderTransform" Value="rotate(90deg)" />
+        </Style>
+
         <!-- 极细分割线，替代卡片边框 -->
         <Style Selector="Border.hline">
             <Setter Property="Height" Value="1" />
@@ -49,11 +59,6 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="16" />
-        </Style>
-
-        <Style Selector="TextBlock.micro">
-            <Setter Property="FontSize" Value="{DynamicResource FontSizeMicro}" />
-            <Setter Property="Opacity" Value="{DynamicResource TextOpacityTertiary}" />
         </Style>
 
         <Style Selector="TextBlock.caption">

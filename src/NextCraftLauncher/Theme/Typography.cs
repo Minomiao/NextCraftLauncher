@@ -17,7 +17,6 @@ public static class Typography
     /// <summary>角色名 → 相对基准的系数。</summary>
     private static readonly (string Name, double Factor)[] Sizes =
     {
-        ("Micro", 0.77),       // 10：暂只给折叠箭头使用
         ("Caption", 0.85),     // 11
         ("Meta", 0.92),        // 12
         ("Body", 1.00),        // 13

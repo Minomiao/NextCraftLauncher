@@ -59,10 +59,6 @@ public sealed partial class ModVersionListRowViewModel : ObservableObject
 
     [ObservableProperty] private bool _isSelected;
 
-    public string Chevron => IsExpanded ? "▾" : "▸";
-
-    partial void OnIsExpandedChanged(bool value) => OnPropertyChanged(nameof(Chevron));
-
     public static ModVersionListRowViewModel CreateHeader(
         string key,
         string title,

@@ -337,11 +337,10 @@
                                                         Command="{Binding ToggleCommand}"
                                                         ToolTip.Tip="{Binding Error}">
                                                     <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="6">
-                                                        <TextBlock Text="{Binding Chevron}"
-                                                                   FontSize="10"
-                                                                   Width="10"
-                                                                   Opacity="0.4"
-                                                                   VerticalAlignment="Center" />
+                                                        <controls:IconView Icon="chevron"
+                                                                           Classes="chevron"
+                                                                           Classes.expanded="{Binding Group.IsExpanded}"
+                                                                           VerticalAlignment="Center" />
                                                         <controls:BlockIcon Grid.Column="1"
                                                                             Width="22"
                                                                             Height="22"
@@ -592,11 +591,10 @@
                                                     Classes="versionRow loaderHeader"
                                                     Command="{Binding ToggleCommand}">
                                                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
-                                                    <TextBlock Text="{Binding Chevron}"
-                                                               FontSize="10"
-                                                               Width="10"
-                                                               Opacity="0.4"
-                                                               VerticalAlignment="Center" />
+                                                    <controls:IconView Icon="chevron"
+                                                                       Classes="chevron"
+                                                                       Classes.expanded="{Binding IsExpanded}"
+                                                                       VerticalAlignment="Center" />
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding Title}"
                                                                Classes="subsection"

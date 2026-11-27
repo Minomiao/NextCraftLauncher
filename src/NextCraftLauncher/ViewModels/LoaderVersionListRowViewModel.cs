@@ -68,8 +68,6 @@ public sealed class LoaderVersionListRowViewModel
 
     public string? Error => Group?.ErrorText;
 
-    public string? Chevron => Group is null ? null : Group.IsExpanded ? "▾" : "▸";
-
     public static LoaderVersionListRowViewModel CreateHeader(
         LoaderVersionGroupViewModel group,
         Action toggle)

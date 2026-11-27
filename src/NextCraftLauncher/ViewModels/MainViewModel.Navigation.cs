@@ -300,17 +300,48 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsVersionDeleteDialogOpen = true;
     }
 
-    /// <summary>进入某个版本的设置页；目前该页只展示版本信息。</summary>
+    /// <summary>
+    /// 进入某个版本的设置页；目前该页只展示版本信息。
+    /// 只切换设置页查看的版本，不改变启动页当前版本。
+    /// </summary>
     [RelayCommand]
     private void OpenVersionSettings(VersionItemViewModel? version)
     {
-        if (version is not null) SelectedVersion = version;
-        if (SelectedVersion is null) return;
+        var target = version ?? SelectedVersion;
+        if (target is null) return;
 
         // 设置页挂在「版本」区块下，所以先切过去；关闭时再回到原来的区块。
         _sectionBeforeVersionDetail = CurrentLaunchSection;
         CurrentLaunchSection = LaunchSection.Versions;
         IsVersionDetailOpen = true;
+
+        VersionSettingsVersion = target;
+        _ = LoadVersionSettingsDetailsAsync(target);
+    }
+
+    /// <summary>解析设置页要展示的版本信息，与启动页的解析互不影响。</summary>
+    private async Task LoadVersionSettingsDetailsAsync(VersionItemViewModel item)
+    {
+        var revision = ++_versionSettingsRevision;
+        VersionSettingsDetails = "正在解析版本...";
+
+        try
+        {
+            var resolved = await Task.Run(
+                () => VersionResolver.Resolve(MinecraftDirectory, item.Id, _settings.DefaultIsolation),
+                _lifetime.Token);
+            if (revision != _versionSettingsRevision) return;
+
+            VersionSettingsDetails = BuildDetailsText(resolved);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            if (revision != _versionSettingsRevision) return;
+            VersionSettingsDetails = "解析失败: " + exception.Message;
+        }
     }
 
     /// <summary>启动按钮下方的「版本设置」：直接打开当前版本的设置页。</summary>

@@ -539,6 +539,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isLaunching;
     [ObservableProperty] private string _versionsCountText = "尚未扫描";
     [ObservableProperty] private string _versionDetails = "请选择左侧版本。";
+
+    // 「版本设置」页查看的版本，与启动版本分开：
+    // 打开设置不会改变启动页显示的版本，启动页的滚轮也不会影响设置页。
+    [ObservableProperty] private VersionItemViewModel? _versionSettingsVersion;
+    [ObservableProperty] private string _versionSettingsDetails = string.Empty;
+    private int _versionSettingsRevision;
     [ObservableProperty] private string? _launchWarning;
     [ObservableProperty] private bool _isVersionIsolated;
     [ObservableProperty] private string _remoteVersionSearch = string.Empty;

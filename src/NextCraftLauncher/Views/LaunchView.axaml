@@ -410,7 +410,7 @@
 
                 <!-- 版本设置：暂时只展示版本信息 -->
                 <Grid RowDefinitions="Auto,*" RowSpacing="12" IsVisible="{Binding IsVersionDetailOpen}">
-                    <TextBlock Text="{Binding SelectedVersion.Id}"
+                    <TextBlock Text="{Binding VersionSettingsVersion.Id}"
                                Classes="section"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" />
@@ -418,7 +418,7 @@
                     <ScrollViewer Grid.Row="1"
                                   VerticalScrollBarVisibility="Auto"
                                   Padding="0,0,12,0">
-                        <TextBlock Text="{Binding VersionDetails}"
+                        <TextBlock Text="{Binding VersionSettingsDetails}"
                                    Classes="code"
                                    LineHeight="18"
                                    TextWrapping="Wrap" />

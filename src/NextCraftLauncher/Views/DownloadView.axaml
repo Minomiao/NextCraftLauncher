@@ -828,9 +828,9 @@
             <Grid Grid.Column="2">
                 <TextBlock Text="没有正在进行的下载"
                            IsVisible="{Binding !HasDownloadTasks}"
+                           Classes="placeholder"
                            HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           Opacity="0.4" />
+                           VerticalAlignment="Center" />
 
                 <ScrollViewer IsVisible="{Binding HasDownloadTasks}"
                               VerticalScrollBarVisibility="Auto">

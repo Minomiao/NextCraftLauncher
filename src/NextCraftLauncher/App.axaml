@@ -109,6 +109,12 @@
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
 
+        <!-- 空态占位：与状态文字同字号，只靠透明度更淡 -->
+        <Style Selector="TextBlock.placeholder">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
+            <Setter Property="Opacity" Value="{DynamicResource TextOpacityTertiary}" />
+        </Style>
+
         <Style Selector="TextBlock.fieldLabel">
             <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
             <Setter Property="Opacity" Value="{DynamicResource TextOpacityLabel}" />

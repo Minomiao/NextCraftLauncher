@@ -194,12 +194,11 @@
                                 Classes.idle="{Binding !HasActiveDownloads}">
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasActiveDownloads}">
                             <TextBlock Text="下载进度"
-                                       FontSize="12"
-                                       Opacity="0.72"
+                                       Classes="bodyMuted"
                                        VerticalAlignment="Center" />
                             <TextBlock Grid.Column="1"
                                        Text="{Binding OverallDownloadPercentText}"
-                                       FontSize="12" />
+                                       Classes="body" />
                         </Grid>
                         <ProgressBar Minimum="0"
                                      Maximum="100"
@@ -222,8 +221,7 @@
                 <TextBlock Text="{Binding MinecraftDirectory}"
                            Margin="0,0,0,14"
                            IsVisible="{Binding IsDownloadVersionsSelected}"
-                           FontSize="11"
-                           Opacity="0.56"
+                           Classes="caption"
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
                            ToolTip.Tip="{Binding MinecraftDirectory}" />
@@ -265,12 +263,10 @@
                                                       ColumnDefinitions="*,Auto"
                                                       Margin="0,10,0,4">
                                                     <TextBlock Text="{Binding GroupTitle}"
-                                                               Classes="section"
-                                                               FontSize="13" />
+                                                               Classes="subsection" />
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding GroupCountText}"
-                                                               FontSize="11"
-                                                               Opacity="0.56"
+                                                               Classes="caption"
                                                                VerticalAlignment="Center" />
                                                 </Grid>
 
@@ -287,11 +283,10 @@
                                                                             Block="{Binding Version.IconName}" />
                                                         <StackPanel Grid.Column="1" Spacing="1">
                                                             <TextBlock Text="{Binding Version.Id}"
-                                                                       FontWeight="SemiBold"
+                                                                       Classes="bodyStrong"
                                                                        TextTrimming="CharacterEllipsis" />
                                                             <TextBlock Text="{Binding Version.Subtitle}"
-                                                                       FontSize="11"
-                                                                       Opacity="0.56" />
+                                                                       Classes="caption" />
                                                         </StackPanel>
                                                     </Grid>
                                                 </Button>
@@ -303,7 +298,7 @@
                                            IsVisible="{Binding ShowRemoteVersionsLoading}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           Opacity="0.56" />
+                                           Classes="meta" />
                             </Grid>
                         </Grid>
 
@@ -319,12 +314,10 @@
                                                     Block="{Binding DownloadIconName}" />
                                 <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding SelectedRemoteVersion.Id}"
-                                               FontSize="18"
-                                               FontWeight="SemiBold"
+                                               Classes="title"
                                                TextTrimming="CharacterEllipsis" />
                                     <TextBlock Text="{Binding SelectedRemoteVersion.Subtitle}"
-                                               FontSize="11"
-                                               Opacity="0.56"
+                                               Classes="caption"
                                                TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                             </Grid>
@@ -360,19 +353,16 @@
                                                                     Spacing="6"
                                                                     VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding Title}"
-                                                                       Classes="section"
-                                                                       FontSize="13"
+                                                                       Classes="subsection"
                                                                        VerticalAlignment="Center" />
                                                             <TextBlock Text="{Binding SelectionText}"
-                                                                       FontSize="12"
-                                                                       Opacity="0.72"
+                                                                       Classes="bodyMuted"
                                                                        VerticalAlignment="Center"
                                                                        IsVisible="{Binding HasSelection}" />
                                                         </StackPanel>
                                                         <TextBlock Grid.Column="3"
                                                                    Text="{Binding Status}"
-                                                                   FontSize="11"
-                                                                   Opacity="0.56"
+                                                                   Classes="caption"
                                                                    VerticalAlignment="Center" />
                                                     </Grid>
                                                 </Button>
@@ -383,22 +373,19 @@
                                                         Command="{Binding Item.SelectCommand}">
                                                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                                         <TextBlock Text="{Binding Version}"
-                                                                   FontSize="13"
-                                                                   FontWeight="SemiBold"
+                                                                   Classes="bodyStrong"
                                                                    TextTrimming="CharacterEllipsis" />
                                                         <TextBlock Grid.Column="1"
                                                                    Text="{Binding Tag}"
                                                                    IsVisible="{Binding HasTag}"
-                                                                   FontSize="11"
-                                                                   Opacity="0.56"
+                                                                   Classes="caption"
                                                                    VerticalAlignment="Center" />
                                                     </Grid>
                                                 </Button>
 
                                                 <TextBlock IsVisible="{Binding IsEmpty}"
                                                            Text="{Binding Text}"
-                                                           FontSize="12"
-                                                           Opacity="0.56"
+                                                           Classes="meta"
                                                            Margin="8,5"
                                                            TextWrapping="Wrap"
                                                            ToolTip.Tip="{Binding Error}" />
@@ -506,14 +493,12 @@
                                                                               CacheKey="{Binding IconKey}" />
                                                         <StackPanel Grid.Column="1" Spacing="2">
                                                             <TextBlock Text="{Binding Name}"
-                                                                       FontWeight="SemiBold"
+                                                                       Classes="bodyStrong"
                                                                        TextTrimming="CharacterEllipsis" />
                                                             <TextBlock Text="{Binding Subtitle}"
-                                                                       FontSize="11"
-                                                                       Opacity="0.56" />
+                                                                       Classes="caption" />
                                                             <TextBlock Text="{Binding Description}"
-                                                                       FontSize="11"
-                                                                       Opacity="0.56"
+                                                                       Classes="caption"
                                                                        TextTrimming="CharacterEllipsis" />
                                                         </StackPanel>
                                                     </Grid>
@@ -558,8 +543,7 @@
                                                       CacheKey="{Binding SelectedModProject.IconKey}" />
                                 <StackPanel Grid.Column="1" Spacing="2">
                                     <TextBlock Text="{Binding ModDetailTitle}"
-                                               FontSize="16"
-                                               FontWeight="SemiBold"
+                                               Classes="title"
                                                TextTrimming="CharacterEllipsis" />
                                     <TextBlock Text="{Binding ModDetailDescription}"
                                                Classes="meta"
@@ -615,13 +599,11 @@
                                                                VerticalAlignment="Center" />
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding Title}"
-                                                               Classes="section"
-                                                               FontSize="13"
+                                                               Classes="subsection"
                                                                VerticalAlignment="Center" />
                                                     <TextBlock Grid.Column="2"
                                                                Text="{Binding CountText}"
-                                                               FontSize="11"
-                                                               Opacity="0.56"
+                                                               Classes="caption"
                                                                VerticalAlignment="Center" />
                                                 </Grid>
                                             </Button>
@@ -635,13 +617,12 @@
                                                     ToolTip.Tip="{Binding Version.Subtitle}">
                                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                                                     <TextBlock Text="{Binding Version.Title}"
-                                                               FontSize="13"
+                                                               Classes="body"
                                                                VerticalAlignment="Center"
                                                                TextTrimming="CharacterEllipsis" />
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding Version.DateText}"
-                                                               FontSize="11"
-                                                               Opacity="0.56"
+                                                               Classes="caption"
                                                                VerticalAlignment="Center" />
                                                 </Grid>
                                             </Button>
@@ -657,11 +638,10 @@
                                   Margin="16,2,14,0">
                                 <StackPanel Spacing="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding SelectedModFileTitle}"
-                                               FontSize="13"
+                                               Classes="body"
                                                TextTrimming="CharacterEllipsis" />
                                     <TextBlock Text="{Binding SelectedModFileFolder}"
-                                               FontSize="11"
-                                               Opacity="0.56"
+                                               Classes="caption"
                                                TextTrimming="CharacterEllipsis"
                                                ToolTip.Tip="{Binding SelectedModFileFolder}" />
                                 </StackPanel>
@@ -697,7 +677,7 @@
                                         <DataTemplate x:DataType="vm:VersionItemViewModel">
                                             <StackPanel Spacing="1">
                                                 <TextBlock Text="{Binding Id}" />
-                                                <TextBlock Text="{Binding Subtitle}" FontSize="11" Opacity="0.56" />
+                                                <TextBlock Text="{Binding Subtitle}" Classes="caption" />
                                             </StackPanel>
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
@@ -706,7 +686,7 @@
                                 <TextBlock Grid.Row="1" Text="所需 Java" Classes="fieldLabel" />
                                 <TextBlock Grid.Row="1" Grid.Column="1"
                                            Text="{Binding RequiredJavaDescription}"
-                                           FontSize="12"
+                                           Classes="body"
                                            VerticalAlignment="Center" />
 
                                 <TextBlock Grid.Row="2" Text="当前 Java" Classes="fieldLabel" />
@@ -759,13 +739,12 @@
                                         <DataTemplate x:DataType="vm:RemoteJavaRuntimeItemViewModel">
                                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Margin="2,5">
                                                 <StackPanel Spacing="1">
-                                                    <TextBlock Text="{Binding ComponentName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Text="{Binding Subtitle}" FontSize="11" Opacity="0.56" />
+                                                    <TextBlock Text="{Binding ComponentName}" Classes="bodyStrong" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Subtitle}" Classes="caption" />
                                                 </StackPanel>
                                                 <TextBlock Grid.Column="1"
                                                            Text="已安装"
-                                                           FontSize="11"
-                                                           Opacity="0.56"
+                                                           Classes="caption"
                                                            VerticalAlignment="Center"
                                                            IsVisible="{Binding IsInstalled}" />
                                                 <Button Grid.Column="2"
@@ -783,12 +762,12 @@
                                            IsVisible="{Binding ShowJavaRuntimeCatalogLoading}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           Opacity="0.56" />
+                                           Classes="meta" />
                                 <TextBlock Text="无法获取 Java 运行时列表"
                                            IsVisible="{Binding IsJavaRuntimeCatalogFailed}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           Opacity="0.56" />
+                                           Classes="meta" />
                             </Grid>
                         </Grid>
                     </Grid>
@@ -806,39 +785,39 @@
                     <StackPanel Spacing="6">
                         <TextBlock Text="总进度"
                                    Foreground="{DynamicResource AccentTextBrush}"
-                                   FontSize="12"
+                                   Classes="body"
                                    HorizontalAlignment="Center" />
                         <Border Height="2"
                                 Margin="6,0"
                                 Background="{DynamicResource AccentFillBrush}" />
                         <TextBlock Text="{Binding OverallDownloadPercentText}"
-                                   FontSize="22"
+                                   Classes="display"
                                    HorizontalAlignment="Center" />
                     </StackPanel>
 
                     <StackPanel Spacing="6">
                         <TextBlock Text="下载速度"
                                    Foreground="{DynamicResource AccentTextBrush}"
-                                   FontSize="12"
+                                   Classes="body"
                                    HorizontalAlignment="Center" />
                         <Border Height="2"
                                 Margin="6,0"
                                 Background="{DynamicResource AccentFillBrush}" />
                         <TextBlock Text="{Binding CurrentDownloadSpeedText}"
-                                   FontSize="22"
+                                   Classes="display"
                                    HorizontalAlignment="Center" />
                     </StackPanel>
 
                     <StackPanel Spacing="6">
                         <TextBlock Text="剩余文件"
                                    Foreground="{DynamicResource AccentTextBrush}"
-                                   FontSize="12"
+                                   Classes="body"
                                    HorizontalAlignment="Center" />
                         <Border Height="2"
                                 Margin="6,0"
                                 Background="{DynamicResource AccentFillBrush}" />
                         <TextBlock Text="{Binding RemainingFilesCount}"
-                                   FontSize="22"
+                                   Classes="display"
                                    HorizontalAlignment="Center" />
                     </StackPanel>
                 </StackPanel>
@@ -868,8 +847,7 @@
                                     <StackPanel Spacing="10">
                                         <Grid ColumnDefinitions="*,Auto">
                                             <TextBlock Text="{Binding Title}"
-                                                       FontSize="16"
-                                                       FontWeight="SemiBold"
+                                                       Classes="title"
                                                        TextTrimming="CharacterEllipsis" />
                                             <Button Grid.Column="1"
                                                     Classes="caption"
@@ -894,7 +872,7 @@
                                                                    Foreground="{DynamicResource AccentTextBrush}"
                                                                    IsVisible="{Binding IsDone}" />
                                                         <TextBlock Text="{Binding Detail}"
-                                                                   FontSize="12"
+                                                                   Classes="body"
                                                                    Foreground="{DynamicResource AccentTextBrush}"
                                                                    IsVisible="{Binding IsActive}" />
                                                         <TextBlock Text="·"

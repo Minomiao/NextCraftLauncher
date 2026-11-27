@@ -117,9 +117,10 @@
                               IsVisible="{Binding IsCustomWindowSize}">
                             <TextBlock Text="自定义尺寸" Classes="fieldLabel" />
                             <Grid Grid.Column="1"
-                                  Width="280"
+                                  Width="240"
+                                  HorizontalAlignment="Center"
                                   ColumnDefinitions="*,Auto,*"
-                                  ColumnSpacing="8">
+                                  ColumnSpacing="10">
                                 <NumericUpDown Grid.Column="0"
                                                Value="{Binding CustomWindowWidth}"
                                                Minimum="320"
@@ -131,6 +132,7 @@
                                                HorizontalAlignment="Stretch" />
                                 <TextBlock Grid.Column="1"
                                            Text="×"
+                                           FontSize="{DynamicResource FontSizeSection}"
                                            VerticalAlignment="Center"
                                            Opacity="0.4" />
                                 <NumericUpDown Grid.Column="2"

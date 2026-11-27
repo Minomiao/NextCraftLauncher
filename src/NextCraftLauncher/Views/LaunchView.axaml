@@ -116,8 +116,7 @@
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Center">
                         <TextBlock Text="当前版本"
-                                   FontSize="12"
-                                   Opacity="0.56"
+                                   Classes="meta"
                                    HorizontalAlignment="Center" />
 
                         <!-- 大版本显示：无容器的弧形轮播，一次一页 -->
@@ -130,20 +129,19 @@
                                     <StackPanel Spacing="2" MaxWidth="440">
                                         <TextBlock Text="{Binding Id}"
                                                    FontSize="{Binding TitleFontSize}"
-                                                   FontWeight="Bold"
+                                                   FontWeight="{DynamicResource FontWeightStrong}"
                                                    HorizontalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding Subtitle}"
-                                                   FontSize="13"
-                                                   Opacity="0.72"
+                                                   Classes="bodyMuted"
                                                    HorizontalAlignment="Center" />
                                     </StackPanel>
                                 </DataTemplate>
                             </controls:ArcCarousel.ItemTemplate>
                         </controls:ArcCarousel>
                         <TextBlock Text="{Binding CurrentJavaName}"
-                                   FontSize="12"
-                                   Opacity="0.56"
+                                   Classes="meta"
+                                   TextWrapping="NoWrap"
                                    HorizontalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" />
 
@@ -165,13 +163,11 @@
                                         IsVisible="{Binding IsMicrosoftAccount}">
                                 <StackPanel Spacing="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding AccountDisplayName}"
-                                               FontSize="14"
-                                               FontWeight="SemiBold"
+                                               Classes="bodyStrong"
                                                HorizontalAlignment="Center"
                                                TextTrimming="CharacterEllipsis" />
                                     <TextBlock Text="{Binding AccountSubtitle}"
-                                               FontSize="11"
-                                               Opacity="0.56"
+                                               Classes="caption"
                                                HorizontalAlignment="Center"
                                                IsVisible="{Binding HasMicrosoftAccount}" />
                                 </StackPanel>
@@ -209,14 +205,14 @@
                             <Button Classes="outline"
                                     Content="版本选择"
                                     Height="34"
-                                    FontSize="12"
+                                    FontSize="{DynamicResource FontSizeMeta}"
                                     HorizontalAlignment="Stretch"
                                     Command="{Binding ShowVersionsSectionCommand}" />
                             <Button Grid.Column="1"
                                     Classes="outline"
                                     Content="版本设置"
                                     Height="34"
-                                    FontSize="12"
+                                    FontSize="{DynamicResource FontSizeMeta}"
                                     HorizontalAlignment="Stretch"
                                     ToolTip.Tip="设置当前版本"
                                     Command="{Binding OpenCurrentVersionSettingsCommand}" />
@@ -260,22 +256,18 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                         <StackPanel Spacing="12">
-                            <TextBlock Text="正版登录" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="正版登录" Classes="title" />
 
                             <TextBlock Text="{Binding LoginStatusText}"
-                                       FontSize="13"
-                                       Opacity="0.72"
+                                       Classes="bodyMuted"
                                        TextWrapping="Wrap" />
 
                             <TextBlock Text="{Binding LoginUserCode}"
-                                       FontSize="30"
-                                       FontWeight="Bold"
-                                       LetterSpacing="2"
+                                       Classes="deviceCode"
                                        HorizontalAlignment="Center" />
 
                             <TextBlock Text="{Binding LoginVerificationUri}"
-                                       FontSize="12"
-                                       Opacity="0.56"
+                                       Classes="meta"
                                        HorizontalAlignment="Center" />
 
                             <StackPanel Orientation="Horizontal"
@@ -307,8 +299,7 @@
                     <!-- 顶部操作 -->
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                         <TextBlock Text="版本管理"
-                                   Classes="section"
-                                   FontSize="13"
+                                   Classes="subsection"
                                    VerticalAlignment="Center" />
 
                         <Button Grid.Column="1"
@@ -339,8 +330,7 @@
                     <Grid Grid.Row="1" ColumnDefinitions="200,1,*" ColumnSpacing="16">
                         <Grid RowDefinitions="Auto,*" RowSpacing="6">
                             <TextBlock Text="游戏文件夹"
-                                       FontSize="11"
-                                       Opacity="0.56"
+                                       Classes="caption"
                                        Margin="4,0,0,0" />
                             <ListBox Grid.Row="1"
                                      ItemsSource="{Binding GameFolders}"
@@ -351,12 +341,10 @@
                                     <DataTemplate x:DataType="vm:GameFolderItemViewModel">
                                         <StackPanel Spacing="1" Margin="2,3" ToolTip.Tip="{Binding Path}">
                                             <TextBlock Text="{Binding Name}"
-                                                       FontSize="13"
-                                                       FontWeight="SemiBold"
+                                                       Classes="bodyStrong"
                                                        TextTrimming="CharacterEllipsis" />
                                             <TextBlock Text="{Binding Path}"
-                                                       FontSize="10"
-                                                       Opacity="0.56"
+                                                       Classes="caption"
                                                        TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
                                     </DataTemplate>
@@ -368,11 +356,10 @@
                         <!-- 本地版本列表 -->
                         <Grid Grid.Column="2" RowDefinitions="Auto,*" RowSpacing="8">
                             <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Text="本地版本" Classes="section" FontSize="13" />
+                                <TextBlock Text="本地版本" Classes="subsection" />
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding VersionsCountText}"
-                                           FontSize="11"
-                                           Opacity="0.56"
+                                           Classes="caption"
                                            VerticalAlignment="Center" />
                             </Grid>
                             <ListBox Grid.Row="1"
@@ -393,11 +380,10 @@
 
                                             <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Id}"
-                                                           FontWeight="SemiBold"
+                                                           Classes="bodyStrong"
                                                            TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{Binding Subtitle}"
-                                                           FontSize="11"
-                                                           Opacity="0.56"
+                                                           Classes="caption"
                                                            TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
 
@@ -425,8 +411,7 @@
                 <!-- 版本设置：暂时只展示版本信息 -->
                 <Grid RowDefinitions="Auto,*" RowSpacing="12" IsVisible="{Binding IsVersionDetailOpen}">
                     <TextBlock Text="{Binding SelectedVersion.Id}"
-                               FontSize="15"
-                               FontWeight="SemiBold"
+                               Classes="section"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" />
 
@@ -434,8 +419,7 @@
                                   VerticalScrollBarVisibility="Auto"
                                   Padding="0,0,12,0">
                         <TextBlock Text="{Binding VersionDetails}"
-                                   FontFamily="Consolas"
-                                   FontSize="12"
+                                   Classes="code"
                                    LineHeight="18"
                                    TextWrapping="Wrap" />
                     </ScrollViewer>

@@ -38,7 +38,8 @@
 
         <!-- 折叠箭头：右向图标，展开时旋转 90° -->
         <Style Selector="controls|IconView.chevron">
-            <Setter Property="IconSize" Value="10" />
+            <Setter Property="IconSize" Value="8" />
+            <Setter Property="StrokeThickness" Value="1.25" />
             <Setter Property="Opacity" Value="{DynamicResource TextOpacityTertiary}" />
             <Setter Property="RenderTransformOrigin" Value="50%,50%" />
         </Style>

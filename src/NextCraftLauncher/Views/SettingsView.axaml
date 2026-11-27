@@ -126,6 +126,8 @@
                                                Maximum="7680"
                                                Increment="10"
                                                FormatString="0"
+                                               ShowButtonSpinner="False"
+                                               TextAlignment="Center"
                                                HorizontalAlignment="Stretch" />
                                 <TextBlock Grid.Column="1"
                                            Text="×"
@@ -137,6 +139,8 @@
                                                Maximum="4320"
                                                Increment="10"
                                                FormatString="0"
+                                               ShowButtonSpinner="False"
+                                               TextAlignment="Center"
                                                HorizontalAlignment="Stretch" />
                             </Grid>
                         </Grid>

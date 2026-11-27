@@ -29,6 +29,7 @@ public partial class App : Application
         try
         {
             Palette.Register(this);
+            Typography.Register(this);
         }
         catch (Exception exception)
         {

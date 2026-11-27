@@ -51,21 +51,91 @@
             <Setter Property="Padding" Value="16" />
         </Style>
 
+        <Style Selector="TextBlock.micro">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeMicro}" />
+            <Setter Property="Opacity" Value="{DynamicResource TextOpacityTertiary}" />
+        </Style>
+
+        <Style Selector="TextBlock.caption">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}" />
+            <Setter Property="Opacity" Value="{DynamicResource TextOpacitySecondary}" />
+        </Style>
+
+        <!-- 分组眉标：比正文小一号、加宽字距 -->
+        <Style Selector="TextBlock.group">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}" />
+            <Setter Property="FontWeight" Value="{DynamicResource FontWeightEmphasis}" />
+            <Setter Property="LetterSpacing" Value="{DynamicResource LetterSpacingGroup}" />
+            <Setter Property="Opacity" Value="{DynamicResource TextOpacitySecondary}" />
+        </Style>
+
         <Style Selector="TextBlock.section">
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeSection}" />
+            <Setter Property="FontWeight" Value="{DynamicResource FontWeightEmphasis}" />
+        </Style>
+
+        <Style Selector="TextBlock.subsection">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
+            <Setter Property="FontWeight" Value="{DynamicResource FontWeightEmphasis}" />
+        </Style>
+
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeTitle}" />
+            <Setter Property="FontWeight" Value="{DynamicResource FontWeightEmphasis}" />
+        </Style>
+
+        <Style Selector="TextBlock.display">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeDisplay}" />
+            <Setter Property="FontWeight" Value="{DynamicResource FontWeightEmphasis}" />
+        </Style>
+
+        <Style Selector="TextBlock.body">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
+        </Style>
+
+        <Style Selector="TextBlock.bodyStrong">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
+            <Setter Property="FontWeight" Value="{DynamicResource FontWeightEmphasis}" />
+        </Style>
+
+        <Style Selector="TextBlock.bodyMuted">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
+            <Setter Property="Opacity" Value="{DynamicResource TextOpacityLabel}" />
         </Style>
 
         <Style Selector="TextBlock.meta">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Opacity" Value="0.56" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
+            <Setter Property="Opacity" Value="{DynamicResource TextOpacitySecondary}" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
 
         <Style Selector="TextBlock.fieldLabel">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Opacity" Value="0.72" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
+            <Setter Property="Opacity" Value="{DynamicResource TextOpacityLabel}" />
             <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style Selector="TextBlock.code">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
+            <Setter Property="FontFamily" Value="{DynamicResource FontFamilyMono}" />
+        </Style>
+
+        <Style Selector="TextBlock.brand">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeTitle}" />
+            <Setter Property="FontWeight" Value="{DynamicResource FontWeightStrong}" />
+            <Setter Property="LetterSpacing" Value="{DynamicResource LetterSpacingBrand}" />
+        </Style>
+
+        <Style Selector="TextBlock.deviceCode">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeDeviceCode}" />
+            <Setter Property="FontWeight" Value="{DynamicResource FontWeightStrong}" />
+            <Setter Property="LetterSpacing" Value="{DynamicResource LetterSpacingBrand}" />
+        </Style>
+
+        <Style Selector="TextBlock.brandSplash">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBrandSplash}" />
+            <Setter Property="FontWeight" Value="{DynamicResource FontWeightStrong}" />
+            <Setter Property="LetterSpacing" Value="{DynamicResource LetterSpacingBrand}" />
         </Style>
 
         <!-- 进度条用主题强调色，和按钮、选中态保持一致；数值变化做缓动 -->

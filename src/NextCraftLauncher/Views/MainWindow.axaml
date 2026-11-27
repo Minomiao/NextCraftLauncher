@@ -84,9 +84,6 @@
                     <TextBlock x:Name="BrandText"
                                Classes="brand"
                                Text="NEXT"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               LetterSpacing="2"
                                HorizontalAlignment="Left"
                                VerticalAlignment="Center" />
 
@@ -178,10 +175,9 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
                 <StackPanel Spacing="14">
-                    <TextBlock Text="删除版本" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock Text="删除版本" Classes="title" />
                     <TextBlock Text="{Binding VersionDeleteDialogMessage}"
-                               FontSize="13"
-                               Opacity="0.72"
+                               Classes="bodyMuted"
                                TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal"
                                 Spacing="8"

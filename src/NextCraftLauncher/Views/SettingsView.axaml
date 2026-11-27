@@ -9,14 +9,6 @@
              x:DataType="vm:MainViewModel">
 
     <UserControl.Styles>
-        <!-- 分组眉标：比字段标签更小更淡，只用来切分段落 -->
-        <Style Selector="TextBlock.group">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="LetterSpacing" Value="0.8" />
-            <Setter Property="Opacity" Value="0.56" />
-        </Style>
-
         <!-- 分区之间的细分隔线 -->
         <Style Selector="Border.divider">
             <Setter Property="Height" Value="1" />
@@ -183,8 +175,7 @@
                                     Width="280"
                                     ToolTip.Tip="{Binding EffectiveGameDirectory}">
                                 <TextBlock Text="{Binding EffectiveGameDirectory}"
-                                           FontSize="11"
-                                           Opacity="0.56"
+                                           Classes="caption"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis" />
                             </Border>

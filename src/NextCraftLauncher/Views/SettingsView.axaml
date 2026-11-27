@@ -113,7 +113,7 @@
                                       SelectedIndex="{Binding SelectedWindowSizeIndex}" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14"
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="14"
                               IsVisible="{Binding IsCustomWindowSize}">
                             <TextBlock Text="自定义尺寸" Classes="fieldLabel" />
                             <Grid Grid.Column="1"

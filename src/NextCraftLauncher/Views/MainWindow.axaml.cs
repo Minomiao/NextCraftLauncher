@@ -152,6 +152,28 @@ public partial class MainWindow : Window
         NavBar.AddHandler(PointerMovedEvent, OnNavPointerMoved, RoutingStrategies.Tunnel);
         NavBar.AddHandler(PointerReleasedEvent, OnNavPointerReleased, RoutingStrategies.Tunnel);
         NavBar.LayoutUpdated += OnNavBarLayoutUpdated;
+
+        // 子页面（标题栏出现返回按钮）按 Esc 返回，与点返回按钮一致。
+        KeyDown += OnWindowKeyDown;
+    }
+
+    /// <summary>子页面按 Esc 返回；有弹窗盖在页面上时不响应。</summary>
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || e.Handled) return;
+        if (_viewModel is not { IsSubPageOpen: true } viewModel) return;
+
+        if (viewModel.IsMessageCardOpen ||
+            viewModel.IsVersionDeleteDialogOpen ||
+            viewModel.IsLoginDialogOpen)
+        {
+            return;
+        }
+
+        if (!viewModel.GoBackCommand.CanExecute(null)) return;
+
+        viewModel.GoBackCommand.Execute(null);
+        e.Handled = true;
     }
 
     private bool _navPressed;

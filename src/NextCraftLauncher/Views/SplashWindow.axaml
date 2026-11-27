@@ -15,12 +15,10 @@
                 VerticalAlignment="Center"
                 HorizontalAlignment="Center">
         <TextBlock Text="NEXT"
-                   FontSize="52"
-                   FontWeight="Bold"
+                   Classes="brandSplash"
                    HorizontalAlignment="Center" />
         <TextBlock Text="Minecraft Launcher"
-                   FontSize="13"
-                   Opacity="0.56"
+                   Classes="meta"
                    HorizontalAlignment="Center" />
     </StackPanel>
 </Window>

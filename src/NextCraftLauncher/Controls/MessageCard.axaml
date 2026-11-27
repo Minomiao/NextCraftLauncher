@@ -98,19 +98,16 @@
             </Border.Transitions>
             <StackPanel Spacing="12">
                 <TextBlock x:Name="TitleText"
-                           FontSize="18"
-                           FontWeight="SemiBold"
+                           Classes="title"
                            TextWrapping="Wrap" />
 
                 <TextBlock x:Name="MessageText"
-                           FontSize="12.5"
-                           Opacity="0.72"
+                           Classes="bodyMuted"
                            TextWrapping="Wrap"
                            IsVisible="False" />
 
                 <TextBlock x:Name="AdviceText"
-                           FontSize="12"
-                           Opacity="0.56"
+                           Classes="meta"
                            TextWrapping="Wrap"
                            IsVisible="False" />
 

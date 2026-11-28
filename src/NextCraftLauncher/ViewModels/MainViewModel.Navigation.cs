@@ -312,9 +312,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         // 设置页挂在「版本」区块下，所以先切过去；关闭时再回到原来的区块。
         _sectionBeforeVersionDetail = CurrentLaunchSection;
-        CurrentLaunchSection = LaunchSection.Versions;
-        CurrentVersionSettingsSection = VersionSettingsSection.Settings;
+
+        // 先标记详情页，再切区块：版本选择列表的进场动画据此跳过。
         IsVersionDetailOpen = true;
+        CurrentVersionSettingsSection = VersionSettingsSection.Settings;
+        CurrentLaunchSection = LaunchSection.Versions;
 
         VersionSettingsVersion = target;
         _ = LoadVersionSettingsDetailsAsync(target);

@@ -294,7 +294,9 @@
 
             <!-- 版本：列表页与详情页二选一 -->
             <Grid IsVisible="{Binding IsVersionsSectionSelected}">
-                <Grid RowDefinitions="Auto,*" RowSpacing="12" IsVisible="{Binding !IsVersionDetailOpen}">
+                <Grid x:Name="VersionsListPage"
+                      RowDefinitions="Auto,*" RowSpacing="12"
+                      IsVisible="{Binding !IsVersionDetailOpen}">
 
                     <!-- 顶部操作 -->
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
@@ -332,7 +334,8 @@
                             <TextBlock Text="游戏文件夹"
                                        Classes="caption"
                                        Margin="4,0,0,0" />
-                            <ListBox Grid.Row="1"
+                            <ListBox x:Name="GameFoldersList"
+                                     Grid.Row="1"
                                      ItemsSource="{Binding GameFolders}"
                                      SelectedItem="{Binding SelectedGameFolder}"
                                      Background="Transparent"
@@ -362,7 +365,8 @@
                                            Classes="caption"
                                            VerticalAlignment="Center" />
                             </Grid>
-                            <ListBox Grid.Row="1"
+                            <ListBox x:Name="LocalVersionsList"
+                                     Grid.Row="1"
                                      ItemsSource="{Binding Versions}"
                                      SelectedItem="{Binding SelectedVersion}"
                                      Background="Transparent"

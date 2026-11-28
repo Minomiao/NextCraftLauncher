@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Animation;
@@ -78,14 +79,41 @@ public partial class LaunchView : UserControl
             return;
         }
 
-        // 进入版本设置时，左侧分栏逐条从左边出现。
+        // 进入版本设置：同步设起始值，避免先亮出一帧再归零造成的闪烁。
         if (e.PropertyName == nameof(MainViewModel.IsVersionDetailOpen) &&
             _viewModel?.IsVersionDetailOpen == true)
         {
-            Dispatcher.UIThread.Post(
-                () => EnterAnimation.Play(VersionSettingsSideBar.Children, -18, 60, 180, 240),
-                DispatcherPriority.Background);
+            EnterAnimation.Play(VersionSettingsSideBar.Children, -18, 60, 180, 240);
+            return;
         }
+
+        // 进入版本选择列表：左边文件夹从左侧、右边版本列表从右侧进场。
+        if (e.PropertyName == nameof(MainViewModel.IsVersionsSectionSelected) &&
+            _viewModel is { IsVersionsSectionSelected: true, IsVersionDetailOpen: false })
+        {
+            PlayVersionsEnter();
+        }
+    }
+
+    /// <summary>版本选择页进场：先藏住整页，等列表行生成后两边分别滑入。</summary>
+    private void PlayVersionsEnter()
+    {
+        VersionsListPage.Opacity = 0;
+
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                var folders = new List<Control>(EnterAnimation.RealizedRows(GameFoldersList));
+                if (folders.Count == 0) folders.Add(GameFoldersList);
+                EnterAnimation.Play(folders, -18, 60, 180, 240);
+
+                var versions = new List<Control>(EnterAnimation.RealizedRows(LocalVersionsList));
+                if (versions.Count == 0) versions.Add(LocalVersionsList);
+                EnterAnimation.Play(versions, 20, 45, 190, 240);
+
+                VersionsListPage.Opacity = 1;
+            },
+            DispatcherPriority.Background);
     }
 
     /// <summary>开关高亮的过渡；状态未变时不重复赋值。</summary>

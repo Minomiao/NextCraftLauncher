@@ -76,6 +76,15 @@
             <Setter Property="Background" Value="{DynamicResource PanelFillPressedBrush}" />
             <Setter Property="CornerRadius" Value="6" />
         </Style>
+        <!-- 扫描期间禁用时保持原样，不闪灰底 -->
+        <Style Selector="Button.icon:disabled">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.icon:disabled /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
 
         <!-- 文件夹列表里的操作行：和文件夹条目同样的尺寸与悬浮反馈 -->
         <Style Selector="Button.folderAction">
@@ -95,6 +104,15 @@
         <Style Selector="Button.folderAction:pressed /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource PanelFillPressedBrush}" />
             <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <!-- 扫描期间禁用时保持原样，不闪灰底 -->
+        <Style Selector="Button.folderAction:disabled">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.folderAction:disabled /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Opacity" Value="1" />
         </Style>
 
         <!-- 账号类型切换（离线 / 正版） -->
@@ -410,6 +428,7 @@
                                             </Border>
                                             <TextBlock Text="添加游戏文件夹"
                                                        Classes="bodyStrong"
+                                                       Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
                                                        VerticalAlignment="Center" />
                                         </StackPanel>
                                     </Button>

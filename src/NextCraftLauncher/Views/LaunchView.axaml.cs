@@ -42,6 +42,7 @@ public partial class LaunchView : UserControl
     };
 
     private readonly TranslateTransform _pillOffset = new();
+    private readonly RotateTransform _plusRotation = new();
     private MainViewModel? _viewModel;
     private Rect? _pillTarget;
     private bool _pillAnimated;
@@ -52,6 +53,18 @@ public partial class LaunchView : UserControl
         InitializeComponent();
 
         AccountPill.RenderTransform = _pillOffset;
+
+        AddFolderPlusIcon.RenderTransformOrigin = RelativePoint.Center;
+        AddFolderPlusIcon.RenderTransform = _plusRotation;
+        _plusRotation.Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = RotateTransform.AngleProperty,
+                Duration = TimeSpan.FromMilliseconds(120),
+                Easing = new CubicEaseOut(),
+            },
+        };
 
         // 高亮只跟随选中项，不响应拖动；位置在布局完成与账号类型变化时同步。
         AccountSwitch.LayoutUpdated += (_, _) => SnapAccountPill(animate: false);
@@ -87,19 +100,49 @@ public partial class LaunchView : UserControl
         }
 
         // 进入版本设置：同步设起始值，避免先亮出一帧再归零造成的闪烁。
-        if (e.PropertyName == nameof(MainViewModel.IsVersionDetailOpen) &&
-            _viewModel?.IsVersionDetailOpen == true)
+        if (e.PropertyName == nameof(MainViewModel.IsVersionDetailOpen))
         {
-            EnterAnimation.Play(VersionSettingsSideBar.Children, -18, 60, 180, 240);
+            if (_viewModel?.IsVersionDetailOpen == true)
+            {
+                CloseImportMenu();
+                EnterAnimation.Play(VersionSettingsSideBar.Children, -18, 60, 180, 240);
+            }
             return;
         }
 
         // 进入版本选择列表：左边文件夹从左侧、右边版本列表从右侧进场。
-        if (e.PropertyName == nameof(MainViewModel.IsVersionsSectionSelected) &&
-            _viewModel is { IsVersionsSectionSelected: true, IsVersionDetailOpen: false })
+        if (e.PropertyName == nameof(MainViewModel.IsVersionsSectionSelected))
         {
-            PlayVersionsEnter();
+            if (_viewModel is { IsVersionsSectionSelected: true, IsVersionDetailOpen: false })
+                PlayVersionsEnter();
+            else
+                CloseImportMenu();
+            return;
         }
+
+        // 选中其它文件夹时收起导入菜单。
+        if (e.PropertyName == nameof(MainViewModel.SelectedGameFolder))
+            CloseImportMenu();
+    }
+
+    private void OnToggleImportMenuClick(object? sender, RoutedEventArgs e)
+    {
+        var open = !ImportMenuPanel.IsVisible;
+        ImportMenuPanel.IsVisible = open;
+        _plusRotation.Angle = open ? 45 : 0;
+
+        if (!open) return;
+
+        EnterAnimation.Play(ImportMenuPanel.Children, 0, 25, 120, 160);
+        Dispatcher.UIThread.Post(() => ImportMenuPanel.BringIntoView(), DispatcherPriority.Background);
+    }
+
+    private void CloseImportMenu()
+    {
+        if (!ImportMenuPanel.IsVisible) return;
+
+        ImportMenuPanel.IsVisible = false;
+        _plusRotation.Angle = 0;
     }
 
     /// <summary>切换游戏文件夹后，右侧版本列表重新进场。</summary>
@@ -258,6 +301,8 @@ public partial class LaunchView : UserControl
 
     private async void OnAddGameFolderClick(object? sender, RoutedEventArgs e)
     {
+        CloseImportMenu();
+
         if (DataContext is not MainViewModel viewModel) return;
 
         var topLevel = TopLevel.GetTopLevel(this);
@@ -278,6 +323,8 @@ public partial class LaunchView : UserControl
 
     private async void OnChoosePclExecutableClick(object? sender, RoutedEventArgs e)
     {
+        CloseImportMenu();
+
         if (DataContext is not MainViewModel viewModel) return;
 
         var topLevel = TopLevel.GetTopLevel(this);
@@ -305,6 +352,8 @@ public partial class LaunchView : UserControl
 
     private async void OnChoosePclFolderClick(object? sender, RoutedEventArgs e)
     {
+        CloseImportMenu();
+
         if (DataContext is not MainViewModel viewModel) return;
 
         var topLevel = TopLevel.GetTopLevel(this);

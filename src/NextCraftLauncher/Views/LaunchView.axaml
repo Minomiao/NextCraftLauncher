@@ -115,6 +115,25 @@
             <Setter Property="Opacity" Value="1" />
         </Style>
 
+        <!-- 内联展开的导入选项：比文件夹行更轻的子项 -->
+        <Style Selector="Button.importOption">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="6,5" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.importOption:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <Style Selector="Button.importOption:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PanelFillPressedBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+
         <!-- 账号类型切换（离线 / 正版） -->
         <Style Selector="Button.accountTab">
             <Setter Property="Background" Value="Transparent" />
@@ -401,37 +420,77 @@
                                     </ListBox>
 
                                     <!-- 文件夹列表末尾：添加 / 导入 -->
-                                    <Button Classes="folderAction"
-                                            ToolTip.Tip="添加或导入游戏文件夹"
-                                            IsEnabled="{Binding !IsBusy}">
-                                        <Button.Flyout>
-                                            <MenuFlyout>
-                                                <MenuItem Header="添加已有文件夹…" Click="OnAddGameFolderClick" />
-                                                <MenuItem Header="导入 PCL 启动器 (.exe)…" Click="OnChoosePclExecutableClick" />
-                                                <MenuItem Header="导入 PCL 文件夹 / 游戏目录…" Click="OnChoosePclFolderClick" />
-                                            </MenuFlyout>
-                                        </Button.Flyout>
-                                        <StackPanel Orientation="Horizontal"
-                                                    Spacing="8"
-                                                    Margin="2,0,0,0">
-                                            <Border Width="16"
-                                                    Height="16"
-                                                    CornerRadius="8"
-                                                    BorderThickness="1"
-                                                    BorderBrush="{DynamicResource SystemControlForegroundBaseHighBrush}"
-                                                    VerticalAlignment="Center">
-                                                <controls:IconView Icon="plus"
-                                                                   IconSize="8"
-                                                                   StrokeThickness="1.25"
-                                                                   HorizontalAlignment="Center"
-                                                                   VerticalAlignment="Center" />
-                                            </Border>
-                                            <TextBlock Text="添加游戏文件夹"
-                                                       Classes="bodyStrong"
-                                                       Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
-                                                       VerticalAlignment="Center" />
+                                    <StackPanel Spacing="1">
+                                        <Button Classes="folderAction"
+                                                ToolTip.Tip="添加或导入游戏文件夹"
+                                                IsEnabled="{Binding !IsBusy}"
+                                                Click="OnToggleImportMenuClick">
+                                            <StackPanel Orientation="Horizontal"
+                                                        Spacing="8"
+                                                        Margin="2,0,0,0">
+                                                <Border Width="16"
+                                                        Height="16"
+                                                        CornerRadius="8"
+                                                        BorderThickness="1"
+                                                        BorderBrush="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                                                        VerticalAlignment="Center">
+                                                    <controls:IconView x:Name="AddFolderPlusIcon"
+                                                                       Icon="plus"
+                                                                       IconSize="8"
+                                                                       StrokeThickness="1.25"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Text="添加游戏文件夹"
+                                                           Classes="bodyStrong"
+                                                           Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- 内联展开：三种导入方式 -->
+                                        <StackPanel x:Name="ImportMenuPanel"
+                                                    IsVisible="False"
+                                                    Spacing="1"
+                                                    Margin="24,0,0,0">
+                                            <Button Classes="importOption"
+                                                    ToolTip.Tip="选择一个已有的 .minecraft 文件夹"
+                                                    Click="OnAddGameFolderClick">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <controls:IconView Icon="folder"
+                                                                       IconSize="12"
+                                                                       VerticalAlignment="Center" />
+                                                    <TextBlock Text="选择已有文件夹"
+                                                               Classes="body"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Classes="importOption"
+                                                    ToolTip.Tip="从 PCL2 启动器文件导入"
+                                                    Click="OnChoosePclExecutableClick">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <controls:IconView Icon="file"
+                                                                       IconSize="12"
+                                                                       VerticalAlignment="Center" />
+                                                    <TextBlock Text="导入 PCL 启动器"
+                                                               Classes="body"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Classes="importOption"
+                                                    ToolTip.Tip="从 PCL2 文件夹或游戏目录导入"
+                                                    Click="OnChoosePclFolderClick">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <controls:IconView Icon="folder"
+                                                                       IconSize="12"
+                                                                       VerticalAlignment="Center" />
+                                                    <TextBlock Text="导入 PCL 文件夹"
+                                                               Classes="body"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
                                         </StackPanel>
-                                    </Button>
+                                    </StackPanel>
                                 </StackPanel>
                             </ScrollViewer>
                         </Grid>

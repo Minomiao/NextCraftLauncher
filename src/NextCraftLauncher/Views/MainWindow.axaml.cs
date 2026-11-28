@@ -749,10 +749,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 版本设置页标题栏的版本名：进入时稍晚淡入，退出时淡出后再隐藏。
-        if (e.PropertyName == nameof(MainViewModel.IsVersionSettingsOpen))
+        // 版本区块标题：进入时稍晚淡入，退出时淡出后再隐藏。
+        if (e.PropertyName == nameof(MainViewModel.IsVersionTitleVisible))
         {
-            if (_viewModel?.IsVersionSettingsOpen == true)
+            if (_viewModel?.IsVersionTitleVisible == true)
                 ShowVersionTitle();
             else
                 HideVersionTitle();

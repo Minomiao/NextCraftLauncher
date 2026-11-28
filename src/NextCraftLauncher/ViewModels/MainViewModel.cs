@@ -746,8 +746,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public bool IsVersionExportSelected => CurrentVersionSettingsSection == VersionSettingsSection.Export;
 
-    /// <summary>版本设置页是否打开（标题栏显示版本名）。</summary>
-    public bool IsVersionSettingsOpen => IsLaunchPageSelected && IsVersionDetailOpen;
+    /// <summary>版本区块打开时，标题栏显示版本名或「版本管理」。</summary>
+    public bool IsVersionTitleVisible => IsLaunchPageSelected && IsVersionsSectionSelected;
+
+    public string VersionPageTitle => IsVersionDetailOpen
+        ? VersionSettingsVersion?.Id ?? string.Empty
+        : "版本管理";
 
     public bool IsSettingsLaunchSelected => CurrentSettingsSection == SettingsSection.Launch;
 
@@ -965,6 +969,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(IsStartSectionSelected));
         OnPropertyChanged(nameof(IsVersionsSectionSelected));
+        OnPropertyChanged(nameof(IsVersionTitleVisible));
         OnPropertyChanged(nameof(IsSubPageOpen));
     }
 
@@ -985,8 +990,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     partial void OnIsVersionDetailOpenChanged(bool value)
     {
         OnPropertyChanged(nameof(IsSubPageOpen));
-        OnPropertyChanged(nameof(IsVersionSettingsOpen));
+        OnPropertyChanged(nameof(VersionPageTitle));
     }
+
+    partial void OnVersionSettingsVersionChanged(VersionItemViewModel? value)
+        => OnPropertyChanged(nameof(VersionPageTitle));
 
     partial void OnIsRemoteVersionDetailOpenChanged(bool value)
         => OnPropertyChanged(nameof(IsSubPageOpen));

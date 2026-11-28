@@ -139,7 +139,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsDownloadPageSelected));
         OnPropertyChanged(nameof(IsSettingsPageSelected));
         OnPropertyChanged(nameof(IsSubPageOpen));
-        OnPropertyChanged(nameof(IsVersionSettingsOpen));
+        OnPropertyChanged(nameof(IsVersionTitleVisible));
 
         if (value == AppPage.Download)
         {

@@ -370,16 +370,10 @@
             <!-- 版本：列表页与详情页二选一 -->
             <Grid IsVisible="{Binding IsVersionsSectionSelected}">
                 <Grid x:Name="VersionsListPage"
-                      RowDefinitions="Auto,*" RowSpacing="12"
                       IsVisible="{Binding !IsVersionDetailOpen}">
 
-                    <!-- 顶部标题 -->
-                    <TextBlock Text="版本管理"
-                               Classes="subsection"
-                               VerticalAlignment="Center" />
-
                     <!-- 左侧：游戏文件夹；“本地版本”在右侧铺开 -->
-                    <Grid Grid.Row="1" ColumnDefinitions="200,1,*" ColumnSpacing="16">
+                    <Grid ColumnDefinitions="200,1,*" ColumnSpacing="16">
                         <Grid RowDefinitions="Auto,*" RowSpacing="6">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Text="游戏文件夹"

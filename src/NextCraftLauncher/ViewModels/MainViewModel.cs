@@ -571,6 +571,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _selectedFabricMirrorIndex;
     [ObservableProperty] private int _selectedNeoForgeMirrorIndex;
     [ObservableProperty] private LaunchSection _currentLaunchSection = LaunchSection.Start;
+    [ObservableProperty] private VersionSettingsSection _currentVersionSettingsSection = VersionSettingsSection.Settings;
     [ObservableProperty] private DownloadSection _currentDownloadSection = DownloadSection.Versions;
     [ObservableProperty] private SettingsSection _currentSettingsSection = SettingsSection.Launch;
     [ObservableProperty] private bool _isVersionDeleteDialogOpen;
@@ -738,6 +739,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public bool IsStartSectionSelected => CurrentLaunchSection == LaunchSection.Start;
 
     public bool IsVersionsSectionSelected => CurrentLaunchSection == LaunchSection.Versions;
+
+    public bool IsVersionSettingsSelected => CurrentVersionSettingsSection == VersionSettingsSection.Settings;
+
+    public bool IsVersionModsSelected => CurrentVersionSettingsSection == VersionSettingsSection.Mods;
+
+    public bool IsVersionExportSelected => CurrentVersionSettingsSection == VersionSettingsSection.Export;
 
     public bool IsSettingsLaunchSelected => CurrentSettingsSection == SettingsSection.Launch;
 
@@ -963,6 +970,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsSettingsLaunchSelected));
         OnPropertyChanged(nameof(IsSettingsDownloadSelected));
         OnPropertyChanged(nameof(IsSettingsAppearanceSelected));
+    }
+
+    partial void OnCurrentVersionSettingsSectionChanged(VersionSettingsSection value)
+    {
+        OnPropertyChanged(nameof(IsVersionSettingsSelected));
+        OnPropertyChanged(nameof(IsVersionModsSelected));
+        OnPropertyChanged(nameof(IsVersionExportSelected));
     }
 
     partial void OnIsVersionDetailOpenChanged(bool value)

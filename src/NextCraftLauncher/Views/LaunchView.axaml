@@ -408,21 +408,32 @@
                     </Grid>
                 </Grid>
 
-                <!-- 版本设置：暂时只展示版本信息 -->
+                <!-- 版本设置：左侧分栏，具体内容暂未实现 -->
                 <Grid RowDefinitions="Auto,*" RowSpacing="12" IsVisible="{Binding IsVersionDetailOpen}">
                     <TextBlock Text="{Binding VersionSettingsVersion.Id}"
                                Classes="section"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" />
 
-                    <ScrollViewer Grid.Row="1"
-                                  VerticalScrollBarVisibility="Auto"
-                                  Padding="0,0,12,0">
-                        <TextBlock Text="{Binding VersionSettingsDetails}"
-                                   Classes="code"
-                                   LineHeight="18"
-                                   TextWrapping="Wrap" />
-                    </ScrollViewer>
+                    <Grid Grid.Row="1" ColumnDefinitions="176,1,*" ColumnSpacing="16">
+                        <StackPanel Spacing="2" VerticalAlignment="Top" Margin="0,2,0,0">
+                            <Button Classes="side"
+                                    Classes.selected="{Binding IsVersionSettingsSelected}"
+                                    Content="设置"
+                                    Command="{Binding ShowVersionSettingsCommand}" />
+                            <Button Classes="side"
+                                    Classes.selected="{Binding IsVersionModsSelected}"
+                                    Content="Mod"
+                                    Command="{Binding ShowVersionModsCommand}" />
+                            <Button Classes="side"
+                                    Classes.selected="{Binding IsVersionExportSelected}"
+                                    Content="导出"
+                                    Command="{Binding ShowVersionExportCommand}" />
+                        </StackPanel>
+
+                        <!-- 具体内容暂空 -->
+                        <Grid Grid.Column="2" />
+                    </Grid>
                 </Grid>
             </Grid>
     </Grid>

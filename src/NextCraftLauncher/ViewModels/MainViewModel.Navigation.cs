@@ -313,6 +313,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // 设置页挂在「版本」区块下，所以先切过去；关闭时再回到原来的区块。
         _sectionBeforeVersionDetail = CurrentLaunchSection;
         CurrentLaunchSection = LaunchSection.Versions;
+        CurrentVersionSettingsSection = VersionSettingsSection.Settings;
         IsVersionDetailOpen = true;
 
         VersionSettingsVersion = target;
@@ -347,6 +348,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>启动按钮下方的「版本设置」：直接打开当前版本的设置页。</summary>
     [RelayCommand]
     private void OpenCurrentVersionSettings() => OpenVersionSettings(null);
+
+    [RelayCommand]
+    private void ShowVersionSettings() => CurrentVersionSettingsSection = VersionSettingsSection.Settings;
+
+    [RelayCommand]
+    private void ShowVersionMods() => CurrentVersionSettingsSection = VersionSettingsSection.Mods;
+
+    [RelayCommand]
+    private void ShowVersionExport() => CurrentVersionSettingsSection = VersionSettingsSection.Export;
 
     [RelayCommand]
     private void CloseVersionSettings()

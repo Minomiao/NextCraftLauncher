@@ -416,7 +416,10 @@
                                TextTrimming="CharacterEllipsis" />
 
                     <Grid Grid.Row="1" ColumnDefinitions="176,1,*" ColumnSpacing="16">
-                        <StackPanel Spacing="2" VerticalAlignment="Top" Margin="0,2,0,0">
+                        <StackPanel x:Name="VersionSettingsSideBar"
+                                    Spacing="2"
+                                    VerticalAlignment="Top"
+                                    Margin="0,2,0,0">
                             <Button Classes="side"
                                     Classes.selected="{Binding IsVersionSettingsSelected}"
                                     Content="设置"

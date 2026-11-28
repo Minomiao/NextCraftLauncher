@@ -75,6 +75,16 @@ public partial class LaunchView : UserControl
         if (e.PropertyName is nameof(MainViewModel.IsMicrosoftAccount) or nameof(MainViewModel.IsOfflineAccount))
         {
             SnapAccountPill(animate: true);
+            return;
+        }
+
+        // 进入版本设置时，左侧分栏逐条从左边出现。
+        if (e.PropertyName == nameof(MainViewModel.IsVersionDetailOpen) &&
+            _viewModel?.IsVersionDetailOpen == true)
+        {
+            Dispatcher.UIThread.Post(
+                () => EnterAnimation.Play(VersionSettingsSideBar.Children, -18, 60, 180, 240),
+                DispatcherPriority.Background);
         }
     }
 

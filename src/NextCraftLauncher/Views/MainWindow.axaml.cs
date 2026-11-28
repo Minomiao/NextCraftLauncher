@@ -188,6 +188,8 @@ public partial class MainWindow : Window
     private readonly TranslateTransform _versionTitleTransform = new();
     private bool? _titleBarState;
     private DispatcherTimer? _titleBarTimer;
+    private DispatcherTimer? _versionTitleHideTimer;
+    private int _versionTitleRevision;
 
     /// <summary>一整段（品牌收起 + 按钮进入）的时长。</summary>
     private const double TitleBarFullDuration = 600;
@@ -281,6 +283,96 @@ public partial class MainWindow : Window
         _titleBarDuration = 0;
 
         ApplyTitleBarProgress(_titleBarProgress);
+    }
+
+    /// <summary>标题栏版本名进场：稍晚淡入并向右归位。</summary>
+    private void ShowVersionTitle()
+    {
+        _versionTitleHideTimer?.Stop();
+
+        VersionTitle.IsVisible = true;
+
+        var delay = TimeSpan.FromMilliseconds(120);
+
+        VersionTitle.Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = Visual.OpacityProperty,
+                Duration = TimeSpan.FromMilliseconds(260),
+                Delay = delay,
+                Easing = new CubicEaseOut(),
+            },
+        };
+
+        _versionTitleTransform.Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = TranslateTransform.XProperty,
+                Duration = TimeSpan.FromMilliseconds(260),
+                Delay = delay,
+                Easing = new CubicEaseOut(),
+            },
+        };
+
+        VersionTitle.Opacity = 0;
+        _versionTitleTransform.X = 16;
+
+        // 等这一轮渲染记下起始值，再设终点。
+        var revision = ++_versionTitleRevision;
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (revision != _versionTitleRevision) return;
+
+                VersionTitle.Opacity = 1;
+                _versionTitleTransform.X = 0;
+            },
+            DispatcherPriority.Background);
+    }
+
+    /// <summary>标题栏版本名退场：先淡出，再隐藏。</summary>
+    private void HideVersionTitle()
+    {
+        if (!VersionTitle.IsVisible) return;
+
+        ++_versionTitleRevision;
+
+        VersionTitle.Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = Visual.OpacityProperty,
+                Duration = TimeSpan.FromMilliseconds(180),
+                Easing = new CubicEaseOut(),
+            },
+        };
+
+        _versionTitleTransform.Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = TranslateTransform.XProperty,
+                Duration = TimeSpan.FromMilliseconds(180),
+                Easing = new CubicEaseOut(),
+            },
+        };
+
+        VersionTitle.Opacity = 0;
+        _versionTitleTransform.X = 8;
+
+        _versionTitleHideTimer ??= new DispatcherTimer(
+            TimeSpan.FromMilliseconds(220),
+            DispatcherPriority.Normal,
+            (_, _) =>
+            {
+                _versionTitleHideTimer!.Stop();
+                VersionTitle.IsVisible = false;
+            });
+
+        _versionTitleHideTimer.Stop();
+        _versionTitleHideTimer.Start();
     }
 
     /// <summary>当前正跟着高亮一起缩小的按钮文字；没按住时为 null。</summary>
@@ -657,52 +749,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 版本设置页标题栏的版本名：比返回按钮稍晚淡入并右往左归位。
+        // 版本设置页标题栏的版本名：进入时稍晚淡入，退出时淡出后再隐藏。
         if (e.PropertyName == nameof(MainViewModel.IsVersionSettingsOpen))
         {
             if (_viewModel?.IsVersionSettingsOpen == true)
-            {
-                var delay = TimeSpan.FromMilliseconds(120);
-
-                VersionTitle.Transitions = new Transitions
-                {
-                    new DoubleTransition
-                    {
-                        Property = Visual.OpacityProperty,
-                        Duration = TimeSpan.FromMilliseconds(260),
-                        Delay = delay,
-                        Easing = new CubicEaseOut(),
-                    },
-                };
-
-                _versionTitleTransform.Transitions = new Transitions
-                {
-                    new DoubleTransition
-                    {
-                        Property = TranslateTransform.XProperty,
-                        Duration = TimeSpan.FromMilliseconds(260),
-                        Delay = delay,
-                        Easing = new CubicEaseOut(),
-                    },
-                };
-
-                VersionTitle.Opacity = 0;
-                _versionTitleTransform.X = 16;
-
-                // 等这一轮渲染记下起始值，再设终点。
-                Dispatcher.UIThread.Post(
-                    () =>
-                    {
-                        VersionTitle.Opacity = 1;
-                        _versionTitleTransform.X = 0;
-                    },
-                    DispatcherPriority.Background);
-            }
+                ShowVersionTitle();
             else
-            {
-                VersionTitle.Opacity = 0;
-                _versionTitleTransform.X = 16;
-            }
+                HideVersionTitle();
 
             return;
         }

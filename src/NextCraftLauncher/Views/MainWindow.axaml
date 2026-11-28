@@ -108,7 +108,7 @@
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                ToolTip.Tip="{Binding VersionSettingsVersion.Id}"
-                               IsVisible="{Binding IsVersionSettingsOpen}"
+                               IsVisible="False"
                                Opacity="0" />
                 </Panel>
 

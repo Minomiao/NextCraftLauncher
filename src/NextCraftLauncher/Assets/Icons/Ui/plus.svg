@@ -5,7 +5,6 @@
      stroke-width="1.5"
      stroke-linecap="round"
      stroke-linejoin="round">
-  <path d="M4 14 V20 H20 V14" />
-  <path d="M12 4 V15" />
-  <path d="M7 10 L12 15 L17 10" />
+  <path d="M12 6 V18" />
+  <path d="M6 12 H18" />
 </svg>

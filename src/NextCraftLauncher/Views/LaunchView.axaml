@@ -77,6 +77,25 @@
             <Setter Property="CornerRadius" Value="6" />
         </Style>
 
+        <!-- 文件夹列表里的操作行：和文件夹条目同样的尺寸与悬浮反馈 -->
+        <Style Selector="Button.folderAction">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="6,5" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.folderAction:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style Selector="Button.folderAction:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonPressedBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+
         <!-- 账号类型切换（离线 / 正版） -->
         <Style Selector="Button.accountTab">
             <Setter Property="Background" Value="Transparent" />
@@ -332,7 +351,8 @@
                                      ItemsSource="{Binding GameFolders}"
                                      SelectedItem="{Binding SelectedGameFolder}"
                                      Background="Transparent"
-                                     Padding="0,0,10,0">
+                                     Padding="0,0,10,0"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:GameFolderItemViewModel">
                                         <StackPanel Spacing="1" Margin="2,3" ToolTip.Tip="{Binding Path}">
@@ -347,19 +367,12 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <!-- 文件夹操作：重新扫描 / 导入 -->
-                            <StackPanel Grid.Row="2"
-                                        Orientation="Horizontal"
-                                        Spacing="2"
-                                        Margin="4,0,0,0">
-                                <Button Classes="icon"
-                                        ToolTip.Tip="重新扫描"
-                                        Command="{Binding RefreshCommand}"
-                                        IsEnabled="{Binding !IsBusy}">
-                                    <controls:IconView Icon="refresh" />
-                                </Button>
-                                <Button Classes="icon"
-                                        ToolTip.Tip="导入"
+                            <!-- 文件夹操作：添加 / 重新扫描 -->
+                            <Grid Grid.Row="2"
+                                  ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="2">
+                                <Button Classes="folderAction"
+                                        ToolTip.Tip="添加或导入游戏文件夹"
                                         IsEnabled="{Binding !IsBusy}">
                                     <Button.Flyout>
                                         <MenuFlyout>
@@ -368,9 +381,34 @@
                                             <MenuItem Header="导入 PCL 文件夹 / 游戏目录…" Click="OnChoosePclFolderClick" />
                                         </MenuFlyout>
                                     </Button.Flyout>
-                                    <controls:IconView Icon="import" />
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="8"
+                                                Margin="2,0,0,0">
+                                        <Border Width="20"
+                                                Height="20"
+                                                CornerRadius="10"
+                                                BorderThickness="1"
+                                                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                VerticalAlignment="Center">
+                                            <controls:IconView Icon="plus"
+                                                               IconSize="10"
+                                                               StrokeThickness="1.25"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="添加游戏文件夹"
+                                                   Classes="body"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
                                 </Button>
-                            </StackPanel>
+                                <Button Grid.Column="1"
+                                        Classes="icon"
+                                        ToolTip.Tip="重新扫描"
+                                        Command="{Binding RefreshCommand}"
+                                        IsEnabled="{Binding !IsBusy}">
+                                    <controls:IconView Icon="refresh" />
+                                </Button>
+                            </Grid>
                         </Grid>
 
 

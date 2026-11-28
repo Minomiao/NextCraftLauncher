@@ -551,35 +551,30 @@
                     </Grid>
                 </Grid>
 
-                <!-- 版本设置：左侧分栏，具体内容暂未实现 -->
-                <Grid RowDefinitions="Auto,*" RowSpacing="12" IsVisible="{Binding IsVersionDetailOpen}">
-                    <TextBlock Text="{Binding VersionSettingsVersion.Id}"
-                               Classes="section"
-                               VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" />
+                <!-- 版本设置：左侧分栏，具体内容暂未实现；版本名显示在标题栏 -->
+                <Grid IsVisible="{Binding IsVersionDetailOpen}"
+                      ColumnDefinitions="176,1,*"
+                      ColumnSpacing="16">
+                    <StackPanel x:Name="VersionSettingsSideBar"
+                                Spacing="2"
+                                VerticalAlignment="Top"
+                                Margin="0,2,0,0">
+                        <Button Classes="side"
+                                Classes.selected="{Binding IsVersionSettingsSelected}"
+                                Content="设置"
+                                Command="{Binding ShowVersionSettingsCommand}" />
+                        <Button Classes="side"
+                                Classes.selected="{Binding IsVersionModsSelected}"
+                                Content="Mod"
+                                Command="{Binding ShowVersionModsCommand}" />
+                        <Button Classes="side"
+                                Classes.selected="{Binding IsVersionExportSelected}"
+                                Content="导出"
+                                Command="{Binding ShowVersionExportCommand}" />
+                    </StackPanel>
 
-                    <Grid Grid.Row="1" ColumnDefinitions="176,1,*" ColumnSpacing="16">
-                        <StackPanel x:Name="VersionSettingsSideBar"
-                                    Spacing="2"
-                                    VerticalAlignment="Top"
-                                    Margin="0,2,0,0">
-                            <Button Classes="side"
-                                    Classes.selected="{Binding IsVersionSettingsSelected}"
-                                    Content="设置"
-                                    Command="{Binding ShowVersionSettingsCommand}" />
-                            <Button Classes="side"
-                                    Classes.selected="{Binding IsVersionModsSelected}"
-                                    Content="Mod"
-                                    Command="{Binding ShowVersionModsCommand}" />
-                            <Button Classes="side"
-                                    Classes.selected="{Binding IsVersionExportSelected}"
-                                    Content="导出"
-                                    Command="{Binding ShowVersionExportCommand}" />
-                        </StackPanel>
-
-                        <!-- 具体内容暂空 -->
-                        <Grid Grid.Column="2" />
-                    </Grid>
+                    <!-- 具体内容暂空 -->
+                    <Grid Grid.Column="2" />
                 </Grid>
             </Grid>
     </Grid>

@@ -128,6 +128,7 @@ public partial class MainWindow : Window
         // 标题栏品牌/返回按钮的位移由代码驱动，初始化时先把两者的最终位置建好。
         BrandText.RenderTransform = _brandTransform;
         BrandBackButton.RenderTransform = _backTransform;
+        VersionTitle.RenderTransform = _versionTitleTransform;
         ApplyTitleBarState(_viewModel?.IsSubPageOpen == true);
 
         // 导航按钮所在区域支持左右拖拽切页（按下后再横向拖）。
@@ -184,6 +185,7 @@ public partial class MainWindow : Window
 
     private readonly TranslateTransform _brandTransform = new();
     private readonly TranslateTransform _backTransform = new();
+    private readonly TranslateTransform _versionTitleTransform = new();
     private bool? _titleBarState;
     private DispatcherTimer? _titleBarTimer;
 
@@ -652,6 +654,56 @@ public partial class MainWindow : Window
             // 启动预热时窗口还是透明的，此时切页直接落位，
             // 否则窗口刚显示出来时还能看到高亮在滑动。
             SnapNavIndicator(animate: IsVisible && Opacity >= 1);
+            return;
+        }
+
+        // 版本设置页标题栏的版本名：比返回按钮稍晚淡入并右往左归位。
+        if (e.PropertyName == nameof(MainViewModel.IsVersionSettingsOpen))
+        {
+            if (_viewModel?.IsVersionSettingsOpen == true)
+            {
+                var delay = TimeSpan.FromMilliseconds(120);
+
+                VersionTitle.Transitions = new Transitions
+                {
+                    new DoubleTransition
+                    {
+                        Property = Visual.OpacityProperty,
+                        Duration = TimeSpan.FromMilliseconds(260),
+                        Delay = delay,
+                        Easing = new CubicEaseOut(),
+                    },
+                };
+
+                _versionTitleTransform.Transitions = new Transitions
+                {
+                    new DoubleTransition
+                    {
+                        Property = TranslateTransform.XProperty,
+                        Duration = TimeSpan.FromMilliseconds(260),
+                        Delay = delay,
+                        Easing = new CubicEaseOut(),
+                    },
+                };
+
+                VersionTitle.Opacity = 0;
+                _versionTitleTransform.X = 16;
+
+                // 等这一轮渲染记下起始值，再设终点。
+                Dispatcher.UIThread.Post(
+                    () =>
+                    {
+                        VersionTitle.Opacity = 1;
+                        _versionTitleTransform.X = 0;
+                    },
+                    DispatcherPriority.Background);
+            }
+            else
+            {
+                VersionTitle.Opacity = 0;
+                _versionTitleTransform.X = 16;
+            }
+
             return;
         }
 

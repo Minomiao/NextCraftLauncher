@@ -77,7 +77,7 @@
               PointerPressed="OnTitleBarPointerPressed">
             <Grid ColumnDefinitions="*,Auto,*" Margin="16,0,0,0">
                 <Panel Height="52"
-                       Width="150"
+                       Width="240"
                        HorizontalAlignment="Left"
                        VerticalAlignment="Center"
                        ClipToBounds="True">
@@ -99,6 +99,17 @@
                         <!-- 退出/返回图标：形状来自 Assets/Icons/Ui/back.svg -->
                         <controls:IconView Icon="back" />
                     </Button>
+
+                    <!-- 版本设置页的版本名，跟返回按钮一起进场 -->
+                    <TextBlock x:Name="VersionTitle"
+                               Text="{Binding VersionSettingsVersion.Id}"
+                               Classes="bodyStrong"
+                               Margin="44,0,12,0"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding VersionSettingsVersion.Id}"
+                               IsVisible="{Binding IsVersionSettingsOpen}"
+                               Opacity="0" />
                 </Panel>
 
                 <Panel Grid.Column="1"

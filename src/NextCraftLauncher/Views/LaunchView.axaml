@@ -59,6 +59,24 @@
             <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}" />
         </Style>
 
+        <!-- 侧栏图标按钮：透明底，悬浮 / 按下才出现浅色块 -->
+        <Style Selector="Button.icon">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.icon:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style Selector="Button.icon:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SoftButtonPressedBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+
         <!-- 账号类型切换（离线 / 正版） -->
         <Style Selector="Button.accountTab">
             <Setter Property="Background" Value="Transparent" />
@@ -298,39 +316,14 @@
                       RowDefinitions="Auto,*" RowSpacing="12"
                       IsVisible="{Binding !IsVersionDetailOpen}">
 
-                    <!-- 顶部操作 -->
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                        <TextBlock Text="版本管理"
-                                   Classes="subsection"
-                                   VerticalAlignment="Center" />
-
-                        <Button Grid.Column="1"
-                                Classes="soft"
-                                Content="重新扫描"
-                                Height="34"
-                                Padding="12,0"
-                                Command="{Binding RefreshCommand}"
-                                IsEnabled="{Binding !IsBusy}" />
-
-                        <DropDownButton Grid.Column="2"
-                                        Classes="soft"
-                                        Content="导入"
-                                        Height="34"
-                                        Padding="14,0"
-                                        IsEnabled="{Binding !IsBusy}">
-                            <DropDownButton.Flyout>
-                                <MenuFlyout>
-                                    <MenuItem Header="添加已有文件夹…" Click="OnAddGameFolderClick" />
-                                    <MenuItem Header="导入 PCL 启动器 (.exe)…" Click="OnChoosePclExecutableClick" />
-                                    <MenuItem Header="导入 PCL 文件夹 / 游戏目录…" Click="OnChoosePclFolderClick" />
-                                </MenuFlyout>
-                            </DropDownButton.Flyout>
-                        </DropDownButton>
-                    </Grid>
+                    <!-- 顶部标题 -->
+                    <TextBlock Text="版本管理"
+                               Classes="subsection"
+                               VerticalAlignment="Center" />
 
                     <!-- 左侧：游戏文件夹；“本地版本”在右侧铺开 -->
                     <Grid Grid.Row="1" ColumnDefinitions="200,1,*" ColumnSpacing="16">
-                        <Grid RowDefinitions="Auto,*" RowSpacing="6">
+                        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="6">
                             <TextBlock Text="游戏文件夹"
                                        Classes="caption"
                                        Margin="4,0,0,0" />
@@ -353,6 +346,31 @@
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
+
+                            <!-- 文件夹操作：重新扫描 / 导入 -->
+                            <StackPanel Grid.Row="2"
+                                        Orientation="Horizontal"
+                                        Spacing="2"
+                                        Margin="4,0,0,0">
+                                <Button Classes="icon"
+                                        ToolTip.Tip="重新扫描"
+                                        Command="{Binding RefreshCommand}"
+                                        IsEnabled="{Binding !IsBusy}">
+                                    <controls:IconView Icon="refresh" />
+                                </Button>
+                                <Button Classes="icon"
+                                        ToolTip.Tip="导入"
+                                        IsEnabled="{Binding !IsBusy}">
+                                    <Button.Flyout>
+                                        <MenuFlyout>
+                                            <MenuItem Header="添加已有文件夹…" Click="OnAddGameFolderClick" />
+                                            <MenuItem Header="导入 PCL 启动器 (.exe)…" Click="OnChoosePclExecutableClick" />
+                                            <MenuItem Header="导入 PCL 文件夹 / 游戏目录…" Click="OnChoosePclFolderClick" />
+                                        </MenuFlyout>
+                                    </Button.Flyout>
+                                    <controls:IconView Icon="import" />
+                                </Button>
+                            </StackPanel>
                         </Grid>
 
 

@@ -81,19 +81,20 @@
         <Style Selector="Button.folderAction">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="6,5" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="4,4" />
+            <Setter Property="MinHeight" Value="40" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style Selector="Button.folderAction:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />
-            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
         </Style>
         <Style Selector="Button.folderAction:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SoftButtonPressedBrush}" />
-            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillPressedBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
         </Style>
 
         <!-- 账号类型切换（离线 / 正版） -->

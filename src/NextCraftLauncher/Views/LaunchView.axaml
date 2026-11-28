@@ -470,7 +470,6 @@
                                                     Click="OnChoosePclExecutableClick">
                                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                                     <controls:IconView Icon="pcl"
-                                                                       IconSize="12"
                                                                        VerticalAlignment="Center" />
                                                     <TextBlock Text="导入 PCL 启动器"
                                                                Classes="body"

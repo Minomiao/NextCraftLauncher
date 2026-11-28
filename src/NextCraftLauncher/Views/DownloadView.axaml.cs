@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -20,6 +21,7 @@ namespace NextCraftLauncher.Views;
 public partial class DownloadView : UserControl
 {
     private MainViewModel? _viewModel;
+    private bool _modRowsAnimationQueued;
 
     public DownloadView()
     {
@@ -30,12 +32,17 @@ public partial class DownloadView : UserControl
     {
         base.OnDataContextChanged(e);
 
-        if (_viewModel is not null) _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        if (_viewModel is not null)
+        {
+            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _viewModel.ModProjects.CollectionChanged -= OnModProjectsChanged;
+        }
 
         if (DataContext is MainViewModel viewModel)
         {
             viewModel.ModSaveFilePicker = PickModSavePathAsync;
             viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            viewModel.ModProjects.CollectionChanged += OnModProjectsChanged;
             _viewModel = viewModel;
         }
         else
@@ -94,6 +101,31 @@ public partial class DownloadView : UserControl
             .Where(items => items.IsVisible)
             .SelectMany(EnterAnimation.RealizedRows);
 
+    /// <summary>Mod / 材质包结果回来后再逐条进场（切换类型时集合会先清空）。</summary>
+    private void OnModProjectsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (_viewModel is not
+            {
+                IsDownloadPageSelected: true,
+                IsDownloadContentSelected: true,
+                IsModDetailOpen: false,
+            } viewModel)
+        {
+            return;
+        }
+
+        if (viewModel.ModProjects.Count == 0 || _modRowsAnimationQueued) return;
+
+        _modRowsAnimationQueued = true;
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                _modRowsAnimationQueued = false;
+                AnimateContent();
+            },
+            DispatcherPriority.Background);
+    }
+
     /// <summary>切换左侧栏目（或进入页面）时，右侧当前列表的条目更轻地逐条出现。</summary>
     private void AnimateContent()
     {
@@ -114,12 +146,20 @@ public partial class DownloadView : UserControl
 
         if (target is null) return;
 
+        var isContentList = viewModel.CurrentDownloadSection is DownloadSection.Mods or DownloadSection.ResourcePacks;
         var rows = EnterAnimation.RealizedRows(target).ToList();
 
-        // 数据还没到（列表为空）时，让列表整体进场，避免右侧看起来完全没动画。
-        if (rows.Count == 0) rows.Add(target);
+        if (rows.Count == 0)
+        {
+            // Mod / 材质包在等搜索结果，列表更宽：结果到达后由集合变更再播，避免先整块滑一次。
+            if (isContentList) return;
 
-        EnterAnimation.Play(rows, 20, 30, 140, 180);
+            // 其它栏目数据未到时让列表整体进场，避免右侧看起来完全没动画。
+            rows.Add(target);
+        }
+
+        // Mod / 材质包的内容更宽，用更大的位移保持视觉平衡。
+        EnterAnimation.Play(rows, isContentList ? 32 : 20, 30, 140, 180);
     }
 
     /// <summary>侧栏结果条目从左侧依次滑入；按条目顺序错开一点时间。</summary>

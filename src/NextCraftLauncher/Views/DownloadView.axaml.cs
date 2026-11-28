@@ -91,7 +91,7 @@ public partial class DownloadView : UserControl
 
         items.AddRange(TaskSideBar.Children.OfType<Control>());
 
-        EnterAnimation.Play(items, -18, 55, 160, 220);
+        EnterAnimation.Play(items, -18, 60, 180, 240);
     }
 
     /// <summary>次级页面时左侧是相关条目列表。</summary>
@@ -159,7 +159,7 @@ public partial class DownloadView : UserControl
         }
 
         // Mod / 材质包的内容更宽，用更大的位移保持视觉平衡。
-        EnterAnimation.Play(rows, isContentList ? 32 : 20, 30, 140, 180);
+        EnterAnimation.Play(rows, isContentList ? 32 : 20, 45, 190, 240);
     }
 
     /// <summary>侧栏结果条目从左侧依次滑入；按条目顺序错开一点时间。</summary>

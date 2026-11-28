@@ -10,25 +10,25 @@ using Avalonia.Threading;
 namespace NextCraftLauncher.Views;
 
 /// <summary>
-/// 栏目进场动画：条目从左侧滑入并淡入，按顺序错开。
+/// 栏目进场动画：条目横向滑入并淡入，按顺序错开。
 /// 用 RenderTransform 而不是 Margin，避免改变布局和已有的外边距。
 /// </summary>
 internal static class EnterAnimation
 {
     /// <summary>对一组条目播放进场动画。</summary>
     /// <param name="items">按显示顺序排列的条目。</param>
-    /// <param name="offset">起始时向左偏移的像素。</param>
+    /// <param name="startX">起始时的横向偏移：负数从左侧进入，正数从右侧进入。</param>
     /// <param name="staggerMs">相邻条目之间的延迟。</param>
     /// <param name="fadeMs">淡入时长。</param>
     /// <param name="slideMs">位移时长。</param>
-    public static void Play(IEnumerable<Control> items, double offset, int staggerMs, int fadeMs, int slideMs)
+    public static void Play(IEnumerable<Control> items, double startX, int staggerMs, int fadeMs, int slideMs)
     {
         var index = 0;
 
         foreach (var control in items)
         {
             var delay = TimeSpan.FromMilliseconds(index++ * staggerMs);
-            var slide = new TranslateTransform(-offset, 0);
+            var slide = new TranslateTransform(startX, 0);
 
             control.Transitions = new Transitions
             {

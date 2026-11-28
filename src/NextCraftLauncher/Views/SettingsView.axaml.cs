@@ -62,7 +62,11 @@ public partial class SettingsView : UserControl
         if (e.PropertyName == nameof(MainViewModel.IsSettingsPageSelected))
         {
             if (_viewModel?.IsSettingsPageSelected == true)
-                EnterAnimation.Play(SettingsSideBar.Children.OfType<Control>(), 18, 55, 160, 220);
+            {
+                EnterAnimation.Play(SettingsSideBar.Children.OfType<Control>(), -18, 55, 160, 220);
+                // 右侧当前栏目也要随进入页面播放一次。
+                Dispatcher.UIThread.Post(AnimateContent, DispatcherPriority.Background);
+            }
             return;
         }
 

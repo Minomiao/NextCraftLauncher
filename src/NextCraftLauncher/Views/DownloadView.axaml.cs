@@ -56,7 +56,12 @@ public partial class DownloadView : UserControl
 
         if (e.PropertyName == nameof(MainViewModel.IsDownloadPageSelected))
         {
-            if (_viewModel?.IsDownloadPageSelected == true) AnimateSideBar();
+            if (_viewModel?.IsDownloadPageSelected == true)
+            {
+                AnimateSideBar();
+                // 右侧列表可能已经生成，也要等这一轮布局完成后再取行。
+                Dispatcher.UIThread.Post(AnimateContent, DispatcherPriority.Background);
+            }
             return;
         }
 
@@ -79,7 +84,7 @@ public partial class DownloadView : UserControl
 
         items.AddRange(TaskSideBar.Children.OfType<Control>());
 
-        EnterAnimation.Play(items, 18, 55, 160, 220);
+        EnterAnimation.Play(items, -18, 55, 160, 220);
     }
 
     /// <summary>次级页面时左侧是相关条目列表。</summary>
@@ -89,21 +94,30 @@ public partial class DownloadView : UserControl
             .Where(items => items.IsVisible)
             .SelectMany(EnterAnimation.RealizedRows);
 
-    /// <summary>切换左侧栏目时，右侧当前列表的条目更轻地逐条出现。</summary>
+    /// <summary>切换左侧栏目（或进入页面）时，右侧当前列表的条目更轻地逐条出现。</summary>
     private void AnimateContent()
     {
         if (_viewModel is not { } viewModel) return;
 
-        var rows = viewModel.CurrentDownloadSection switch
+        ItemsControl? target = viewModel.CurrentDownloadSection switch
         {
-            DownloadSection.Versions => EnterAnimation.RealizedRows(
-                viewModel.IsRemoteVersionDetailOpen ? LoaderVersionsList : RemoteVersionsList),
-            DownloadSection.Mods or DownloadSection.ResourcePacks => EnterAnimation.RealizedRows(
-                viewModel.IsModDetailOpen ? ModVersionList : ModResultsItems),
-            DownloadSection.Java => EnterAnimation.RealizedRows(JavaRuntimeList),
-            DownloadSection.Running => EnterAnimation.RealizedRows(DownloadTasksItems),
-            _ => Array.Empty<Control>(),
+            DownloadSection.Versions => viewModel.IsRemoteVersionDetailOpen
+                ? LoaderVersionsList
+                : RemoteVersionsList,
+            DownloadSection.Mods or DownloadSection.ResourcePacks => viewModel.IsModDetailOpen
+                ? ModVersionList
+                : ModResultsItems,
+            DownloadSection.Java => JavaRuntimeList,
+            DownloadSection.Running => DownloadTasksItems,
+            _ => null,
         };
+
+        if (target is null) return;
+
+        var rows = EnterAnimation.RealizedRows(target).ToList();
+
+        // 数据还没到（列表为空）时，让列表整体进场，避免右侧看起来完全没动画。
+        if (rows.Count == 0) rows.Add(target);
 
         EnterAnimation.Play(rows, 10, 30, 140, 180);
     }

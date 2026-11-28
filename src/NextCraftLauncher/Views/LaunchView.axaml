@@ -69,11 +69,11 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style Selector="Button.icon:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SoftButtonHoverBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillHoverBrush}" />
             <Setter Property="CornerRadius" Value="6" />
         </Style>
         <Style Selector="Button.icon:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource SoftButtonPressedBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelFillPressedBrush}" />
             <Setter Property="CornerRadius" Value="6" />
         </Style>
 

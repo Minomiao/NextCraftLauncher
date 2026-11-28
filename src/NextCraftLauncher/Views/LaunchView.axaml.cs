@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Animation;
@@ -44,6 +45,7 @@ public partial class LaunchView : UserControl
     private MainViewModel? _viewModel;
     private Rect? _pillTarget;
     private bool _pillAnimated;
+    private bool _versionsAnimationQueued;
 
     public LaunchView()
     {
@@ -59,7 +61,11 @@ public partial class LaunchView : UserControl
     {
         base.OnDataContextChanged(e);
 
-        if (_viewModel is not null) _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        if (_viewModel is not null)
+        {
+            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _viewModel.Versions.CollectionChanged -= OnVersionsChanged;
+        }
 
         _viewModel = DataContext as MainViewModel;
         _pillTarget = null;
@@ -67,6 +73,7 @@ public partial class LaunchView : UserControl
         if (_viewModel is not null)
         {
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            _viewModel.Versions.CollectionChanged += OnVersionsChanged;
             SnapAccountPill(animate: false);
         }
     }
@@ -93,6 +100,45 @@ public partial class LaunchView : UserControl
         {
             PlayVersionsEnter();
         }
+    }
+
+    /// <summary>切换游戏文件夹后，右侧版本列表重新进场。</summary>
+    private void OnVersionsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (_viewModel is not
+            {
+                IsLaunchPageSelected: true,
+                IsVersionsSectionSelected: true,
+                IsVersionDetailOpen: false,
+            } viewModel)
+        {
+            return;
+        }
+
+        if (viewModel.Versions.Count == 0 || _versionsAnimationQueued) return;
+
+        // 先藏住列表，避免扫描结果到达前先亮出旧内容或空列表。
+        _versionsAnimationQueued = true;
+        LocalVersionsList.Opacity = 0;
+
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                _versionsAnimationQueued = false;
+
+                if (_viewModel is not { IsVersionsSectionSelected: true, IsVersionDetailOpen: false })
+                {
+                    LocalVersionsList.Opacity = 1;
+                    return;
+                }
+
+                var rows = new List<Control>(EnterAnimation.RealizedRows(LocalVersionsList));
+                if (rows.Count == 0) rows.Add(LocalVersionsList);
+                EnterAnimation.Play(rows, 20, 45, 190, 240);
+
+                LocalVersionsList.Opacity = 1;
+            },
+            DispatcherPriority.Background);
     }
 
     /// <summary>版本选择页进场：先藏住整页，等列表行生成后两边分别滑入。</summary>

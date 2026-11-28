@@ -119,7 +119,7 @@ public partial class DownloadView : UserControl
         // 数据还没到（列表为空）时，让列表整体进场，避免右侧看起来完全没动画。
         if (rows.Count == 0) rows.Add(target);
 
-        EnterAnimation.Play(rows, 10, 30, 140, 180);
+        EnterAnimation.Play(rows, 20, 30, 140, 180);
     }
 
     /// <summary>侧栏结果条目从左侧依次滑入；按条目顺序错开一点时间。</summary>

@@ -91,7 +91,7 @@ public partial class SettingsView : UserControl
 
         if (panel is null) return;
 
-        EnterAnimation.Play(EnterAnimation.SectionRows(panel), 10, 30, 140, 180);
+        EnterAnimation.Play(EnterAnimation.SectionRows(panel), 20, 30, 140, 180);
     }
 
     /// <summary>

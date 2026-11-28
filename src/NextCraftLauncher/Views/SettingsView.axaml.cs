@@ -1,3 +1,5 @@
+using System;
+using System.ComponentModel;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
@@ -5,6 +7,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using NextCraftLauncher.ViewModels;
 
 namespace NextCraftLauncher.Views;
@@ -13,6 +16,8 @@ public partial class SettingsView : UserControl
 {
     /// <summary>下拉列表比输入框左右各多出的宽度。</summary>
     private const double PopupBleed = 1;
+
+    private MainViewModel? _viewModel;
 
     public SettingsView()
     {
@@ -32,6 +37,57 @@ public partial class SettingsView : UserControl
                     ApplyPopupBleed(combo, popup);
             };
         }
+    }
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+
+        if (_viewModel is not null) _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+        if (DataContext is MainViewModel viewModel)
+        {
+            viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            _viewModel = viewModel;
+        }
+        else
+        {
+            _viewModel = null;
+        }
+    }
+
+    /// <summary>从顶部导航进入设置页时左侧逐条出现；切换栏目时右侧内容逐条出现。</summary>
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.IsSettingsPageSelected))
+        {
+            if (_viewModel?.IsSettingsPageSelected == true)
+                EnterAnimation.Play(SettingsSideBar.Children.OfType<Control>(), 18, 55, 160, 220);
+            return;
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.CurrentSettingsSection))
+        {
+            // 等新栏目完成布局后再播放，避免对隐藏状态的控件开动画。
+            Dispatcher.UIThread.Post(AnimateContent, DispatcherPriority.Background);
+        }
+    }
+
+    private void AnimateContent()
+    {
+        if (_viewModel is not { } viewModel) return;
+
+        StackPanel? panel = viewModel.CurrentSettingsSection switch
+        {
+            SettingsSection.Launch => LaunchSettingsPanel,
+            SettingsSection.Download => DownloadSettingsPanel,
+            SettingsSection.Appearance => AppearanceSettingsPanel,
+            _ => null,
+        };
+
+        if (panel is null) return;
+
+        EnterAnimation.Play(EnterAnimation.SectionRows(panel), 10, 30, 140, 180);
     }
 
     /// <summary>

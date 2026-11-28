@@ -57,7 +57,10 @@
     <Grid ColumnDefinitions="176,1,*" ColumnSpacing="16">
 
         <!-- 左侧边栏 -->
-        <StackPanel Spacing="2" VerticalAlignment="Top" Margin="0,2,0,0">
+        <StackPanel x:Name="SettingsSideBar"
+                    Spacing="2"
+                    VerticalAlignment="Top"
+                    Margin="0,2,0,0">
             <Button Classes="side"
                     Classes.selected="{Binding IsSettingsLaunchSelected}"
                     Content="启动设置"
@@ -79,7 +82,7 @@
             <ScrollViewer IsVisible="{Binding IsSettingsLaunchSelected}"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Width="550" HorizontalAlignment="Left">
+                <StackPanel x:Name="LaunchSettingsPanel" Width="550" HorizontalAlignment="Left">
 
                     <TextBlock Text="启动设置" Classes="section" />
 
@@ -202,7 +205,7 @@
             <ScrollViewer IsVisible="{Binding IsSettingsDownloadSelected}"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Width="550" HorizontalAlignment="Left">
+                <StackPanel x:Name="DownloadSettingsPanel" Width="550" HorizontalAlignment="Left">
 
                     <TextBlock Text="下载设置" Classes="section" />
 
@@ -355,7 +358,7 @@
             <ScrollViewer IsVisible="{Binding IsSettingsAppearanceSelected}"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Width="550" HorizontalAlignment="Left">
+                <StackPanel x:Name="AppearanceSettingsPanel" Width="550" HorizontalAlignment="Left">
 
                     <TextBlock Text="外观" Classes="section" />
 

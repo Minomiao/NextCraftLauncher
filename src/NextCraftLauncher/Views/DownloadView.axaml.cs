@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Animation;
@@ -42,13 +44,68 @@ public partial class DownloadView : UserControl
         }
     }
 
-    /// <summary>翻页后把列表滚回顶部，否则会停在新一页的末尾。</summary>
+    /// <summary>翻页后把列表滚回顶部，否则会停在新一页的末尾；并驱动进入页面时的进场动画。</summary>
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(MainViewModel.ModPage)) return;
+        if (e.PropertyName == nameof(MainViewModel.ModPage))
+        {
+            var scroll = ModResultsScroll;
+            if (scroll is not null) scroll.Offset = new Vector(scroll.Offset.X, 0);
+            return;
+        }
 
-        var scroll = ModResultsScroll;
-        if (scroll is not null) scroll.Offset = new Vector(scroll.Offset.X, 0);
+        if (e.PropertyName == nameof(MainViewModel.IsDownloadPageSelected))
+        {
+            if (_viewModel?.IsDownloadPageSelected == true) AnimateSideBar();
+            return;
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.CurrentDownloadSection))
+        {
+            // 等这一轮布局把新栏目的列表行生成出来，再取条目播放。
+            Dispatcher.UIThread.Post(AnimateContent, DispatcherPriority.Background);
+        }
+    }
+
+    /// <summary>从顶部导航进入下载页时，左侧条目一条接一条出现。</summary>
+    private void AnimateSideBar()
+    {
+        var items = new List<Control>();
+
+        if (SectionSideBar.IsVisible)
+            items.AddRange(SectionSideBar.Children.OfType<Control>());
+        else
+            items.AddRange(RelatedSideBarRows());
+
+        items.AddRange(TaskSideBar.Children.OfType<Control>());
+
+        EnterAnimation.Play(items, 18, 55, 160, 220);
+    }
+
+    /// <summary>次级页面时左侧是相关条目列表。</summary>
+    private IEnumerable<Control> RelatedSideBarRows()
+        => RelatedItemsPanel.Children
+            .OfType<ItemsControl>()
+            .Where(items => items.IsVisible)
+            .SelectMany(EnterAnimation.RealizedRows);
+
+    /// <summary>切换左侧栏目时，右侧当前列表的条目更轻地逐条出现。</summary>
+    private void AnimateContent()
+    {
+        if (_viewModel is not { } viewModel) return;
+
+        var rows = viewModel.CurrentDownloadSection switch
+        {
+            DownloadSection.Versions => EnterAnimation.RealizedRows(
+                viewModel.IsRemoteVersionDetailOpen ? LoaderVersionsList : RemoteVersionsList),
+            DownloadSection.Mods or DownloadSection.ResourcePacks => EnterAnimation.RealizedRows(
+                viewModel.IsModDetailOpen ? ModVersionList : ModResultsItems),
+            DownloadSection.Java => EnterAnimation.RealizedRows(JavaRuntimeList),
+            DownloadSection.Running => EnterAnimation.RealizedRows(DownloadTasksItems),
+            _ => Array.Empty<Control>(),
+        };
+
+        EnterAnimation.Play(rows, 10, 30, 140, 180);
     }
 
     /// <summary>侧栏结果条目从左侧依次滑入；按条目顺序错开一点时间。</summary>

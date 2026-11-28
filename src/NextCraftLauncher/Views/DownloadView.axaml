@@ -113,7 +113,8 @@
             <Grid Width="176"
                   Margin="0,0,16,0"
                   RowDefinitions="*,Auto">
-                <StackPanel Spacing="2"
+                <StackPanel x:Name="SectionSideBar"
+                            Spacing="2"
                             VerticalAlignment="Top"
                             Margin="0,2,0,0"
                             IsVisible="{Binding !IsSubPageOpen}">
@@ -140,7 +141,7 @@
                               HorizontalScrollBarVisibility="Disabled"
                               Margin="0,2,0,0"
                               IsVisible="{Binding IsSubPageOpen}">
-                    <StackPanel Spacing="2">
+                    <StackPanel x:Name="RelatedItemsPanel" Spacing="2">
                         <ItemsControl ItemsSource="{Binding RelatedRemoteVersions}"
                                       IsVisible="{Binding IsRemoteVersionDetailOpen}">
                             <ItemsControl.ItemTemplate>
@@ -187,7 +188,7 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <StackPanel Grid.Row="1" Spacing="8">
+                <StackPanel x:Name="TaskSideBar" Grid.Row="1" Spacing="8">
                     <!-- 所有任务的合计进度；无任务时只剩置灰的空进度条 -->
                     <StackPanel Spacing="4"
                                 Classes="taskProgress"
@@ -252,7 +253,8 @@
                             </Grid>
 
                             <Grid Grid.Row="1">
-                                <ListBox Classes="versionList"
+                                <ListBox x:Name="RemoteVersionsList"
+                                         Classes="versionList"
                                          ItemsSource="{Binding RemoteVersionRows}"
                                          Background="Transparent"
                                          Padding="0,0,14,0">
@@ -324,7 +326,7 @@
 
                             <Grid Grid.Row="1" RowDefinitions="*">
                                 <!-- 与游戏版本列表同构：分组标题行 + 版本行，共用 versionRow 样式 -->
-                                <ListBox
+                                <ListBox x:Name="LoaderVersionsList"
                                          Classes="versionList"
                                          ItemsSource="{Binding LoaderVersionRows}"
                                          Background="Transparent"
@@ -479,7 +481,7 @@
                                           x:Name="ModResultsScroll"
                                           VerticalScrollBarVisibility="Auto">
                                 <StackPanel Spacing="6" Margin="0,0,10,0">
-                                    <ItemsControl ItemsSource="{Binding ModProjects}">
+                                    <ItemsControl x:Name="ModResultsItems" ItemsSource="{Binding ModProjects}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ModProjectItemViewModel">
                                                 <Button Classes="versionRow"
@@ -578,7 +580,8 @@
                                 </ItemsControl>
                             </ScrollViewer>
 
-                            <ListBox Grid.Row="3"
+                            <ListBox x:Name="ModVersionList"
+                                     Grid.Row="3"
                                      Classes="versionList"
                                      ItemsSource="{Binding ModVersionRows}"
                                      Background="Transparent"
@@ -731,7 +734,8 @@
                                        Classes="meta" />
 
                             <Grid Grid.Row="2">
-                                <ListBox ItemsSource="{Binding AvailableJavaRuntimes}"
+                                <ListBox x:Name="JavaRuntimeList"
+                                         ItemsSource="{Binding AvailableJavaRuntimes}"
                                          Background="Transparent">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate x:DataType="vm:RemoteJavaRuntimeItemViewModel">
@@ -832,7 +836,7 @@
 
                 <ScrollViewer IsVisible="{Binding HasDownloadTasks}"
                               VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding DownloadTasks}">
+                    <ItemsControl x:Name="DownloadTasksItems" ItemsSource="{Binding DownloadTasks}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Spacing="12" />
